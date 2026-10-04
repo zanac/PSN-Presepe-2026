@@ -409,7 +409,7 @@ Regole:
 - Fino a 20 tappe per striscia. Una sola tappa vuol dire colore fisso per tutto il ciclo.
 - Se una sezione contiene almeno una tappa valida, le tappe del file sostituiscono **tutte** quelle predefinite di quella striscia. Le strisce senza tappe nel file restano con quelle predefinite.
 
-Le tappe predefinite riproducono le curve storiche del firmware. Per esempio la striscia del tramonto:
+Le tappe predefinite di TRAMONTO e ALBA riproducono le curve storiche del firmware. La curva diurna del CIELO è stata ridisegnata nella release 038: al 30 % del GIORNO è quasi bianca (80 % della strada fra caldo e bianco), tiene il bianco pieno dal 45 % al 55 %, torna all'80 % al 70 % e rientra nel colore caldo all'inizio del TRAMONTO. Per esempio la striscia del tramonto:
 
 ```ini
 [TRAMONTO]
@@ -422,7 +422,7 @@ tappa = TRAMONTO, 100,   0,  0,  0     ; spenta a fine tramonto, fino al giro do
 
 Per aggiungere un colore intermedio, per esempio un passaggio rosso fra il picco arancio e il bianco tenue, basta inserire una tappa in mezzo: `tappa = TRAMONTO, 60, 140, 30, 10`.
 
-Le tappe predefinite sono state confrontate con il firmware precedente, che aveva le curve scritte nel codice, in 1.000.000 di punti del ciclo:
+Quando sono state introdotte le tappe (prima della modifica al cielo della release 038), quelle predefinite sono state confrontate con il firmware precedente, che aveva le curve scritte nel codice, in 1.000.000 di punti del ciclo:
 - le strisce TRAMONTO e ALBA differiscono al massimo di 1 gradino su 255 (arrotondamenti), in 15 punti su un milione;
 - il CIELO differisce di 1 gradino su 255 nello 0,5 % dei punti;
 - l'unica differenza maggiore (10 gradini) cade nel solo istante dello "scatto" dell'alba al 38 %, dove il codice vecchio e il nuovo arrotondano il confine in modo diverso.

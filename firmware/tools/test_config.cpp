@@ -160,8 +160,10 @@ int main(int argc, char **argv) {
   }
   // 8. default tappe: the historical key colours are where they used to be
   {
-    CfgRGB g = cfgColoreTappe(d, CFG_S_CIELO, 0.0f), wh = cfgColoreTappe(d, CFG_S_CIELO, 40.0f * 0.3333f);
-    CHECK(g.r == 210 && g.g == 82 && g.b == 18); CHECK(wh.r >= 254 && wh.g >= 254 && wh.b >= 254);
+    CfgRGB g = cfgColoreTappe(d, CFG_S_CIELO, 0.0f), wh = cfgColoreTappe(d, CFG_S_CIELO, 40.0f * 0.50f);
+    CHECK(g.r == 210 && g.g == 82 && g.b == 18); CHECK(wh.r == 255 && wh.g == 255 && wh.b == 255);   // noon plateau 45..55 %
+    CfgRGB q = cfgColoreTappe(d, CFG_S_CIELO, cfgPosizione(d, CFG_GIORNO, 30.0f));
+    CHECK(q.r == 246 && q.g == 220 && q.b == 208);
     CfgRGB pk = cfgColoreTappe(d, CFG_S_TRAMONTO, cfgPosizione(d, CFG_TRAMONTO, 38.0f));
     CHECK(pk.r == 155 && pk.g == 92 && pk.b == 16);
     CfgRGB off = cfgColoreTappe(d, CFG_S_ALBA, 20.0f), on = cfgColoreTappe(d, CFG_S_ALBA, 85.0f);

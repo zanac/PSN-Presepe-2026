@@ -409,7 +409,7 @@ Rules:
 - Up to 20 tappe per strip. A single tappa means a fixed colour for the whole cycle.
 - If a section contains at least one valid tappa, the file's tappe replace **all** the default tappe of that strip. Strips without tappe in the file keep their defaults.
 
-The default tappe reproduce the historical curves of the firmware. For example, the sunset strip:
+The default tappe of TRAMONTO and ALBA reproduce the historical curves of the firmware. The CIELO day curve was reshaped in release 038: it nearly reaches white (80 % of the way) at 30 % of GIORNO, holds full white from 45 % to 55 %, is back at 80 % at 70 % and returns to the warm colour by the start of TRAMONTO. For example, the sunset strip:
 
 ```ini
 [TRAMONTO]
@@ -422,7 +422,7 @@ tappa = TRAMONTO, 100,   0,  0,  0     ; off at the end of the sunset, until the
 
 To add an intermediate colour, for example a red stage between the orange peak and the faint white, add a tappa in between: `tappa = TRAMONTO, 60, 140, 30, 10`.
 
-The default tappe were checked against the previous hard-coded firmware at 1,000,000 points of the cycle:
+When the tappe were introduced (before the release 038 sky change), their defaults were checked against the previous hard-coded firmware at 1,000,000 points of the cycle:
 - the sunset and dawn strips differ by at most 1 step out of 255 (float rounding), at 15 points out of a million;
 - the sky strip differs by 1 step out of 255 at 0.5 % of the points;
 - the only larger difference (10 steps) is at the single instant of the dawn "step" at 38 %, where the old and the new code round the boundary differently.

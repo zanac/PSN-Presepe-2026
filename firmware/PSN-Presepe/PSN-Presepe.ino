@@ -275,11 +275,14 @@ static void tappa(PresepeConfig &c, uint8_t s, uint8_t fase, float pct, uint8_t 
 // Curve storiche (fino al firmware Rev D senza tappe), tutte con curva morbida.
 static void cfgTappeDefault(PresepeConfig &c) {
   for (uint8_t s = 0; s < CFG_NUM_STRISCE; s++) c.numTappe[s] = 0;
-  // CIELO: caldo -> bianco pieno a 1/3 del GIORNO -> caldo a 2/3, si spegne nel TRAMONTO,
-  // resta spento fino al 38 % dell'ALBA, poi riparte da un minimo caldo fino al GIORNO.
+  // CIELO (dalla release 038): caldo -> 80 % del bianco al 30 % del GIORNO -> bianco pieno
+  // dal 45 % al 55 % -> di nuovo 80 % al 70 % -> caldo all'inizio del TRAMONTO; si spegne
+  // nel TRAMONTO, resta spento fino al 38 % dell'ALBA, poi riparte da un minimo caldo.
   tappa(c, CFG_S_CIELO, CFG_GIORNO,    0.0f, 210,  82,  18);
-  tappa(c, CFG_S_CIELO, CFG_GIORNO,   33.33f, 255, 255, 255);
-  tappa(c, CFG_S_CIELO, CFG_GIORNO,   66.67f, 210,  82,  18);
+  tappa(c, CFG_S_CIELO, CFG_GIORNO,   30.0f, 246, 220, 208);
+  tappa(c, CFG_S_CIELO, CFG_GIORNO,   45.0f, 255, 255, 255);
+  tappa(c, CFG_S_CIELO, CFG_GIORNO,   55.0f, 255, 255, 255);
+  tappa(c, CFG_S_CIELO, CFG_GIORNO,   70.0f, 246, 220, 208);
   tappa(c, CFG_S_CIELO, CFG_TRAMONTO,  0.0f, 210,  82,  18);
   tappa(c, CFG_S_CIELO, CFG_TRAMONTO, 30.0f,  16,  16,  16);
   tappa(c, CFG_S_CIELO, CFG_TRAMONTO, 38.0f,   0,   0,   0);
