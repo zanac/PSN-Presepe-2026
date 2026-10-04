@@ -12,9 +12,10 @@
 struct __FlashStringHelper; 
 #define F(x) (reinterpret_cast<const __FlashStringHelper*>(x))
 const bool LOW=false, HIGH=true;
-unsigned long T=0; unsigned long millis(){return T;}
+unsigned long T=0; unsigned long millis(){return T;} void delay(unsigned long ms){T+=ms;}
 bool pins[100]; int potRaw=512;
-bool digitalRead(int p){return pins[p];}
+unsigned long testPressAt=~0UL;   // TEST forced LOW from this time on (splash test)
+bool digitalRead(int p){ if(p==24 && T>=testPressAt) return false; return pins[p];}
 int analogRead(int){return potRaw;}
 const uint8_t PIN_START=22,PIN_NEXT=23,PIN_TEST=24,PIN_POT=54; const unsigned long DEBOUNCE_MS=20;
 #include "cfgblock.h"   // CONFIG block of the sketch
@@ -72,5 +73,11 @@ int main(){
   press(PIN_START,2100); CHECK(coloreStato==0 && coloreValori[CFG_S_CIELO][0]==255);
   // TEST long -> exit; TEST still held must not count in the normal loop
   pins[PIN_TEST]=LOW; run(2100); CHECK(!modalitaColore && running && stableTest==LOW && lastTestRead==LOW);
+  // splash window: TEST pressed within the 3 s enters, no press = normal start
+  pins[PIN_TEST]=HIGH; T=0; CHECK(attesaSplash(3000)==false && T>=3000);
+  T=0; testPressAt=2500; CHECK(attesaSplash(3000)==true && T>=2530 && T<2600);   // pressed at 2.5 s
+  testPressAt=~0UL;
+  pins[PIN_TEST]=LOW; T=0; CHECK(attesaSplash(3000)==true && T<100);   // held from power-on: immediate
+  pins[PIN_TEST]=HIGH;
   printf("colour-mode simulation: %s (%d failures)\n", fails?"FAILED":"OK", fails); return fails?1:0;
 }
