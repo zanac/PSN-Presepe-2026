@@ -332,7 +332,7 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 1. Carica i valori di default.
 2. Legge `/PRESEPE.INI` dalla microSD, oppure `/PRESEPE.TXT` se il primo manca.
 3. Mostra la schermata iniziale sull'OLED.
-4. Mostra lo stato della SD:
+4. Mostra lo stato della SD (con `fastboot = 1` solo se `PRESEPE.INI` contiene errori):
 
    | Messaggio OLED | Significato |
    |---|---|
@@ -341,8 +341,10 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
    | `MANCA PRESEPE.INI` | scheda presente, nessuno dei due file trovato |
    | `SD ASSENTE` | nessuna scheda |
 
-5. Esegue l'autotest (circa 22 s, disattivabile), con melodia opzionale.
-6. Avvia il ciclo, in marcia o in pausa secondo `partenza`.
+5. Esegue l'autotest (circa 22 s) con melodia opzionale. Saltato con `fastboot = 1`.
+6. Avvia il ciclo dall'inizio del GIORNO, in marcia o in pausa secondo `partenza`.
+
+**Avvio rapido** (`[SISTEMA] fastboot`, predefinito **1** dalla release 038): salta l'attesa di 3 s sulla schermata iniziale, la schermata della SD (tranne se il file ha errori), l'autotest e la melodia, così la scena parte subito. Con `fastboot = 0` l'avvio è completo, e `autotest_avvio` e `melodia_avvio` decidono se eseguire autotest e melodia.
 
 **Pulsanti:**
 
@@ -374,7 +376,7 @@ La scheda viene letta **una sola volta, all'accensione**. Se `PRESEPE.INI` manca
 | `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tinta in %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = spente), `colore`, `accendi = FASE, %`, `spegni = FASE, %` (può scavalcare la fine del ciclo), `fuoco` (0–100), `dissolvenza_ms` |
-| `[SISTEMA]` | `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio`, `oled`, `debug_ms` |
+| `[SISTEMA]` | `fastboot` (predefinito 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (entrambi solo con `fastboot = 0`), `oled`, `debug_ms` |
 
 Gli eventi dei relè restano validi finché non arriva il successivo: un relè mantiene lo stato fino al suo prossimo evento. Un relè si può indicare col numero (1–16), col nome, o come `Grp_GG_RR`, dove relè = (GG − 1) × 4 + RR. La prima riga `evento` valida sostituisce tutta la tabella di default.
 

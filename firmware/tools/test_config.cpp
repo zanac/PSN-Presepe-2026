@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
       "[TRAMONTO]\ntappa = tramonto, 10, 200, 80, 20\ntappa = TRAMONTO, 60.5, 0, 0, 255, LINEARE\n"
       "[STELLE]\nnumero = 80\nattive = 30\ncolore = 100,100,100\n"
       "[CASETTE]\nnumero = 12\naccendi = NOTTE, 90\nspegni = GIORNO, 10\nfuoco = 0\n"
-      "[SISTEMA]\nbuzzer = 0\ndebug_ms = 0\n";
+      "[SISTEMA]\nbuzzer = 0\ndebug_ms = 0\nfastboot = no\n";
     PresepeConfig c; cfgDefault(c); cfgParseBuffer(c, t);
     CHECK(c.errori == 0);
     CHECK(c.durataMs[0] == 30000UL && c.durataMs[1] == 120000UL && c.durataMs[2] == 600000UL);
@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
     CHECK(c.numTappe[CFG_S_CIELO] == d.numTappe[CFG_S_CIELO] && c.tappeDaFile[CFG_S_CIELO] == 0);   // untouched strips keep defaults
     CHECK(c.numStelle == 80 && c.stelleAttive == 30 && c.coloreStelle.g == 100);
     CHECK(c.numCasette == 12 && c.accendiFase == CFG_NOTTE && c.accendiPct == 90 && c.spegniFase == CFG_GIORNO && c.fuoco == 0);
-    CHECK(c.buzzer == 0 && c.debugMs == 0);
+    CHECK(c.buzzer == 0 && c.debugMs == 0 && c.fastboot == 0 && d.fastboot == 1);
     CHECK(c.lumCielo == 100);   // untouched keys keep defaults
   }
 

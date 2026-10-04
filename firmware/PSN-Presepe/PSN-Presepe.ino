@@ -218,6 +218,7 @@ struct PresepeConfig {
   uint16_t dissolvenzaMs;                 // tempo di accensione/spegnimento morbido
   // [SISTEMA]
   uint8_t  buzzer, melodiaAvvio, autotestAvvio, oled;
+  uint8_t  fastboot;                      // 1 = avvio rapido: niente splash, autotest e melodia
   uint16_t beepHz, beepMs;
   uint32_t debugMs;
   // stato lettura (non configurabile)
@@ -370,6 +371,7 @@ void cfgDefault(PresepeConfig &c) {
   c.fuoco = 20; c.dissolvenzaMs = 3000;
   // [SISTEMA]
   c.buzzer = 1; c.melodiaAvvio = 1; c.autotestAvvio = 1; c.oled = 1;
+  c.fastboot = 1;   // dalla release 038 l'avvio rapido e' il predefinito
   c.beepHz = 900; c.beepMs = 90; c.debugMs = 5000UL;
   c.sdStato = SD_NON_LETTA;
 }
@@ -574,6 +576,7 @@ static bool sezSistema(PresepeConfig &c, const char *k, char *v) {
   if (ugualeCI(k, "buzzer")) return leggiBool(v, c.buzzer);
   if (ugualeCI(k, "melodia_avvio")) return leggiBool(v, c.melodiaAvvio);
   if (ugualeCI(k, "autotest_avvio")) return leggiBool(v, c.autotestAvvio);
+  if (ugualeCI(k, "fastboot")) return leggiBool(v, c.fastboot);
   if (ugualeCI(k, "oled")) return leggiBool(v, c.oled);
   if (ugualeCI(k, "beep_hz")) { if (!leggiLong(v, n, 100, 8000)) return false; c.beepHz = (uint16_t)n; return true; }
   if (ugualeCI(k, "beep_ms")) { if (!leggiLong(v, n, 10, 2000)) return false; c.beepMs = (uint16_t)n; return true; }
@@ -1456,13 +1459,15 @@ bool inizializzaOled() {
   stampaDurataOled(durataCicloStabile);
   display.print(F(" (mm:ss)"));
   display.display();
-  delay(3000);
+  if (!cfg.fastboot) delay(3000);   // [SISTEMA] fastboot = 1: niente attesa sullo splash
   return true;
 }
 
 // Esito della lettura microSD, mostrato dopo lo splash per 2,5 s.
 void mostraStatoSD() {
   if (!oledPresente) return;
+  // [SISTEMA] fastboot = 1: la schermata compare solo se PRESEPE.INI contiene errori.
+  if (cfg.fastboot && cfg.sdStato != SD_OK_ERRORI) return;
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
@@ -2084,8 +2089,8 @@ void setup() {
 
   // Autotest di accensione: ALBA -> GIORNO -> TRAMONTO -> STELLE -> CASETTE.
   // Cinque passi sincronizzati con la melodia; OLED mostra la progress bar complessiva.
-  // [SISTEMA] autotest_avvio = 0 lo salta.
-  if (cfg.autotestAvvio) eseguiSequenzaBoot();
+  // [SISTEMA] autotest_avvio = 0 lo salta; fastboot = 1 lo salta sempre (e con lui la melodia).
+  if (cfg.autotestAvvio && !cfg.fastboot) eseguiSequenzaBoot();
 
   // Rileggi dopo l'autotest: se il potenziometro e' stato mosso
   // durante il boot, il ciclo parte gia' nello scaglione corretto.
@@ -2119,6 +2124,7 @@ void setup() {
   Serial.println(F("A0  = DURATA CICLO (3 scaglioni da [CICLO])"));
   Serial.println(F("D50-D53 = microSD SPI (CS D53), D49 = scheda inserita"));
   stampaConfig();
+  Serial.println(cfg.fastboot ? F("Avvio rapido (fastboot): si") : F("Avvio rapido (fastboot): no"));
   Serial.print(F("Durata ciclo impostata all\'avvio: "));
   Serial.print(durataCiclo() / 1000UL);
   Serial.println(F(" secondi"));

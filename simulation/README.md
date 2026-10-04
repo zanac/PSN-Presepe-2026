@@ -18,7 +18,7 @@ The firmware is a single file, so the Wokwi project needs only these files:
 
 `simulation/make_wokwi_bundle.sh [out_dir] [--no-display]` copies them into one folder with these names.
 
-Wokwi does not accept `.ini` files, so the configuration goes in `PRESEPE.TXT`. The firmware looks for `PRESEPE.INI` first and falls back to `PRESEPE.TXT`, so the very same sketch runs on the real board and in Wokwi. On the OLED you will see `PRESEPE.TXT OK`.
+Wokwi does not accept `.ini` files, so the configuration goes in `PRESEPE.TXT`. The firmware looks for `PRESEPE.INI` first and falls back to `PRESEPE.TXT`, so the very same sketch runs on the real board and in Wokwi. The serial monitor prints `microSD: PRESEPE.TXT letto senza errori`. The OLED shows `PRESEPE.TXT OK` only with `[SISTEMA] fastboot = 0`, because the default fast boot skips that screen unless the file has errors.
 
 If an older version of the project has `PresepeConfig.h` or `PresepeConfig.cpp` tabs, delete them. That code is now inside the sketch, and a second copy causes "multiple definition" errors.
 
@@ -28,7 +28,7 @@ To try a different configuration:
 1. Edit `PRESEPE.TXT` in Wokwi.
 2. Restart the simulation. The file is read only at boot.
 
-Rename the file to check the defaults: the OLED then shows `MANCA PRESEPE.INI`.
+Rename the file to check the defaults: the serial monitor then reports the file as missing (and, with `fastboot = 0`, the OLED shows `MANCA PRESEPE.INI`).
 
 ## What is simulated
 

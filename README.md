@@ -332,7 +332,7 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
 1. Load the defaults.
 2. Read `/PRESEPE.INI` from the SD card, or `/PRESEPE.TXT` if the first is missing.
 3. Show the OLED splash.
-4. Show the SD status screen:
+4. Show the SD status screen (with `fastboot = 1`, only when `PRESEPE.INI` has errors):
 
    | OLED message | Meaning |
    |---|---|
@@ -341,8 +341,10 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
    | `MANCA PRESEPE.INI` | card present, neither file found |
    | `SD ASSENTE` | no card |
 
-5. Run the self-test (about 22 s; can be disabled), with an optional melody.
-6. Start the cycle, running or paused according to `partenza`.
+5. Run the self-test (about 22 s), with an optional melody. Skipped with `fastboot = 1`.
+6. Start the cycle from the beginning of GIORNO, running or paused according to `partenza`.
+
+**Fast boot** (`[SISTEMA] fastboot`, default **1**, since release 038) skips the 3 s splash wait, the SD status screen (unless the file has errors), the self-test and the melody, so the scene starts immediately. Set `fastboot = 0` for the full start-up; `autotest_avvio` and `melodia_avvio` then decide whether the self-test and the melody run.
 
 **Buttons:**
 
@@ -374,7 +376,7 @@ The card is read **once, at power-on**. If `PRESEPE.INI` is missing, the firmwar
 | `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tint %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = off), `colore`, `accendi = PHASE, %`, `spegni = PHASE, %` (may wrap past the end of the cycle), `fuoco` (0–100), `dissolvenza_ms` |
-| `[SISTEMA]` | `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio`, `oled`, `debug_ms` |
+| `[SISTEMA]` | `fastboot` (default 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (both only with `fastboot = 0`), `oled`, `debug_ms` |
 
 Relay events are persistent: a relay keeps its state until its next event. Relays can be named by number (1–16), by name, or as `Grp_GG_RR`, where relay = (GG − 1) × 4 + RR. The first valid `evento` line replaces the whole default table.
 
