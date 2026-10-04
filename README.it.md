@@ -331,7 +331,7 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 **Avvio:**
 1. Carica i valori di default.
 2. Legge `/PRESEPE.INI` dalla microSD, oppure `/PRESEPE.TXT` se il primo manca.
-3. Mostra la schermata iniziale sull'OLED.
+3. Mostra sull'OLED la schermata iniziale "by Vanni" per 3 s, sempre (anche con `fastboot = 1`). Premendo TEST in questi 3 s si entra nella modalità colore.
 4. Mostra lo stato della SD (con `fastboot = 1` solo se `PRESEPE.INI` contiene errori):
 
    | Messaggio OLED | Significato |
@@ -344,7 +344,7 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 5. Esegue l'autotest (circa 22 s) con melodia opzionale. Saltato con `fastboot = 1`.
 6. Avvia il ciclo dall'inizio del GIORNO, in marcia o in pausa secondo `partenza`.
 
-**Avvio rapido** (`[SISTEMA] fastboot`, predefinito **1** dalla release 038): salta l'attesa di 3 s sulla schermata iniziale, la schermata della SD (tranne se il file ha errori), l'autotest e la melodia, così la scena parte subito. Con `fastboot = 0` l'avvio è completo, e `autotest_avvio` e `melodia_avvio` decidono se eseguire autotest e melodia.
+**Avvio rapido** (`[SISTEMA] fastboot`, predefinito **1** dalla release 038): mantiene solo i 3 s della schermata iniziale e salta la schermata della SD (tranne se il file ha errori), l'autotest e la melodia, così la scena parte subito. Con `fastboot = 0` l'avvio è completo, e `autotest_avvio` e `melodia_avvio` decidono se eseguire autotest e melodia.
 
 **Pulsanti:**
 
@@ -359,7 +359,7 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 
 ### Modalità colore (trovare i valori R, G, B per le tappe)
 
-Tieni premuto **TEST mentre accendi** la centralina: invece del ciclo normale parte la modalità colore. Relè, stelle e casette restano spenti.
+Premi **TEST durante i 3 s della schermata iniziale** ("by Vanni", in basso `TEST = modo colore`): invece del ciclo normale parte la modalità colore. Va bene anche tenerlo premuto dall'accensione. Relè, stelle e casette restano spenti.
 
 1. **Scelta della striscia.** La striscia proposta si accende di **bianco**, le altre restano spente. **AVANTI** scorre ALBA → CIELO → TRAMONTO → ALBA…; **START** conferma.
 2. **Regolazione.** Le pressioni brevi di **START / AVANTI / TEST** scelgono il canale **R / G / B**, e il potenziometro lo regola da 0 a 255.

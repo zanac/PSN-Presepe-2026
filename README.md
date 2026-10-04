@@ -331,7 +331,7 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
 **Boot:**
 1. Load the defaults.
 2. Read `/PRESEPE.INI` from the SD card, or `/PRESEPE.TXT` if the first is missing.
-3. Show the OLED splash.
+3. Show the OLED splash "by Vanni" for 3 s, always (also with `fastboot = 1`). Pressing TEST during these 3 s enters the colour mode.
 4. Show the SD status screen (with `fastboot = 1`, only when `PRESEPE.INI` has errors):
 
    | OLED message | Meaning |
@@ -344,7 +344,7 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
 5. Run the self-test (about 22 s), with an optional melody. Skipped with `fastboot = 1`.
 6. Start the cycle from the beginning of GIORNO, running or paused according to `partenza`.
 
-**Fast boot** (`[SISTEMA] fastboot`, default **1**, since release 038) skips the 3 s splash wait, the SD status screen (unless the file has errors), the self-test and the melody, so the scene starts immediately. Set `fastboot = 0` for the full start-up; `autotest_avvio` and `melodia_avvio` then decide whether the self-test and the melody run.
+**Fast boot** (`[SISTEMA] fastboot`, default **1**, since release 038) keeps only the 3 s splash and skips the SD status screen (unless the file has errors), the self-test and the melody, so the scene starts immediately. Set `fastboot = 0` for the full start-up; `autotest_avvio` and `melodia_avvio` then decide whether the self-test and the melody run.
 
 **Buttons:**
 
@@ -359,7 +359,7 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
 
 ### Colour mode (finding the R, G, B values for the tappe)
 
-Hold **TEST while powering on** to enter the colour mode instead of the normal cycle. Relays, stars and houses stay off.
+Press **TEST during the 3 s splash** ("by Vanni", bottom line `TEST = modo colore`) to enter the colour mode instead of the normal cycle; holding it from power-on works too. Relays, stars and houses stay off.
 
 1. **Choose the strip.** The proposed strip lights up **white**, the others stay off. **NEXT** steps ALBA → CIELO → TRAMONTO → ALBA…; **START** confirms.
 2. **Adjust.** Short **START / NEXT / TEST** select the **R / G / B** channel, and the potentiometer sets it from 0 to 255.

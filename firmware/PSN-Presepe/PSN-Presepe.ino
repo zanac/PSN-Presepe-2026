@@ -230,7 +230,7 @@ struct PresepeConfig {
   uint16_t dissolvenzaMs;                 // tempo di accensione/spegnimento morbido
   // [SISTEMA]
   uint8_t  buzzer, melodiaAvvio, autotestAvvio, oled;
-  uint8_t  fastboot;                      // 1 = avvio rapido: niente splash, autotest e melodia
+  uint8_t  fastboot;                      // 1 = avvio rapido: niente schermata SD, autotest e melodia (lo splash di 3 s resta)
   uint16_t beepHz, beepMs;
   uint32_t debugMs;
   // stato lettura (non configurabile)
@@ -1502,9 +1502,10 @@ bool inizializzaOled() {
   display.setCursor(18,46);
   stampaDurataOled(durataCicloStabile);
   display.print(F(" (mm:ss)"));
+  display.setCursor(12,56); display.print(F("TEST = modo colore"));
   display.display();
-  if (!cfg.fastboot) delay(3000);   // [SISTEMA] fastboot = 1: niente attesa sullo splash
-  return true;
+  return true;   // i 3 s dello splash li gestisce attesaSplash() in setup()
+
 }
 
 // Esito della lettura microSD, mostrato dopo lo splash per 2,5 s.
@@ -2292,6 +2293,20 @@ void loopModalitaColore() {
   }
 }
 
+// Attesa dello splash: ritorna true appena TEST risulta premuto (stabile 30 ms).
+bool attesaSplash(unsigned long durataMs) {
+  unsigned long inizio = millis(), premutoDa = 0;
+  bool premuto = false;
+  while (millis() - inizio < durataMs) {
+    if (digitalRead(PIN_TEST) == LOW) {
+      if (!premuto) { premuto = true; premutoDa = millis(); }
+      else if (millis() - premutoDa >= 30UL) return true;
+    } else premuto = false;
+    delay(2);
+  }
+  return false;
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -2346,11 +2361,10 @@ void setup() {
   potRawStabile = potLimita(analogRead(PIN_POT));
   durataCicloStabile = durataDaRaw(potRawStabile);
 
-  // TEST tenuto premuto all'accensione = modalita' colore (controllato prima dello splash).
-  bool testAllAvvio = true;
-  for (uint8_t i = 0; i < 6 && testAllAvvio; i++) { if (digitalRead(PIN_TEST) != LOW) testAllAvvio = false; delay(5); }
-
   oledPresente = cfg.oled ? inizializzaOled() : false;   // [SISTEMA] oled
+  // Splash "by Vanni" per 3 s (anche con fastboot): in questo tempo una pressione
+  // di TEST (anche tenuto dall'accensione) attiva la modalita' colore.
+  bool testAllAvvio = attesaSplash(3000UL);
   mostraStatoSD();
   randomSeed(analogRead(A15) ^ micros());
 
