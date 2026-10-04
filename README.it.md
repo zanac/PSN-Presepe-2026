@@ -303,7 +303,7 @@ Librerie: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (con Adafruit BusIO)
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Occupazione: 56,3 kB di flash (22 %), 3,2 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
+Occupazione: 55,9 kB di flash (22 %), 3,7 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
 
 ### Compilazione
 
@@ -314,7 +314,7 @@ Occupazione: 56,3 kB di flash (22 %), 3,2 kB di RAM statica. I buffer dei LED e 
   arduino-cli core install arduino:avr
   arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
   firmware/tools/fw_compile.sh                       # -> firmware/PSN-Presepe/build/PSN-Presepe.ino.hex
-  firmware/tools/run_tests.sh                        # 33 controlli sul PC del lettore di PRESEPE.INI (blocco CONFIG)
+  firmware/tools/run_tests.sh                        # 54 controlli sul PC del lettore di PRESEPE.INI e delle tappe
   ```
 
 Lo sketch dichiara i suoi prototipi esplicitamente, quindi non dipende dalla generazione automatica dei prototipi dell'IDE.
@@ -363,14 +363,15 @@ Il firmware gira invariato nel simulatore Wokwi con il cablaggio Rev D: barre RG
 
 Copia [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) nella **radice** di una microSD o microSDHC (2–32 GB, FAT16/FAT32). Le schede da 64 GB in su escono formattate exFAT, che la libreria SD di Arduino non legge: riformattale prima in FAT32.
 
-La scheda viene letta **una sola volta, all'accensione**. Se `PRESEPE.INI` manca, il firmware cerca `PRESEPE.TXT` con lo stesso contenuto (comodo per Wokwi, o se Windows ha salvato il file come `.txt`). Il file di esempio contiene esattamente i valori di default, con ogni chiave commentata.
+La scheda viene letta **una sola volta, all'accensione**. Se `PRESEPE.INI` manca, il firmware cerca `PRESEPE.TXT` con lo stesso contenuto (comodo per Wokwi, o se Windows ha salvato il file come `.txt`). Il file di esempio contiene esattamente i valori di default, e ogni chiave è spiegata in italiano nei commenti.
 
 | Sezione | Chiavi |
 |---|---|
 | `[CICLO]` | `durata1..3` (s, 10–86400), `pot_min`, `pot_max`, `pot_invertito`, `partenza = marcia / pausa` |
 | `[FASI]` | % di inizio di `tramonto`, `crepuscolo`, `notte`, `alba` (devono essere strettamente crescenti) |
 | `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 caratteri), `forza1..16 = auto / on / off`, `evento = FASE, RELÈ, ON/OFF, %` (fino a 64) |
-| `[COLORI]` | colori RGB chiave delle curve, `bianco_coda`, `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
+| `[CIELO]`, `[TRAMONTO]`, `[ALBA]` | `tappa = FASE, %, R, G, B [, morbida / lineare]` (fino a 20 per striscia), vedi sotto |
+| `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tinta in %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = spente), `colore`, `accendi = FASE, %`, `spegni = FASE, %` (può scavalcare la fine del ciclo), `fuoco` (0–100), `dissolvenza_ms` |
 | `[SISTEMA]` | `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio`, `oled`, `debug_ms` |
@@ -385,6 +386,48 @@ nome1  = Mulino
 evento = GIORNO, Mulino, ON, 10
 evento = NOTTE,  Mulino, OFF, 0
 ```
+
+### Colori delle strisce RGB: le "tappe"
+
+Il colore di ogni striscia analogica lungo il ciclo è una lista di **tappe**, nella sezione della striscia: `[CIELO]`, `[TRAMONTO]` o `[ALBA]`. Una tappa dice: *in questo punto del ciclo la striscia ha esattamente questo colore*. Fra due tappe consecutive il firmware passa gradualmente da un colore all'altro.
+
+```ini
+tappa = FASE, % della fase, R, G, B [, curva]
+```
+
+- **FASE, %:** dove si trova la tappa. Per esempio `TRAMONTO, 38` è al 38 % della fase del tramonto. I decimali si scrivono col punto: `33.33`.
+- **R, G, B:** il colore in quel punto, da 0 a 255. `0, 0, 0` vuol dire spenta.
+- **curva** (facoltativa) indica come la striscia *arriva* a questa tappa dalla precedente:
+  - `morbida` (predefinita): parte piano, accelera a metà e rallenta arrivando (smoothstep), la dissolvenza naturale usata finora;
+  - `lineare`: velocità costante per tutto il tratto.
+
+Regole:
+- Scrivi le tappe in ordine di tempo, dal GIORNO all'ALBA. Una tappa che torna indietro nel tempo viene ignorata e conta come errore.
+- La lista fa il giro: dopo l'ultima tappa la striscia va gradualmente verso la prima tappa del ciclo successivo.
+- **Due tappe nello stesso punto fanno un cambio istantaneo** (uno scatto): la striscia arriva al primo colore e riparte dal secondo.
+- Per tenere una striscia spenta in un tratto, metti una tappa `0, 0, 0` all'inizio e una alla fine di quel tratto.
+- Fino a 20 tappe per striscia. Una sola tappa vuol dire colore fisso per tutto il ciclo.
+- Se una sezione contiene almeno una tappa valida, le tappe del file sostituiscono **tutte** quelle predefinite di quella striscia. Le strisce senza tappe nel file restano con quelle predefinite.
+
+Le tappe predefinite riproducono le curve storiche del firmware. Per esempio la striscia del tramonto:
+
+```ini
+[TRAMONTO]
+tappa = TRAMONTO,   0,   0,  0,  0     ; spenta fino all'inizio del tramonto
+tappa = TRAMONTO,   0,  18, 10,  4     ; scatto: si accende tenue e calda
+tappa = TRAMONTO,  38, 155, 92, 16     ; picco arancio
+tappa = TRAMONTO,  82,  16, 16, 16     ; perde colore fino a un bianco tenue
+tappa = TRAMONTO, 100,   0,  0,  0     ; spenta a fine tramonto, fino al giro dopo
+```
+
+Per aggiungere un colore intermedio, per esempio un passaggio rosso fra il picco arancio e il bianco tenue, basta inserire una tappa in mezzo: `tappa = TRAMONTO, 60, 140, 30, 10`.
+
+Le tappe predefinite sono state confrontate con il firmware precedente, che aveva le curve scritte nel codice, in 1.000.000 di punti del ciclo:
+- le strisce TRAMONTO e ALBA differiscono al massimo di 1 gradino su 255 (arrotondamenti), in 15 punti su un milione;
+- il CIELO differisce di 1 gradino su 255 nello 0,5 % dei punti;
+- l'unica differenza maggiore (10 gradini) cade nel solo istante dello "scatto" dell'alba al 38 %, dove il codice vecchio e il nuovo arrotondano il confine in modo diverso.
+
+Niente di tutto questo è visibile.
 
 Gestione degli errori:
 - Una riga sbagliata viene saltata e contata, e quella chiave mantiene il valore di default.
