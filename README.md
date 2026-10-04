@@ -541,7 +541,6 @@ KiCad 8–10 open the KiCad 7 files, but the scripts were written for the KiCad 
 - **ERC was not run.** `kicad-cli` 7 has no ERC; connectivity is proven by schematic ↔ PCB parity and by the independent checks instead.
 - **Ordered Gerbers carry revision "C"** in the X2 `ProjectId` header attribute, a leftover title-block value. It is cosmetic, has no effect on fabrication, and is fixed in the scripts. See the frozen order folder.
 - **Annotation warnings:** the `J_*` reference designators make KiCad report annotation warnings. They are harmless.
-- **CI workflow** (`.github/workflows/firmware.yml`) is written but has not run on GitHub yet.
 
 ## 15. Safety
 

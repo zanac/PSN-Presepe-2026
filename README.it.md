@@ -541,7 +541,6 @@ KiCad 8–10 aprono i file di KiCad 7, ma gli script sono scritti per l'API Pyth
 - **ERC non eseguito.** `kicad-cli` 7 non ha l'ERC; le connessioni sono dimostrate dalla parità schema ↔ PCB e dalle verifiche indipendenti.
 - **I Gerber ordinati riportano revisione "C"** nell'attributo di intestazione X2 `ProjectId`, residuo del cartiglio. È solo estetico, non incide sulla produzione ed è corretto negli script. Vedi la cartella congelata dell'ordine.
 - **Avvisi di annotazione:** i riferimenti `J_*` fanno segnalare a KiCad avvisi di annotazione. Sono innocui.
-- **Workflow CI** (`.github/workflows/firmware.yml`): è scritto ma non è ancora stato eseguito su GitHub.
 
 ## 15. Sicurezza
 
