@@ -28,6 +28,8 @@ To try a different configuration:
 1. Edit `PRESEPE.TXT` in Wokwi.
 2. Restart the simulation. The file is read only at boot.
 
+**Colour mode in Wokwi:** press and hold the TEST button with the mouse while the simulation starts (the sketch reads it right after loading the microSD), then use the buttons and the potentiometer as on the real board.
+
 Rename the file to check the defaults: the serial monitor then reports the file as missing (and, with `fastboot = 0`, the OLED shows `MANCA PRESEPE.INI`).
 
 ## What is simulated

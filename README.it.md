@@ -303,7 +303,7 @@ Librerie: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (con Adafruit BusIO)
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Occupazione: 55,9 kB di flash (22 %), 3,7 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
+Occupazione: 59,3 kB di flash (23 %), 3,8 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
 
 ### Compilazione
 
@@ -314,7 +314,7 @@ Occupazione: 55,9 kB di flash (22 %), 3,7 kB di RAM statica. I buffer dei LED e 
   arduino-cli core install arduino:avr
   arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
   firmware/tools/fw_compile.sh                       # -> firmware/PSN-Presepe/build/PSN-Presepe.ino.hex
-  firmware/tools/run_tests.sh                        # 54 controlli sul PC del lettore di PRESEPE.INI e delle tappe
+  firmware/tools/run_tests.sh                        # 68 controlli su PRESEPE.INI e tappe + simulazione della modalità colore
   ```
 
 Lo sketch dichiara i suoi prototipi esplicitamente, quindi non dipende dalla generazione automatica dei prototipi dell'IDE.
@@ -356,6 +356,18 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 | **Potenziometro** | Sceglie una delle tre durate del ciclo; la modifica vale quando la manopola si ferma. |
 
 **Monitor seriale** (115200 baud): all'avvio stampa tutta la configurazione in uso, compresi tutti gli eventi dei relè, poi una riga di stato periodica (`debug_ms`).
+
+### Modalità colore (trovare i valori R, G, B per le tappe)
+
+Tieni premuto **TEST mentre accendi** la centralina: invece del ciclo normale parte la modalità colore. Relè, stelle e casette restano spenti.
+
+1. **Scelta della striscia.** La striscia proposta si accende di **bianco**, le altre restano spente. **AVANTI** scorre ALBA → CIELO → TRAMONTO → ALBA…; **START** conferma.
+2. **Regolazione.** Le pressioni brevi di **START / AVANTI / TEST** scelgono il canale **R / G / B**, e il potenziometro lo regola da 0 a 255.
+   - **Aggancio:** dopo la scelta di un canale la manopola non cambia nulla finché non arriva al valore attuale del canale. Il display indica da che parte girare (`gira + verso 220`), poi scrive `agganciato`. Così, passando da R a G, il verde non salta al valore del rosso.
+   - **Regolazione fine:** **due clic entro 1 s** sullo stesso tasto del canale. Da lì tutta la corsa della manopola copre solo ±16 intorno al valore attuale; per agganciarla porta la manopola al centro. Altri due clic tornano alla regolazione normale. Il display mostra `FINE`.
+   - La striscia parte dal colore della sua prima tappa accesa. Il colore passa dalla stessa correzione gamma e dagli stessi limiti `lum_*` della scena, quindi il valore trovato è esattamente quello da scrivere nella tappa.
+3. Il display mostra striscia, canale attivo, R G B e una riga pronta da copiare (`tappa: 246, 220, 208`). Il monitor seriale stampa la stessa riga a ogni variazione.
+4. **START tenuto 2 s** torna alla scelta della striscia (ogni striscia ricorda i suoi valori); **TEST tenuto 2 s** esce e fa partire il ciclo normale. Non viene salvato nulla: i valori vanno copiati in `PRESEPE.INI`.
 
 ### Simulazione
 

@@ -170,6 +170,29 @@ int main(int argc, char **argv) {
     CHECK(off.r == 0 && off.g == 0 && off.b == 0); CHECK(on.r == 18 && on.g == 12 && on.b == 5);
   }
 
+  // 9. colour mode: potentiometer -> value (normal / fine) and pick-up
+  {
+    PresepeConfig c; cfgDefault(c);              // pot 0..1023, pot_invertito = 1
+    CHECK(cfgValoreDaPot(c, 0, 0, 0) == 255 && cfgValoreDaPot(c, 1023, 0, 0) == 0);
+    c.potInvertito = 0;
+    CHECK(cfgValoreDaPot(c, 0, 0, 0) == 0 && cfgValoreDaPot(c, 1023, 0, 0) == 255);
+    CHECK(cfgValoreDaPot(c, 512, 0, 0) == 128);
+    CHECK(cfgValoreDaPot(c, -50, 0, 0) == 0 && cfgValoreDaPot(c, 2000, 0, 0) == 255);   // clamped
+    // fine: whole travel = base -16 .. base +16, centre = base
+    CHECK(cfgValoreDaPot(c, 0, 1, 100) == 84 && cfgValoreDaPot(c, 1023, 1, 100) == 116);
+    CHECK(cfgValoreDaPot(c, 512, 1, 100) == 100);
+    CHECK(cfgValoreDaPot(c, 0, 1, 5) == 0 && cfgValoreDaPot(c, 1023, 1, 250) == 255);    // clamped at 0 / 255
+    CfgAggancio a; cfgAggancioReset(a);
+    CHECK(cfgAggancioAggiorna(a, 100, 50) == 0 && cfgAggancioAggiorna(a, 100, 80) == 0);  // below, approaching
+    CHECK(cfgAggancioAggiorna(a, 100, 99) == 1);                                           // reached (+/-1)
+    CHECK(cfgAggancioAggiorna(a, 100, 10) == 1);                                           // stays engaged
+    cfgAggancioReset(a);
+    CHECK(cfgAggancioAggiorna(a, 100, 200) == 0 && cfgAggancioAggiorna(a, 100, 150) == 0); // above
+    CHECK(cfgAggancioAggiorna(a, 100, 90) == 1);                                           // jumped past: engaged
+    cfgAggancioReset(a);
+    CHECK(cfgAggancioAggiorna(a, 100, 100) == 1);                                          // already on the value
+  }
+
   std::printf("%d checks, %d failures\n", checks, fails);
   return fails ? 1 : 0;
 }

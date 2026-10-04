@@ -126,6 +126,15 @@ const unsigned long OLED_POPUP_MS = 1800UL;
 #define MID_CYCLE_MS (cfg.durataMs[1])
 #define MAX_CYCLE_MS (cfg.durataMs[2])
 
+// Tasti della modalita' colore (dichiarati qui, prima di ogni funzione, per i
+// prototipi automatici dell'IDE Arduino).
+struct TastoColore {
+  uint8_t pin;
+  bool stabile, ultimaLettura, lungoFatto;
+  unsigned long cambioMs, premutoMs;
+};
+enum EventoTasto : uint8_t { TASTO_NULLA = 0, TASTO_BREVE, TASTO_LUNGO };
+
 // ==== CONFIG BEGIN ====
 // Parametri da microSD: strutture, valori di default, lettore di PRESEPE.INI.
 // Questo blocco (fino a CONFIG END) e' indipendente dall'hardware tranne le parti
@@ -169,6 +178,9 @@ enum CfgStriscia : uint8_t { CFG_S_CIELO = 0, CFG_S_TRAMONTO, CFG_S_ALBA, CFG_NU
 // Come si arriva a una tappa partendo dalla precedente.
 enum CfgCurva : uint8_t { CURVA_MORBIDA = 0,   // parte e arriva piano (smoothstep), come le dissolvenze storiche
                           CURVA_LINEARE = 1 }; // velocita' costante per tutto il tratto
+
+// Aggancio del potenziometro nella modalita' colore (vedi cfgAggancioAggiorna).
+struct CfgAggancio { uint8_t agganciato; int8_t lato; };   // lato: -1 sotto, +1 sopra, 0 ignoto
 
 struct CfgTappa {           // "tappa = FASE, %, R, G, B [, curva]"
   uint8_t fase;             // CfgFase
@@ -676,6 +688,38 @@ uint8_t cfgCaricaDaSD(uint8_t pinCS, uint8_t pinCD) {
   return cfg.sdStato;
 }
 #endif
+
+// ---------------------------------------------------------------- modalita' colore
+// Logica pura (verificata su PC) della "modalita' colore": potenziometro -> valore
+// 0..255 con regolazione fine e "aggancio" (pickup) del valore gia' presente.
+
+// Valore 0..255 dal potenziometro. Normale: tutta la corsa = 0..255.
+// Fine: tutta la corsa = base-16 .. base+16 (centro manopola = base).
+uint8_t cfgValoreDaPot(const PresepeConfig &c, int raw, uint8_t fine, uint8_t base) {
+  float pos = (float)(raw - c.potMin) / (float)(c.potMax - c.potMin);
+  if (pos < 0.0f) pos = 0.0f;
+  if (pos > 1.0f) pos = 1.0f;
+  if (c.potInvertito) pos = 1.0f - pos;     // stesso verso del potenziometro della durata
+  long v = fine ? (long)base + (long)((pos - 0.5f) * 32.0f + (pos >= 0.5f ? 0.5f : -0.5f))
+                : (long)(pos * 255.0f + 0.5f);
+  if (v < 0) v = 0;
+  if (v > 255) v = 255;
+  return (uint8_t)v;
+}
+
+// Aggancio: dopo un cambio di canale la manopola non modifica nulla finche' il suo
+// valore non arriva (o passa oltre) il valore attuale del canale.
+void cfgAggancioReset(CfgAggancio &a) { a.agganciato = 0; a.lato = 0; }
+// Ritorna 1 quando la manopola e' agganciata: da quel momento il canale segue 'daPot'.
+uint8_t cfgAggancioAggiorna(CfgAggancio &a, uint8_t attuale, uint8_t daPot) {
+  if (a.agganciato) return 1;
+  int d = (int)daPot - (int)attuale;
+  if (d >= -1 && d <= 1) { a.agganciato = 1; return 1; }            // sul valore (+/-1 per il rumore)
+  int8_t lato = d < 0 ? -1 : 1;
+  if (a.lato != 0 && lato != a.lato) { a.agganciato = 1; return 1; } // e' passata oltre: agganciata
+  a.lato = lato;
+  return 0;
+}
 // ==== CONFIG END ====
 
 int potLimita(int raw) { return constrain(raw, (int)cfg.potMin, (int)cfg.potMax); }
@@ -2029,6 +2073,225 @@ void eseguiSequenzaBoot() {
 // SETUP
 // ============================================================
 
+// ============================================================
+// MODALITA' COLORE (ricerca dei valori RGB per le tappe)
+// ============================================================
+// Si entra tenendo premuto TEST all'accensione.
+//   Scelta striscia: AVANTI = ALBA -> CIELO -> TRAMONTO, la striscia proposta e' bianca;
+//                    START = conferma; TEST tenuto 2 s = esce.
+//   Regolazione:     START / AVANTI / TEST brevi = canale R / G / B;
+//                    due clic entro 1 s sullo stesso tasto = regolazione fine (+/-16);
+//                    START tenuto 2 s = torna alla scelta; TEST tenuto 2 s = esce.
+// La striscia riceve il colore con gamma e lum_* come nella scena: il valore
+// trovato e' esattamente quello da scrivere nella tappa.
+
+const unsigned long COLORE_LUNGO_MS = 2000UL;
+const unsigned long COLORE_DOPPIO_MS = 1000UL;
+
+
+bool modalitaColore = false;
+uint8_t coloreStato = 0;                 // 0 = scelta striscia, 1 = regolazione
+uint8_t coloreStriscia = 0;              // indice in ORDINE_STRISCE_COLORE
+uint8_t coloreCanale = 0;                // 0 R, 1 G, 2 B
+uint8_t coloreFine = 0, coloreBaseFine = 0;
+uint8_t coloreValori[CFG_NUM_STRISCE][3];
+CfgAggancio coloreAggancio;
+unsigned long coloreUltimoClicMs = 0;
+int8_t coloreUltimoClicCanale = -1;
+unsigned long coloreOledMs = 0, coloreSerialeMs = 0;
+uint8_t coloreUltimoPot = 0;            // ultimo valore letto dalla manopola (per "gira verso")
+bool coloreDaStampare = false;
+TastoColore tastiColore[3];
+const uint8_t ORDINE_STRISCE_COLORE[CFG_NUM_STRISCE] = { CFG_S_ALBA, CFG_S_CIELO, CFG_S_TRAMONTO };
+
+const __FlashStringHelper *nomeStrisciaColore(uint8_t s) {
+  if (s == CFG_S_CIELO) return F("CIELO");
+  if (s == CFG_S_TRAMONTO) return F("TRAMONTO");
+  return F("ALBA");
+}
+
+void tastoColoreInit(TastoColore &t, uint8_t pin) {
+  t.pin = pin;
+  bool l = digitalRead(pin);
+  t.stabile = l; t.ultimaLettura = l;
+  t.lungoFatto = (l == LOW);             // gia' premuto (es. TEST dell'ingresso): ignora fino al rilascio
+  t.cambioMs = millis(); t.premutoMs = millis();
+}
+
+EventoTasto tastoColoreLeggi(TastoColore &t) {
+  bool l = digitalRead(t.pin);
+  unsigned long ora = millis();
+  if (l != t.ultimaLettura) { t.ultimaLettura = l; t.cambioMs = ora; }
+  if ((ora - t.cambioMs) >= DEBOUNCE_MS && l != t.stabile) {
+    t.stabile = l;
+    if (l == LOW) { t.premutoMs = ora; t.lungoFatto = false; }
+    else { bool era = t.lungoFatto; t.lungoFatto = false; if (!era) return TASTO_BREVE; }
+  }
+  if (t.stabile == LOW && !t.lungoFatto && (ora - t.premutoMs) >= COLORE_LUNGO_MS) {
+    t.lungoFatto = true;
+    return TASTO_LUNGO;
+  }
+  return TASTO_NULLA;
+}
+
+int letturaPotMedia() {
+  long somma = 0;
+  for (uint8_t i = 0; i < 4; i++) somma += analogRead(PIN_POT);
+  return (int)(somma / 4);
+}
+
+void coloreUscite() {
+  uint8_t s = ORDINE_STRISCE_COLORE[coloreStriscia];
+  uint8_t r = 255, g = 255, b = 255;     // in scelta: bianco
+  if (coloreStato == 1) { r = coloreValori[s][0]; g = coloreValori[s][1]; b = coloreValori[s][2]; }
+  setCielo(s == CFG_S_CIELO ? r : 0, s == CFG_S_CIELO ? g : 0, s == CFG_S_CIELO ? b : 0);
+  setTramonto(s == CFG_S_TRAMONTO ? r : 0, s == CFG_S_TRAMONTO ? g : 0, s == CFG_S_TRAMONTO ? b : 0);
+  setAlba(s == CFG_S_ALBA ? r : 0, s == CFG_S_ALBA ? g : 0, s == CFG_S_ALBA ? b : 0);
+}
+
+void coloreOled() {
+  if (!oledPresente) return;
+  uint8_t s = ORDINE_STRISCE_COLORE[coloreStriscia];
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+  if (coloreStato == 0) {
+    display.print(F("MODALITA' COLORE"));
+    display.setTextSize(2);
+    display.setCursor(0, 16); display.print(nomeStrisciaColore(s));
+    display.setTextSize(1);
+    display.setCursor(0, 40); display.print(F("AVANTI = cambia"));
+    display.setCursor(0, 52); display.print(F("START = regola"));
+  } else {
+    const char canali[3] = { 'R', 'G', 'B' };
+    display.print(nomeStrisciaColore(s));
+    display.setCursor(80, 0); display.print('['); display.print(canali[coloreCanale]);
+    if (coloreFine) display.print(F(" FINE"));
+    display.print(']');
+    display.setCursor(0, 14);
+    for (uint8_t c = 0; c < 3; c++) {
+      display.print(c == coloreCanale ? '>' : ' ');
+      display.print(canali[c]); display.print(coloreValori[s][c]); display.print(' ');
+    }
+    display.setCursor(0, 28);
+    if (coloreAggancio.agganciato) display.print(F("agganciato"));
+    else {
+      uint8_t obiettivo = coloreValori[s][coloreCanale];
+      display.print(coloreUltimoPot < obiettivo ? F("gira + verso ") : F("gira - verso "));
+      display.print(coloreFine ? F("centro") : F(""));
+      if (!coloreFine) display.print(obiettivo);
+    }
+    display.setCursor(0, 40);
+    display.print(F("tappa: ")); display.print(coloreValori[s][0]); display.print(F(", "));
+    display.print(coloreValori[s][1]); display.print(F(", ")); display.print(coloreValori[s][2]);
+    display.setCursor(0, 54); display.print(F("S2s=strisce T2s=esci"));
+  }
+  display.display();
+}
+
+void coloreSeriale() {
+  uint8_t s = ORDINE_STRISCE_COLORE[coloreStriscia];
+  Serial.print(F("COLORE ")); Serial.print(nomeStrisciaColore(s)); Serial.print(F(": tappa = FASE, %, "));
+  Serial.print(coloreValori[s][0]); Serial.print(F(", ")); Serial.print(coloreValori[s][1]);
+  Serial.print(F(", ")); Serial.println(coloreValori[s][2]);
+}
+
+void coloreScegliCanale(uint8_t canale) {
+  unsigned long ora = millis();
+  uint8_t s = ORDINE_STRISCE_COLORE[coloreStriscia];
+  if (canale == coloreCanale && coloreUltimoClicCanale == (int8_t)canale &&
+      (ora - coloreUltimoClicMs) <= COLORE_DOPPIO_MS) {
+    coloreFine = !coloreFine;            // secondo clic entro 1 s: regolazione fine on/off
+    coloreBaseFine = coloreValori[s][canale];
+    coloreUltimoClicCanale = -1;         // un terzo clic ricomincia il conteggio
+  } else {
+    if (canale != coloreCanale) coloreFine = 0;
+    coloreCanale = canale;
+    coloreUltimoClicCanale = canale;
+    coloreUltimoClicMs = ora;
+  }
+  cfgAggancioReset(coloreAggancio);
+  buzzerBeep();
+}
+
+void entraModalitaColore() {
+  modalitaColore = true;
+  coloreStato = 0; coloreStriscia = 0; coloreCanale = 0; coloreFine = 0;
+  for (uint8_t s = 0; s < CFG_NUM_STRISCE; s++) {
+    CfgRGB c0 = cfg.numTappe[s] ? cfg.tappe[s][0].col : CfgRGB{ 0, 0, 0 };
+    if (c0.r == 0 && c0.g == 0 && c0.b == 0 && cfg.numTappe[s] > 1) c0 = cfg.tappe[s][1].col;  // salta lo "spento" iniziale
+    coloreValori[s][0] = c0.r; coloreValori[s][1] = c0.g; coloreValori[s][2] = c0.b;
+  }
+  tastoColoreInit(tastiColore[0], PIN_START);
+  tastoColoreInit(tastiColore[1], PIN_NEXT);
+  tastoColoreInit(tastiColore[2], PIN_TEST);
+  cfgAggancioReset(coloreAggancio);
+  tuttoSpento();
+  spegniRele();
+  coloreUscite();
+  coloreOled();
+  Serial.println(F("=== MODALITA' COLORE ==="));
+  Serial.println(F("Scelta striscia: AVANTI = cambia, START = regola, TEST 2 s = esci"));
+}
+
+void esciModalitaColore() {
+  modalitaColore = false;
+  tuttoSpento();
+  // I tasti possono essere ancora premuti: il ciclo normale non deve vederli come pressioni.
+  lastStartRead = stableStart = digitalRead(PIN_START);
+  lastNextRead  = stableNext  = digitalRead(PIN_NEXT);
+  lastTestRead  = stableTest  = digitalRead(PIN_TEST);
+  cycleStartMs = millis();
+  running = !cfg.partenzaInPausa;
+  if (!running) pauseStartedMs = cycleStartMs;
+  Serial.println(F("USCITA MODALITA' COLORE: parte il ciclo"));
+  buzzerBeep();
+}
+
+void loopModalitaColore() {
+  EventoTasto e0 = tastoColoreLeggi(tastiColore[0]);
+  EventoTasto e1 = tastoColoreLeggi(tastiColore[1]);
+  EventoTasto e2 = tastoColoreLeggi(tastiColore[2]);
+  bool cambiato = false;
+
+  if (e2 == TASTO_LUNGO) { esciModalitaColore(); return; }
+
+  if (coloreStato == 0) {
+    if (e1 == TASTO_BREVE) { coloreStriscia = (coloreStriscia + 1) % CFG_NUM_STRISCE; buzzerBeep(); cambiato = true; }
+    if (e0 == TASTO_BREVE) {
+      coloreStato = 1; coloreCanale = 0; coloreFine = 0; coloreUltimoClicCanale = -1;
+      cfgAggancioReset(coloreAggancio);
+      buzzerBeep(); cambiato = true; coloreDaStampare = true;
+    }
+  } else {
+    if (e0 == TASTO_LUNGO) { coloreStato = 0; coloreFine = 0; buzzerBeep(); cambiato = true; }
+    else {
+      if (e0 == TASTO_BREVE) { coloreScegliCanale(0); cambiato = true; }
+      if (e1 == TASTO_BREVE) { coloreScegliCanale(1); cambiato = true; }
+      if (e2 == TASTO_BREVE) { coloreScegliCanale(2); cambiato = true; }
+      uint8_t s = ORDINE_STRISCE_COLORE[coloreStriscia];
+      uint8_t &v = coloreValori[s][coloreCanale];
+      uint8_t daPot = cfgValoreDaPot(cfg, letturaPotMedia(), coloreFine, coloreBaseFine);
+      if ((daPot < v) != (coloreUltimoPot < v)) cambiato = true;   // cambia il verso da indicare
+      coloreUltimoPot = daPot;
+      uint8_t eraAgganciato = coloreAggancio.agganciato;
+      if (cfgAggancioAggiorna(coloreAggancio, v, daPot)) {
+        if (daPot != v) { v = daPot; cambiato = true; coloreDaStampare = true; }
+      }
+      if (eraAgganciato != coloreAggancio.agganciato) cambiato = true;
+    }
+  }
+
+  if (cambiato) coloreUscite();
+  unsigned long ora = millis();
+  if (cambiato && (ora - coloreOledMs) >= 80UL) { coloreOled(); coloreOledMs = ora; }
+  else if ((ora - coloreOledMs) >= 500UL) { coloreOled(); coloreOledMs = ora; }   // aggiorna anche lo stato "gira verso"
+  if (coloreDaStampare && coloreStato == 1 && (ora - coloreSerialeMs) >= 250UL) {
+    coloreSeriale(); coloreSerialeMs = ora; coloreDaStampare = false;
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -2083,6 +2346,10 @@ void setup() {
   potRawStabile = potLimita(analogRead(PIN_POT));
   durataCicloStabile = durataDaRaw(potRawStabile);
 
+  // TEST tenuto premuto all'accensione = modalita' colore (controllato prima dello splash).
+  bool testAllAvvio = true;
+  for (uint8_t i = 0; i < 6 && testAllAvvio; i++) { if (digitalRead(PIN_TEST) != LOW) testAllAvvio = false; delay(5); }
+
   oledPresente = cfg.oled ? inizializzaOled() : false;   // [SISTEMA] oled
   mostraStatoSD();
   randomSeed(analogRead(A15) ^ micros());
@@ -2090,7 +2357,8 @@ void setup() {
   // Autotest di accensione: ALBA -> GIORNO -> TRAMONTO -> STELLE -> CASETTE.
   // Cinque passi sincronizzati con la melodia; OLED mostra la progress bar complessiva.
   // [SISTEMA] autotest_avvio = 0 lo salta; fastboot = 1 lo salta sempre (e con lui la melodia).
-  if (cfg.autotestAvvio && !cfg.fastboot) eseguiSequenzaBoot();
+  // In modalita' colore l'autotest non serve.
+  if (cfg.autotestAvvio && !cfg.fastboot && !testAllAvvio) eseguiSequenzaBoot();
 
   // Rileggi dopo l'autotest: se il potenziometro e' stato mosso
   // durante il boot, il ciclo parte gia' nello scaglione corretto.
@@ -2131,6 +2399,8 @@ void setup() {
   Serial.print(F("Posizione potenziometro A0: "));
   Serial.println(analogRead(PIN_POT));
   Serial.println();
+
+  if (testAllAvvio) entraModalitaColore();   // TEST premuto all'accensione
 }
 
 // ============================================================
@@ -2140,6 +2410,8 @@ void setup() {
 void loop() {
 
   buzzerTick();
+
+  if (modalitaColore) { loopModalitaColore(); return; }
 
   // ----- comandi fisici -----
 

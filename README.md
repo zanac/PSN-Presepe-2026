@@ -303,7 +303,7 @@ Libraries: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (with Adafruit BusI
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Size: 55.9 kB flash (22 %), 3.7 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
+Size: 59.3 kB flash (23 %), 3.8 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
 
 ### Build
 
@@ -314,7 +314,7 @@ Size: 55.9 kB flash (22 %), 3.7 kB static RAM. The LED and OLED buffers are allo
   arduino-cli core install arduino:avr
   arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
   firmware/tools/fw_compile.sh                       # -> firmware/PSN-Presepe/build/PSN-Presepe.ino.hex
-  firmware/tools/run_tests.sh                        # 54 host-side checks of the INI reader and colour tappe
+  firmware/tools/run_tests.sh                        # 68 checks of the INI reader / tappe + colour-mode simulation
   ```
 
 The sketch declares its prototypes explicitly, so it does not depend on the IDE's automatic prototype generation.
@@ -356,6 +356,18 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
 | **Potentiometer** | Selects one of the three cycle lengths; the change is applied once the knob settles. |
 
 **Serial monitor** (115200 baud): prints the whole active configuration at boot, including every relay event, followed by a periodic status line (`debug_ms`).
+
+### Colour mode (finding the R, G, B values for the tappe)
+
+Hold **TEST while powering on** to enter the colour mode instead of the normal cycle. Relays, stars and houses stay off.
+
+1. **Choose the strip.** The proposed strip lights up **white**, the others stay off. **NEXT** steps ALBA → CIELO → TRAMONTO → ALBA…; **START** confirms.
+2. **Adjust.** Short **START / NEXT / TEST** select the **R / G / B** channel, and the potentiometer sets it from 0 to 255.
+   - **Pick-up:** after choosing a channel the knob does nothing until it reaches the channel's current value. The display shows which way to turn (`gira + verso 220`), then `agganciato`. Switching from R to G therefore never makes G jump to R's value.
+   - **Fine adjustment:** **two clicks within 1 s** on the same channel button. The whole knob travel then covers only ±16 around the current value; centre the knob to pick it up. Two clicks again return to normal. The display shows `FINE`.
+   - The strip starts from the colour of its first lit tappa. The colour goes through the same gamma correction and `lum_*` limits as the scene, so the value you find is exactly the one to write in the tappa.
+3. The display shows the strip, the active channel, R G B and a ready-to-copy line (`tappa: 246, 220, 208`). The serial monitor prints the same line at every change.
+4. **START held 2 s** returns to the strip choice (each strip keeps its values); **TEST held 2 s** leaves the mode and starts the normal cycle. Nothing is saved: copy the values into `PRESEPE.INI`.
 
 ### Simulation
 
