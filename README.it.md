@@ -303,7 +303,7 @@ Librerie: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (con Adafruit BusIO)
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Occupazione: 55,9 kB di flash (22 %), 3,7 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
+Occupazione: 59,3 kB di flash (23 %), 3,8 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
 
 ### Compilazione
 
@@ -314,7 +314,7 @@ Occupazione: 55,9 kB di flash (22 %), 3,7 kB di RAM statica. I buffer dei LED e 
   arduino-cli core install arduino:avr
   arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
   firmware/tools/fw_compile.sh                       # -> firmware/PSN-Presepe/build/PSN-Presepe.ino.hex
-  firmware/tools/run_tests.sh                        # 54 controlli sul PC del lettore di PRESEPE.INI e delle tappe
+  firmware/tools/run_tests.sh                        # 68 controlli su PRESEPE.INI e tappe + simulazione della modalità colore
   ```
 
 Lo sketch dichiara i suoi prototipi esplicitamente, quindi non dipende dalla generazione automatica dei prototipi dell'IDE.
@@ -331,8 +331,8 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 **Avvio:**
 1. Carica i valori di default.
 2. Legge `/PRESEPE.INI` dalla microSD, oppure `/PRESEPE.TXT` se il primo manca.
-3. Mostra la schermata iniziale sull'OLED.
-4. Mostra lo stato della SD:
+3. Mostra sull'OLED la schermata iniziale "by Vanni" per 3 s, sempre (anche con `fastboot = 1`). Premendo TEST in questi 3 s si entra nella modalità colore.
+4. Mostra lo stato della SD (con `fastboot = 1` solo se `PRESEPE.INI` contiene errori):
 
    | Messaggio OLED | Significato |
    |---|---|
@@ -341,8 +341,10 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
    | `MANCA PRESEPE.INI` | scheda presente, nessuno dei due file trovato |
    | `SD ASSENTE` | nessuna scheda |
 
-5. Esegue l'autotest (circa 22 s, disattivabile), con melodia opzionale.
-6. Avvia il ciclo, in marcia o in pausa secondo `partenza`.
+5. Esegue l'autotest (circa 22 s) con melodia opzionale. Saltato con `fastboot = 1`.
+6. Avvia il ciclo dall'inizio del GIORNO, in marcia o in pausa secondo `partenza`.
+
+**Avvio rapido** (`[SISTEMA] fastboot`, predefinito **1** dalla release 038): mantiene solo i 3 s della schermata iniziale e salta la schermata della SD (tranne se il file ha errori), l'autotest e la melodia, così la scena parte subito. Con `fastboot = 0` l'avvio è completo, e `autotest_avvio` e `melodia_avvio` decidono se eseguire autotest e melodia.
 
 **Pulsanti:**
 
@@ -354,6 +356,18 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 | **Potenziometro** | Sceglie una delle tre durate del ciclo; la modifica vale quando la manopola si ferma. |
 
 **Monitor seriale** (115200 baud): all'avvio stampa tutta la configurazione in uso, compresi tutti gli eventi dei relè, poi una riga di stato periodica (`debug_ms`).
+
+### Modalità colore (trovare i valori R, G, B per le tappe)
+
+Premi **TEST durante i 3 s della schermata iniziale** ("by Vanni", in basso `TEST = modo colore`): invece del ciclo normale parte la modalità colore. Va bene anche tenerlo premuto dall'accensione. Relè, stelle e casette restano spenti.
+
+1. **Scelta della striscia.** La striscia proposta si accende di **bianco**, le altre restano spente. **AVANTI** scorre ALBA → CIELO → TRAMONTO → ALBA…; **START** conferma.
+2. **Regolazione.** Le pressioni brevi di **START / AVANTI / TEST** scelgono il canale **R / G / B**, e il potenziometro lo regola da 0 a 255.
+   - **Aggancio:** dopo la scelta di un canale la manopola non cambia nulla finché non arriva al valore attuale del canale. Il display indica da che parte girare (`gira + verso 220`), poi scrive `agganciato`. Così, passando da R a G, il verde non salta al valore del rosso.
+   - **Regolazione fine:** **due clic entro 1 s** sullo stesso tasto del canale. Da lì tutta la corsa della manopola copre solo ±16 intorno al valore attuale; per agganciarla porta la manopola al centro. Altri due clic tornano alla regolazione normale. Il display mostra `FINE`.
+   - La striscia parte dal colore della sua prima tappa accesa. Il colore passa dalla stessa correzione gamma e dagli stessi limiti `lum_*` della scena, quindi il valore trovato è esattamente quello da scrivere nella tappa.
+3. Il display mostra striscia, canale attivo, R G B e una riga pronta da copiare (`tappa: 246, 220, 208`). Il monitor seriale stampa la stessa riga a ogni variazione.
+4. **START tenuto 2 s** torna alla scelta della striscia (ogni striscia ricorda i suoi valori); **TEST tenuto 2 s** esce e fa partire il ciclo normale. Non viene salvato nulla: i valori vanno copiati in `PRESEPE.INI`.
 
 ### Simulazione
 
@@ -374,7 +388,7 @@ La scheda viene letta **una sola volta, all'accensione**. Se `PRESEPE.INI` manca
 | `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tinta in %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = spente), `colore`, `accendi = FASE, %`, `spegni = FASE, %` (può scavalcare la fine del ciclo), `fuoco` (0–100), `dissolvenza_ms` |
-| `[SISTEMA]` | `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio`, `oled`, `debug_ms` |
+| `[SISTEMA]` | `fastboot` (predefinito 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (entrambi solo con `fastboot = 0`), `oled`, `debug_ms` |
 
 Gli eventi dei relè restano validi finché non arriva il successivo: un relè mantiene lo stato fino al suo prossimo evento. Un relè si può indicare col numero (1–16), col nome, o come `Grp_GG_RR`, dove relè = (GG − 1) × 4 + RR. La prima riga `evento` valida sostituisce tutta la tabella di default.
 
@@ -409,7 +423,7 @@ Regole:
 - Fino a 20 tappe per striscia. Una sola tappa vuol dire colore fisso per tutto il ciclo.
 - Se una sezione contiene almeno una tappa valida, le tappe del file sostituiscono **tutte** quelle predefinite di quella striscia. Le strisce senza tappe nel file restano con quelle predefinite.
 
-Le tappe predefinite riproducono le curve storiche del firmware. Per esempio la striscia del tramonto:
+Le tappe predefinite di TRAMONTO e ALBA riproducono le curve storiche del firmware. La curva diurna del CIELO è stata ridisegnata nella release 038: al 30 % del GIORNO è quasi bianca (80 % della strada fra caldo e bianco), tiene il bianco pieno dal 45 % al 55 %, torna all'80 % al 70 % e rientra nel colore caldo all'inizio del TRAMONTO. Per esempio la striscia del tramonto:
 
 ```ini
 [TRAMONTO]
@@ -422,7 +436,7 @@ tappa = TRAMONTO, 100,   0,  0,  0     ; spenta a fine tramonto, fino al giro do
 
 Per aggiungere un colore intermedio, per esempio un passaggio rosso fra il picco arancio e il bianco tenue, basta inserire una tappa in mezzo: `tappa = TRAMONTO, 60, 140, 30, 10`.
 
-Le tappe predefinite sono state confrontate con il firmware precedente, che aveva le curve scritte nel codice, in 1.000.000 di punti del ciclo:
+Quando sono state introdotte le tappe (prima della modifica al cielo della release 038), quelle predefinite sono state confrontate con il firmware precedente, che aveva le curve scritte nel codice, in 1.000.000 di punti del ciclo:
 - le strisce TRAMONTO e ALBA differiscono al massimo di 1 gradino su 255 (arrotondamenti), in 15 punti su un milione;
 - il CIELO differisce di 1 gradino su 255 nello 0,5 % dei punti;
 - l'unica differenza maggiore (10 gradini) cade nel solo istante dello "scatto" dell'alba al 38 %, dove il codice vecchio e il nuovo arrotondano il confine in modo diverso.
@@ -541,7 +555,6 @@ KiCad 8–10 aprono i file di KiCad 7, ma gli script sono scritti per l'API Pyth
 - **ERC non eseguito.** `kicad-cli` 7 non ha l'ERC; le connessioni sono dimostrate dalla parità schema ↔ PCB e dalle verifiche indipendenti.
 - **I Gerber ordinati riportano revisione "C"** nell'attributo di intestazione X2 `ProjectId`, residuo del cartiglio. È solo estetico, non incide sulla produzione ed è corretto negli script. Vedi la cartella congelata dell'ordine.
 - **Avvisi di annotazione:** i riferimenti `J_*` fanno segnalare a KiCad avvisi di annotazione. Sono innocui.
-- **Workflow CI** (`.github/workflows/firmware.yml`): è scritto ma non è ancora stato eseguito su GitHub.
 
 ## 15. Sicurezza
 

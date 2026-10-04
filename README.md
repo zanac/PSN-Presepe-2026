@@ -303,7 +303,7 @@ Libraries: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (with Adafruit BusI
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Size: 55.9 kB flash (22 %), 3.7 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
+Size: 59.3 kB flash (23 %), 3.8 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
 
 ### Build
 
@@ -314,7 +314,7 @@ Size: 55.9 kB flash (22 %), 3.7 kB static RAM. The LED and OLED buffers are allo
   arduino-cli core install arduino:avr
   arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
   firmware/tools/fw_compile.sh                       # -> firmware/PSN-Presepe/build/PSN-Presepe.ino.hex
-  firmware/tools/run_tests.sh                        # 54 host-side checks of the INI reader and colour tappe
+  firmware/tools/run_tests.sh                        # 68 checks of the INI reader / tappe + colour-mode simulation
   ```
 
 The sketch declares its prototypes explicitly, so it does not depend on the IDE's automatic prototype generation.
@@ -331,8 +331,8 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
 **Boot:**
 1. Load the defaults.
 2. Read `/PRESEPE.INI` from the SD card, or `/PRESEPE.TXT` if the first is missing.
-3. Show the OLED splash.
-4. Show the SD status screen:
+3. Show the OLED splash "by Vanni" for 3 s, always (also with `fastboot = 1`). Pressing TEST during these 3 s enters the colour mode.
+4. Show the SD status screen (with `fastboot = 1`, only when `PRESEPE.INI` has errors):
 
    | OLED message | Meaning |
    |---|---|
@@ -341,8 +341,10 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
    | `MANCA PRESEPE.INI` | card present, neither file found |
    | `SD ASSENTE` | no card |
 
-5. Run the self-test (about 22 s; can be disabled), with an optional melody.
-6. Start the cycle, running or paused according to `partenza`.
+5. Run the self-test (about 22 s), with an optional melody. Skipped with `fastboot = 1`.
+6. Start the cycle from the beginning of GIORNO, running or paused according to `partenza`.
+
+**Fast boot** (`[SISTEMA] fastboot`, default **1**, since release 038) keeps only the 3 s splash and skips the SD status screen (unless the file has errors), the self-test and the melody, so the scene starts immediately. Set `fastboot = 0` for the full start-up; `autotest_avvio` and `melodia_avvio` then decide whether the self-test and the melody run.
 
 **Buttons:**
 
@@ -354,6 +356,18 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
 | **Potentiometer** | Selects one of the three cycle lengths; the change is applied once the knob settles. |
 
 **Serial monitor** (115200 baud): prints the whole active configuration at boot, including every relay event, followed by a periodic status line (`debug_ms`).
+
+### Colour mode (finding the R, G, B values for the tappe)
+
+Press **TEST during the 3 s splash** ("by Vanni", bottom line `TEST = modo colore`) to enter the colour mode instead of the normal cycle; holding it from power-on works too. Relays, stars and houses stay off.
+
+1. **Choose the strip.** The proposed strip lights up **white**, the others stay off. **NEXT** steps ALBA → CIELO → TRAMONTO → ALBA…; **START** confirms.
+2. **Adjust.** Short **START / NEXT / TEST** select the **R / G / B** channel, and the potentiometer sets it from 0 to 255.
+   - **Pick-up:** after choosing a channel the knob does nothing until it reaches the channel's current value. The display shows which way to turn (`gira + verso 220`), then `agganciato`. Switching from R to G therefore never makes G jump to R's value.
+   - **Fine adjustment:** **two clicks within 1 s** on the same channel button. The whole knob travel then covers only ±16 around the current value; centre the knob to pick it up. Two clicks again return to normal. The display shows `FINE`.
+   - The strip starts from the colour of its first lit tappa. The colour goes through the same gamma correction and `lum_*` limits as the scene, so the value you find is exactly the one to write in the tappa.
+3. The display shows the strip, the active channel, R G B and a ready-to-copy line (`tappa: 246, 220, 208`). The serial monitor prints the same line at every change.
+4. **START held 2 s** returns to the strip choice (each strip keeps its values); **TEST held 2 s** leaves the mode and starts the normal cycle. Nothing is saved: copy the values into `PRESEPE.INI`.
 
 ### Simulation
 
@@ -374,7 +388,7 @@ The card is read **once, at power-on**. If `PRESEPE.INI` is missing, the firmwar
 | `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tint %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = off), `colore`, `accendi = PHASE, %`, `spegni = PHASE, %` (may wrap past the end of the cycle), `fuoco` (0–100), `dissolvenza_ms` |
-| `[SISTEMA]` | `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio`, `oled`, `debug_ms` |
+| `[SISTEMA]` | `fastboot` (default 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (both only with `fastboot = 0`), `oled`, `debug_ms` |
 
 Relay events are persistent: a relay keeps its state until its next event. Relays can be named by number (1–16), by name, or as `Grp_GG_RR`, where relay = (GG − 1) × 4 + RR. The first valid `evento` line replaces the whole default table.
 
@@ -409,7 +423,7 @@ Rules:
 - Up to 20 tappe per strip. A single tappa means a fixed colour for the whole cycle.
 - If a section contains at least one valid tappa, the file's tappe replace **all** the default tappe of that strip. Strips without tappe in the file keep their defaults.
 
-The default tappe reproduce the historical curves of the firmware. For example, the sunset strip:
+The default tappe of TRAMONTO and ALBA reproduce the historical curves of the firmware. The CIELO day curve was reshaped in release 038: it nearly reaches white (80 % of the way) at 30 % of GIORNO, holds full white from 45 % to 55 %, is back at 80 % at 70 % and returns to the warm colour by the start of TRAMONTO. For example, the sunset strip:
 
 ```ini
 [TRAMONTO]
@@ -422,7 +436,7 @@ tappa = TRAMONTO, 100,   0,  0,  0     ; off at the end of the sunset, until the
 
 To add an intermediate colour, for example a red stage between the orange peak and the faint white, add a tappa in between: `tappa = TRAMONTO, 60, 140, 30, 10`.
 
-The default tappe were checked against the previous hard-coded firmware at 1,000,000 points of the cycle:
+When the tappe were introduced (before the release 038 sky change), their defaults were checked against the previous hard-coded firmware at 1,000,000 points of the cycle:
 - the sunset and dawn strips differ by at most 1 step out of 255 (float rounding), at 15 points out of a million;
 - the sky strip differs by 1 step out of 255 at 0.5 % of the points;
 - the only larger difference (10 steps) is at the single instant of the dawn "step" at 38 %, where the old and the new code round the boundary differently.
@@ -541,7 +555,6 @@ KiCad 8–10 open the KiCad 7 files, but the scripts were written for the KiCad 
 - **ERC was not run.** `kicad-cli` 7 has no ERC; connectivity is proven by schematic ↔ PCB parity and by the independent checks instead.
 - **Ordered Gerbers carry revision "C"** in the X2 `ProjectId` header attribute, a leftover title-block value. It is cosmetic, has no effect on fabrication, and is fixed in the scripts. See the frozen order folder.
 - **Annotation warnings:** the `J_*` reference designators make KiCad report annotation warnings. They are harmless.
-- **CI workflow** (`.github/workflows/firmware.yml`) is written but has not run on GitHub yet.
 
 ## 15. Safety
 

@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
       "[TRAMONTO]\ntappa = tramonto, 10, 200, 80, 20\ntappa = TRAMONTO, 60.5, 0, 0, 255, LINEARE\n"
       "[STELLE]\nnumero = 80\nattive = 30\ncolore = 100,100,100\n"
       "[CASETTE]\nnumero = 12\naccendi = NOTTE, 90\nspegni = GIORNO, 10\nfuoco = 0\n"
-      "[SISTEMA]\nbuzzer = 0\ndebug_ms = 0\n";
+      "[SISTEMA]\nbuzzer = 0\ndebug_ms = 0\nfastboot = no\n";
     PresepeConfig c; cfgDefault(c); cfgParseBuffer(c, t);
     CHECK(c.errori == 0);
     CHECK(c.durataMs[0] == 30000UL && c.durataMs[1] == 120000UL && c.durataMs[2] == 600000UL);
@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
     CHECK(c.numTappe[CFG_S_CIELO] == d.numTappe[CFG_S_CIELO] && c.tappeDaFile[CFG_S_CIELO] == 0);   // untouched strips keep defaults
     CHECK(c.numStelle == 80 && c.stelleAttive == 30 && c.coloreStelle.g == 100);
     CHECK(c.numCasette == 12 && c.accendiFase == CFG_NOTTE && c.accendiPct == 90 && c.spegniFase == CFG_GIORNO && c.fuoco == 0);
-    CHECK(c.buzzer == 0 && c.debugMs == 0);
+    CHECK(c.buzzer == 0 && c.debugMs == 0 && c.fastboot == 0 && d.fastboot == 1);
     CHECK(c.lumCielo == 100);   // untouched keys keep defaults
   }
 
@@ -160,12 +160,37 @@ int main(int argc, char **argv) {
   }
   // 8. default tappe: the historical key colours are where they used to be
   {
-    CfgRGB g = cfgColoreTappe(d, CFG_S_CIELO, 0.0f), wh = cfgColoreTappe(d, CFG_S_CIELO, 40.0f * 0.3333f);
-    CHECK(g.r == 210 && g.g == 82 && g.b == 18); CHECK(wh.r >= 254 && wh.g >= 254 && wh.b >= 254);
+    CfgRGB g = cfgColoreTappe(d, CFG_S_CIELO, 0.0f), wh = cfgColoreTappe(d, CFG_S_CIELO, 40.0f * 0.50f);
+    CHECK(g.r == 210 && g.g == 82 && g.b == 18); CHECK(wh.r == 255 && wh.g == 255 && wh.b == 255);   // noon plateau 45..55 %
+    CfgRGB q = cfgColoreTappe(d, CFG_S_CIELO, cfgPosizione(d, CFG_GIORNO, 30.0f));
+    CHECK(q.r == 246 && q.g == 220 && q.b == 208);
     CfgRGB pk = cfgColoreTappe(d, CFG_S_TRAMONTO, cfgPosizione(d, CFG_TRAMONTO, 38.0f));
     CHECK(pk.r == 155 && pk.g == 92 && pk.b == 16);
     CfgRGB off = cfgColoreTappe(d, CFG_S_ALBA, 20.0f), on = cfgColoreTappe(d, CFG_S_ALBA, 85.0f);
     CHECK(off.r == 0 && off.g == 0 && off.b == 0); CHECK(on.r == 18 && on.g == 12 && on.b == 5);
+  }
+
+  // 9. colour mode: potentiometer -> value (normal / fine) and pick-up
+  {
+    PresepeConfig c; cfgDefault(c);              // pot 0..1023, pot_invertito = 1
+    CHECK(cfgValoreDaPot(c, 0, 0, 0) == 255 && cfgValoreDaPot(c, 1023, 0, 0) == 0);
+    c.potInvertito = 0;
+    CHECK(cfgValoreDaPot(c, 0, 0, 0) == 0 && cfgValoreDaPot(c, 1023, 0, 0) == 255);
+    CHECK(cfgValoreDaPot(c, 512, 0, 0) == 128);
+    CHECK(cfgValoreDaPot(c, -50, 0, 0) == 0 && cfgValoreDaPot(c, 2000, 0, 0) == 255);   // clamped
+    // fine: whole travel = base -16 .. base +16, centre = base
+    CHECK(cfgValoreDaPot(c, 0, 1, 100) == 84 && cfgValoreDaPot(c, 1023, 1, 100) == 116);
+    CHECK(cfgValoreDaPot(c, 512, 1, 100) == 100);
+    CHECK(cfgValoreDaPot(c, 0, 1, 5) == 0 && cfgValoreDaPot(c, 1023, 1, 250) == 255);    // clamped at 0 / 255
+    CfgAggancio a; cfgAggancioReset(a);
+    CHECK(cfgAggancioAggiorna(a, 100, 50) == 0 && cfgAggancioAggiorna(a, 100, 80) == 0);  // below, approaching
+    CHECK(cfgAggancioAggiorna(a, 100, 99) == 1);                                           // reached (+/-1)
+    CHECK(cfgAggancioAggiorna(a, 100, 10) == 1);                                           // stays engaged
+    cfgAggancioReset(a);
+    CHECK(cfgAggancioAggiorna(a, 100, 200) == 0 && cfgAggancioAggiorna(a, 100, 150) == 0); // above
+    CHECK(cfgAggancioAggiorna(a, 100, 90) == 1);                                           // jumped past: engaged
+    cfgAggancioReset(a);
+    CHECK(cfgAggancioAggiorna(a, 100, 100) == 1);                                          // already on the value
   }
 
   std::printf("%d checks, %d failures\n", checks, fails);
