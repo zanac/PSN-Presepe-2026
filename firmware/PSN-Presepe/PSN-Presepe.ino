@@ -147,6 +147,7 @@ const unsigned long OLED_POPUP_MS = 1800UL;
 #define CFG_MAX_CASETTE  100   // pixel WS2811 massimi per catena CASETTE
 #define CFG_MAX_EVENTI    64   // righe "evento" della schedulazione rele'
 #define CFG_NOME_LEN      13   // 12 caratteri + terminatore (nome rele' su OLED)
+#define CFG_MAX_TAPPE     20   // tappe di colore massime per striscia RGB (CIELO / TRAMONTO / ALBA)
 #define CFG_FILE_NAME     "PRESEPE.INI"   // file cercato per primo nella radice della microSD
 #define CFG_FILE_NAME_ALT "PRESEPE.TXT"   // alternativa (Wokwi non accetta file .ini; utile anche su Windows)
 
@@ -162,6 +163,19 @@ struct CfgEvento {          // { FASE, RELE', ACCESO, % DELLA FASE }
 };
 
 enum CfgForza : uint8_t { FORZA_AUTO = 0, FORZA_ON = 1, FORZA_OFF = 2 };
+
+// Strisce RGB analogiche con colori a tappe ([CIELO], [TRAMONTO], [ALBA]).
+enum CfgStriscia : uint8_t { CFG_S_CIELO = 0, CFG_S_TRAMONTO, CFG_S_ALBA, CFG_NUM_STRISCE };
+// Come si arriva a una tappa partendo dalla precedente.
+enum CfgCurva : uint8_t { CURVA_MORBIDA = 0,   // parte e arriva piano (smoothstep), come le dissolvenze storiche
+                          CURVA_LINEARE = 1 }; // velocita' costante per tutto il tratto
+
+struct CfgTappa {           // "tappa = FASE, %, R, G, B [, curva]"
+  uint8_t fase;             // CfgFase
+  uint8_t curva;            // CfgCurva del tratto che ARRIVA a questa tappa
+  float   pct;              // 0..100 % della fase
+  CfgRGB  col;              // colore da avere esattamente in quel punto
+};
 
 enum CfgSdStato : uint8_t {
   SD_NON_LETTA = 0,   // lettura non tentata
@@ -185,10 +199,10 @@ struct PresepeConfig {
   char     nome[16][CFG_NOME_LEN];
   CfgEvento eventi[CFG_MAX_EVENTI];
   uint8_t  numEventi;
+  // [CIELO] [TRAMONTO] [ALBA] - colori a tappe, in ordine di tempo nel ciclo
+  CfgTappa tappe[CFG_NUM_STRISCE][CFG_MAX_TAPPE];
+  uint8_t  numTappe[CFG_NUM_STRISCE];
   // [COLORI]
-  CfgRGB   giornoCaldo, giornoBianco, cieloMinimo;
-  CfgRGB   tramontoChiaro, tramontoArancio, albaChiara, albaArancio;
-  uint8_t  biancoCoda;                    // bianco tenue finale di cielo/tramonto/alba
   uint8_t  lumCielo, lumTramonto, lumAlba; // limite luminosita' 0..100 %
   uint8_t  gamma, pwmInvertito;
   // [STELLE]
@@ -210,6 +224,7 @@ struct PresepeConfig {
   uint8_t  sdStato;
   uint16_t righeLette, errori, primaRigaErrata;
   uint8_t  eventiDaFile;                  // 1 = la schedulazione arriva dal file
+  uint8_t  tappeDaFile[CFG_NUM_STRISCE];  // 1 = le tappe di quella striscia arrivano dal file
 };
 
 extern PresepeConfig cfg;
@@ -222,6 +237,10 @@ void cfgParseBuffer(PresepeConfig &c, const char *testo);
 // Controlli di coerenza finali (fasi crescenti, limiti, ecc.).
 void cfgValida(PresepeConfig &c);
 const char *cfgNomeFase(uint8_t f);
+// Posizione nel ciclo (0..100 %) del punto "pct % della fase".
+float cfgPosizione(const PresepeConfig &c, uint8_t fase, float pct);
+// Colore della striscia 's' nel punto 'p' (0..100 %) del ciclo, calcolato dalle tappe.
+CfgRGB cfgColoreTappe(const PresepeConfig &c, uint8_t s, float p);
 
 #ifdef ARDUINO
 // Legge /PRESEPE.INI dalla microSD (pin CS). Ritorna lo stato in cfg.sdStato.
@@ -248,6 +267,79 @@ const char *cfgNomeFase(uint8_t f) { return f < 5 ? NOMI_FASE[f] : "?"; }
 
 static CfgRGB rgb(uint8_t r, uint8_t g, uint8_t b) { CfgRGB c = { r, g, b }; return c; }
 
+static void tappa(PresepeConfig &c, uint8_t s, uint8_t fase, float pct, uint8_t r, uint8_t g, uint8_t b) {
+  CfgTappa &t = c.tappe[s][c.numTappe[s]++];
+  t.fase = fase; t.pct = pct; t.col = rgb(r, g, b); t.curva = CURVA_MORBIDA;
+}
+
+// Curve storiche (fino al firmware Rev D senza tappe), tutte con curva morbida.
+static void cfgTappeDefault(PresepeConfig &c) {
+  for (uint8_t s = 0; s < CFG_NUM_STRISCE; s++) c.numTappe[s] = 0;
+  // CIELO: caldo -> bianco pieno a 1/3 del GIORNO -> caldo a 2/3, si spegne nel TRAMONTO,
+  // resta spento fino al 38 % dell'ALBA, poi riparte da un minimo caldo fino al GIORNO.
+  tappa(c, CFG_S_CIELO, CFG_GIORNO,    0.0f, 210,  82,  18);
+  tappa(c, CFG_S_CIELO, CFG_GIORNO,   33.33f, 255, 255, 255);
+  tappa(c, CFG_S_CIELO, CFG_GIORNO,   66.67f, 210,  82,  18);
+  tappa(c, CFG_S_CIELO, CFG_TRAMONTO,  0.0f, 210,  82,  18);
+  tappa(c, CFG_S_CIELO, CFG_TRAMONTO, 30.0f,  16,  16,  16);
+  tappa(c, CFG_S_CIELO, CFG_TRAMONTO, 38.0f,   0,   0,   0);
+  tappa(c, CFG_S_CIELO, CFG_ALBA,     38.0f,   0,   0,   0);
+  tappa(c, CFG_S_CIELO, CFG_ALBA,     38.0f,  10,   4,   1);
+  // TRAMONTO (striscia sinistra): accesa solo nella fase TRAMONTO.
+  tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,   0.0f,   0,  0,  0);
+  tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,   0.0f,  18, 10,  4);
+  tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,  38.0f, 155, 92, 16);
+  tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,  82.0f,  16, 16, 16);
+  tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO, 100.0f,   0,  0,  0);
+  // ALBA (striscia destra): accesa solo nella fase ALBA.
+  tappa(c, CFG_S_ALBA, CFG_ALBA,   0.0f,   0,  0,  0);
+  tappa(c, CFG_S_ALBA, CFG_ALBA,   0.0f,  18, 12,  5);
+  tappa(c, CFG_S_ALBA, CFG_ALBA,  38.0f, 155, 78, 22);
+  tappa(c, CFG_S_ALBA, CFG_ALBA,  82.0f,  16, 16, 16);
+  tappa(c, CFG_S_ALBA, CFG_ALBA, 100.0f,   0,  0,  0);
+}
+
+float cfgPosizione(const PresepeConfig &c, uint8_t fase, float pct) {
+  const float inizio[5] = { 0.0f, c.pTramonto, c.pCrepuscolo, c.pNotte, c.pAlba };
+  const float fine[5]   = { c.pTramonto, c.pCrepuscolo, c.pNotte, c.pAlba, 100.0f };
+  if (fase > 4) fase = 4;
+  return inizio[fase] + (fine[fase] - inizio[fase]) * pct / 100.0f;
+}
+
+// Stessa aritmetica di interpola8() dello sketch (troncamento).
+static uint8_t interp8(uint8_t da, uint8_t a, float t) {
+  if (t < 0.0f) t = 0.0f;
+  if (t > 1.0f) t = 1.0f;
+  return (uint8_t)(da + ((float)a - da) * t);
+}
+
+CfgRGB cfgColoreTappe(const PresepeConfig &c, uint8_t s, float p) {
+  const uint8_t n = c.numTappe[s];
+  if (n == 0) return rgb(0, 0, 0);
+  const CfgTappa *t = c.tappe[s];
+  if (n == 1) return t[0].col;
+  // tappa precedente = l'ultima con posizione <= p (a pari posizione vince l'ultima: "scatto")
+  int8_t prec = -1;
+  for (uint8_t i = 0; i < n; i++) if (cfgPosizione(c, t[i].fase, t[i].pct) <= p) prec = i;
+  float pPrec, pSucc; uint8_t succ;
+  if (prec < 0) {                       // prima della prima tappa: arriva dall'ultima del giro prima
+    prec = n - 1; succ = 0;
+    pPrec = cfgPosizione(c, t[prec].fase, t[prec].pct) - 100.0f;
+    pSucc = cfgPosizione(c, t[0].fase, t[0].pct);
+  } else {
+    pPrec = cfgPosizione(c, t[prec].fase, t[prec].pct);
+    if (prec + 1 < n) { succ = prec + 1; pSucc = cfgPosizione(c, t[succ].fase, t[succ].pct); }
+    else { succ = 0; pSucc = cfgPosizione(c, t[0].fase, t[0].pct) + 100.0f; }   // giro del ciclo
+  }
+  float x = (pSucc > pPrec) ? (p - pPrec) / (pSucc - pPrec) : 1.0f;
+  if (x < 0.0f) x = 0.0f;
+  if (x > 1.0f) x = 1.0f;
+  if (t[succ].curva == CURVA_MORBIDA) x = x * x * (3.0f - 2.0f * x);
+  return rgb(interp8(t[prec].col.r, t[succ].col.r, x),
+             interp8(t[prec].col.g, t[succ].col.g, x),
+             interp8(t[prec].col.b, t[succ].col.b, x));
+}
+
 void cfgDefault(PresepeConfig &c) {
   memset(&c, 0, sizeof(c));
   // [CICLO] - 1 / 3 / 5 minuti, pot invertito come nel cablaggio storico.
@@ -261,11 +353,9 @@ void cfgDefault(PresepeConfig &c) {
   c.eventi[0].fase = CFG_TRAMONTO; c.eventi[0].rele = 2; c.eventi[0].acceso = 1; c.eventi[0].pct = 30;
   c.eventi[1].fase = CFG_NOTTE;    c.eventi[1].rele = 2; c.eventi[1].acceso = 0; c.eventi[1].pct = 50;
   c.numEventi = 2;
-  // [COLORI] - valori identici alle costanti del firmware precedente.
-  c.giornoCaldo = rgb(210, 82, 18); c.giornoBianco = rgb(255, 255, 255); c.cieloMinimo = rgb(10, 4, 1);
-  c.tramontoChiaro = rgb(18, 10, 4); c.tramontoArancio = rgb(155, 92, 16);
-  c.albaChiara = rgb(18, 12, 5);     c.albaArancio = rgb(155, 78, 22);
-  c.biancoCoda = 16;
+  // [CIELO] [TRAMONTO] [ALBA] - tappe che riproducono le curve storiche del firmware.
+  cfgTappeDefault(c);
+  // [COLORI]
   c.lumCielo = 100; c.lumTramonto = 100; c.lumAlba = 100;
   c.gamma = 1; c.pwmInvertito = 0;
   // [STELLE]
@@ -415,19 +505,35 @@ static bool sezRele(PresepeConfig &c, const char *k, char *v) {
   return false;
 }
 static bool sezColori(PresepeConfig &c, const char *k, char *v) {
-  struct { const char *k; CfgRGB *d; } t[] = {
-    { "giorno_caldo", &c.giornoCaldo }, { "giorno_bianco", &c.giornoBianco }, { "cielo_minimo", &c.cieloMinimo },
-    { "tramonto_chiaro", &c.tramontoChiaro }, { "tramonto_arancio", &c.tramontoArancio },
-    { "alba_chiara", &c.albaChiara }, { "alba_arancio", &c.albaArancio } };
-  for (uint8_t i = 0; i < sizeof(t) / sizeof(t[0]); i++) if (ugualeCI(k, t[i].k)) return leggiRGB(v, *t[i].d);
   long n;
-  if (ugualeCI(k, "bianco_coda")) { if (!leggiLong(v, n, 0, 255)) return false; c.biancoCoda = (uint8_t)n; return true; }
   if (ugualeCI(k, "lum_cielo")) { if (!leggiLong(v, n, 0, 100)) return false; c.lumCielo = (uint8_t)n; return true; }
   if (ugualeCI(k, "lum_tramonto")) { if (!leggiLong(v, n, 0, 100)) return false; c.lumTramonto = (uint8_t)n; return true; }
   if (ugualeCI(k, "lum_alba")) { if (!leggiLong(v, n, 0, 100)) return false; c.lumAlba = (uint8_t)n; return true; }
   if (ugualeCI(k, "gamma")) return leggiBool(v, c.gamma);
   if (ugualeCI(k, "pwm_invertito")) return leggiBool(v, c.pwmInvertito);
   return false;
+}
+// [CIELO] / [TRAMONTO] / [ALBA]:  tappa = FASE, %, R, G, B [, morbida|lineare]
+static bool sezStriscia(PresepeConfig &c, uint8_t s, const char *k, char *v) {
+  if (!ugualeCI(k, "tappa")) return false;
+  char *f[7]; uint8_t nf = campi(v, f, 7);
+  if (nf != 5 && nf != 6) return false;
+  CfgTappa t; memset(&t, 0, sizeof(t)); float pct; long r, g, b;
+  if (!leggiFase(f[0], t.fase) || !leggiFloat(f[1], pct, 0.0f, 100.0f) ||
+      !leggiLong(f[2], r, 0, 255) || !leggiLong(f[3], g, 0, 255) || !leggiLong(f[4], b, 0, 255)) return false;
+  t.pct = pct; t.col = rgb((uint8_t)r, (uint8_t)g, (uint8_t)b); t.curva = CURVA_MORBIDA;
+  if (nf == 6) {
+    if (ugualeCI(f[5], "morbida")) t.curva = CURVA_MORBIDA;
+    else if (ugualeCI(f[5], "lineare")) t.curva = CURVA_LINEARE;
+    else return false;
+  }
+  if (!c.tappeDaFile[s]) { c.numTappe[s] = 0; c.tappeDaFile[s] = 1; }   // il file sostituisce le tappe di default
+  if (c.numTappe[s] >= CFG_MAX_TAPPE) return false;
+  if (c.numTappe[s] > 0) {                                              // devono essere in ordine di tempo
+    const CfgTappa &u = c.tappe[s][c.numTappe[s] - 1];
+    if (t.fase < u.fase || (t.fase == u.fase && t.pct < u.pct)) return false;
+  }
+  c.tappe[s][c.numTappe[s]++] = t; return true;
 }
 static bool sezStelle(PresepeConfig &c, const char *k, char *v) {
   long n;
@@ -484,6 +590,7 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
     if (strlen(n) > 15) { errore(c, numeroRiga); sezione[0] = 0; return; }
     strcpy(sezione, n);
     if (!(ugualeCI(n, "CICLO") || ugualeCI(n, "FASI") || ugualeCI(n, "RELE") || ugualeCI(n, "COLORI") ||
+          ugualeCI(n, "CIELO") || ugualeCI(n, "TRAMONTO") || ugualeCI(n, "ALBA") ||
           ugualeCI(n, "STELLE") || ugualeCI(n, "CASETTE") || ugualeCI(n, "SISTEMA"))) { errore(c, numeroRiga); sezione[0] = 0; }
     return;
   }
@@ -496,6 +603,9 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
   else if (ugualeCI(sezione, "FASI")) ok = sezFasi(c, k, v);
   else if (ugualeCI(sezione, "RELE")) ok = sezRele(c, k, v);
   else if (ugualeCI(sezione, "COLORI")) ok = sezColori(c, k, v);
+  else if (ugualeCI(sezione, "CIELO")) ok = sezStriscia(c, CFG_S_CIELO, k, v);
+  else if (ugualeCI(sezione, "TRAMONTO")) ok = sezStriscia(c, CFG_S_TRAMONTO, k, v);
+  else if (ugualeCI(sezione, "ALBA")) ok = sezStriscia(c, CFG_S_ALBA, k, v);
   else if (ugualeCI(sezione, "STELLE")) ok = sezStelle(c, k, v);
   else if (ugualeCI(sezione, "CASETTE")) ok = sezCasette(c, k, v);
   else if (ugualeCI(sezione, "SISTEMA")) ok = sezSistema(c, k, v);
@@ -503,15 +613,16 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
 }
 
 void cfgValida(PresepeConfig &c) {
-  PresepeConfig d; cfgDefault(d);
+  // Nessuna copia completa dei default (sarebbe ~1,6 kB sullo stack): i valori
+  // di ripiego qui sotto sono gli stessi di cfgDefault().
   // fasi strettamente crescenti, altrimenti tutte di default
   if (!(c.pTramonto < c.pCrepuscolo && c.pCrepuscolo < c.pNotte && c.pNotte < c.pAlba)) {
-    c.pTramonto = d.pTramonto; c.pCrepuscolo = d.pCrepuscolo; c.pNotte = d.pNotte; c.pAlba = d.pAlba;
+    c.pTramonto = 40.0f; c.pCrepuscolo = 50.0f; c.pNotte = 55.0f; c.pAlba = 85.0f;
     errore(c, 0xFFFF);
   }
-  if (c.potMax - c.potMin < 30) { c.potMin = d.potMin; c.potMax = d.potMax; errore(c, 0xFFFF); }
-  if (c.lumStelleMin > c.lumStelleMax) { c.lumStelleMin = d.lumStelleMin; c.lumStelleMax = d.lumStelleMax; errore(c, 0xFFFF); }
-  if (c.scintillioMinMs > c.scintillioMaxMs) { c.scintillioMinMs = d.scintillioMinMs; c.scintillioMaxMs = d.scintillioMaxMs; errore(c, 0xFFFF); }
+  if (c.potMax - c.potMin < 30) { c.potMin = 0; c.potMax = 1023; errore(c, 0xFFFF); }
+  if (c.lumStelleMin > c.lumStelleMax) { c.lumStelleMin = 22; c.lumStelleMax = 75; errore(c, 0xFFFF); }
+  if (c.scintillioMinMs > c.scintillioMaxMs) { c.scintillioMinMs = 6400; c.scintillioMaxMs = 12200; errore(c, 0xFFFF); }
   if (c.stelleAttive > c.numStelle) c.stelleAttive = (uint8_t)c.numStelle;
 }
 
@@ -1337,7 +1448,7 @@ bool inizializzaOled() {
   display.setTextSize(1);
   // Startup splash: PSN-Presepe! by Vanni
   display.setCursor(27,18); display.print(F("PSN-Presepe!"));
-  display.setCursor(30,30); display.print(F("by Vanni 001"));
+  display.setCursor(30,30); display.print(F("by Vanni 037"));
   display.setCursor(18,46);
   stampaDurataOled(durataCicloStabile);
   display.print(F(" (mm:ss)"));
@@ -1392,6 +1503,19 @@ void stampaConfig() {
   Serial.print(cfg.durataMs[1] / 1000UL); Serial.print('/'); Serial.println(cfg.durataMs[2] / 1000UL);
   Serial.print(F("Fasi %: ")); Serial.print(cfg.pTramonto); Serial.print(' '); Serial.print(cfg.pCrepuscolo);
   Serial.print(' '); Serial.print(cfg.pNotte); Serial.print(' '); Serial.println(cfg.pAlba);
+  {
+    static const char *const NOMI_STRISCE[CFG_NUM_STRISCE] = { "CIELO", "TRAMONTO", "ALBA" };
+    for (uint8_t s = 0; s < CFG_NUM_STRISCE; s++) {
+      Serial.print(F("Tappe ")); Serial.print(NOMI_STRISCE[s]); Serial.print(F(": "));
+      Serial.print(cfg.numTappe[s]); Serial.println(cfg.tappeDaFile[s] ? F(" (dal file)") : F(" (predefinite)"));
+      for (uint8_t i = 0; i < cfg.numTappe[s]; i++) {
+        const CfgTappa &t = cfg.tappe[s][i];
+        Serial.print(F("  ")); Serial.print(cfgNomeFase(t.fase)); Serial.print(' '); Serial.print(t.pct);
+        Serial.print(F("% -> ")); Serial.print(t.col.r); Serial.print(','); Serial.print(t.col.g); Serial.print(',');
+        Serial.print(t.col.b); Serial.println(t.curva == CURVA_LINEARE ? F(" lineare") : F(" morbida"));
+      }
+    }
+  }
   Serial.print(F("Eventi rele': ")); Serial.println(cfg.numEventi);
   for (uint8_t i = 0; i < cfg.numEventi; i++) {
     Serial.print(F("  ")); Serial.print(cfgNomeFase(cfg.eventi[i].fase)); Serial.print(F(" "));
@@ -1435,9 +1559,6 @@ void faseAvanti() {
 
 void aggiornaScena(float p) {
   Fase fase = faseDaPercentuale(p);
-  // Le laterali restano completamente spente (PWM=0) quando inattive.
-  // L'hardware reale ha mostrato che questo stato e' stabile; lo sfarfallio
-  // compariva invece durante le precedenti dissolvenze nella zona minima.
 
   // Genera una nuova disposizione a ogni ingresso nel crepuscolo.
   if (fase == CREPUSCOLO && ultimaFaseStelle != CREPUSCOLO) {
@@ -1445,204 +1566,37 @@ void aggiornaScena(float p) {
   }
   ultimaFaseStelle = fase;
 
-  uint8_t r = 0, g = 0, b = 0, livelloStelle = 0;
-  uint8_t tr = 0, tg = 0, tb = 0; // luce laterale tramonto
-  uint8_t ar = 0, ag = 0, ab = 0; // luce laterale alba
+  // Strisce RGB: colore calcolato dalle tappe di [CIELO], [TRAMONTO], [ALBA]
+  // (vedi cfgColoreTappe nel blocco CONFIG). Le tappe di default riproducono
+  // le curve storiche: le laterali restano a PWM esattamente zero quando inattive.
+  CfgRGB cielo = cfgColoreTappe(cfg, CFG_S_CIELO, p);
+  CfgRGB tram  = cfgColoreTappe(cfg, CFG_S_TRAMONTO, p);
+  CfgRGB alba  = cfgColoreTappe(cfg, CFG_S_ALBA, p);
 
+  // Stelle: compaiono nel CREPUSCOLO (lineare), piene di NOTTE,
+  // si dissolvono durante tutta l'ALBA (curva morbida).
+  uint8_t livelloStelle = 0;
   switch (fase) {
-
-    case GIORNO: {
-      // Il giorno parte con la tonalita' calda abituale, raggiunge
-      // progressivamente il bianco pieno dell'autotest al 33% della fase,
-      // poi torna alla tonalita' calda entro il 66%. L'ultimo terzo resta
-      // stabile, cosi' l'ingresso nel TRAMONTO rimane invariato.
-      float t = progresso(p, 0.0f, P_TRAMONTO);
-      float mixBianco = 0.0f;
-
-      if (t < (1.0f / 3.0f)) {
-        mixBianco = t * 3.0f;             // caldo -> bianco
-      } else if (t < (2.0f / 3.0f)) {
-        mixBianco = 2.0f - (t * 3.0f);    // bianco -> caldo
-      }
-
-      // Smoothstep per rendere morbidi partenza, inversione e arrivo.
-      mixBianco = constrain(mixBianco, 0.0f, 1.0f);
-      mixBianco = mixBianco * mixBianco * (3.0f - 2.0f * mixBianco);
-
-      r = interpola8(cfg.giornoCaldo.r, cfg.giornoBianco.r, mixBianco);
-      g = interpola8(cfg.giornoCaldo.g, cfg.giornoBianco.g, mixBianco);
-      b = interpola8(cfg.giornoCaldo.b, cfg.giornoBianco.b, mixBianco);
-
-      tr = 0; tg = 0; tb = 0;
-      ar = 0; ag = 0; ab = 0;
-      livelloStelle = 0;
+    case CREPUSCOLO:
+      livelloStelle = interpola8(0, cfg.livelloNotte, progresso(p, P_CREPU, P_NOTTE));
       break;
-    }
-
-    case TRAMONTO: {
-      float t = progresso(p, P_TRAMONTO, P_CREPU);
-
-      // Il CIELO fa il percorso inverso rispetto all'ALBA.
-      // Parte esattamente dal colore lasciato dal GIORNO (210,82,18) e
-      // deve essere completamente spento quando TRAMONTO raggiunge il picco
-      // al 38% della fase. Prima perde gradualmente saturazione fino a un
-      // bianco molto tenue; negli ultimi istanti R=G=B e si spengono insieme.
-      if (t < 0.30f) {
-        float x = t / 0.30f;
-        x = x * x * (3.0f - 2.0f * x);
-        const uint8_t BIANCO_CIELO = cfg.biancoCoda;
-        r = interpola8(cfg.giornoCaldo.r, BIANCO_CIELO, x);
-        g = interpola8(cfg.giornoCaldo.g, BIANCO_CIELO, x);
-        b = interpola8(cfg.giornoCaldo.b, BIANCO_CIELO, x);
-      } else if (t < 0.38f) {
-        float x = (t - 0.30f) / 0.08f;
-        x = constrain(x, 0.0f, 1.0f);
-        x = x * x * (3.0f - 2.0f * x);
-        uint8_t bianco = interpola8(cfg.biancoCoda, 0, x);
-        r = bianco;
-        g = bianco;
-        b = bianco;
-      } else {
-        r = 0; g = 0; b = 0;
-      }
-      livelloStelle = 0;
-
-      // Laterale TRAMONTO: stessa filosofia dell'ALBA, con un picco
-      // leggermente piu' arancione. Parte tenue, raggiunge il colore massimo,
-      // poi perde saturazione fino a un bianco debole. Nell'ultimo tratto
-      // R=G=B e i tre canali si spengono esattamente insieme.
-      const uint8_t TRAMONTO_CHIARO_R = cfg.tramontoChiaro.r;
-      const uint8_t TRAMONTO_CHIARO_G = cfg.tramontoChiaro.g;
-      const uint8_t TRAMONTO_CHIARO_B = cfg.tramontoChiaro.b;
-      const uint8_t TRAMONTO_ARANCIO_R = cfg.tramontoArancio.r;
-      const uint8_t TRAMONTO_ARANCIO_G = cfg.tramontoArancio.g;
-      const uint8_t TRAMONTO_ARANCIO_B = cfg.tramontoArancio.b;
-
-      if (t < 0.38f) {
-        float x = t / 0.38f;
-        x = x * x * (3.0f - 2.0f * x);
-        tr = interpola8(TRAMONTO_CHIARO_R, TRAMONTO_ARANCIO_R, x);
-        tg = interpola8(TRAMONTO_CHIARO_G, TRAMONTO_ARANCIO_G, x);
-        tb = interpola8(TRAMONTO_CHIARO_B, TRAMONTO_ARANCIO_B, x);
-      } else if (t < 0.82f) {
-        float x = (t - 0.38f) / (0.82f - 0.38f);
-        x = constrain(x, 0.0f, 1.0f);
-        x = x * x * (3.0f - 2.0f * x);
-        const uint8_t BIANCO_CODA = cfg.biancoCoda;
-        tr = interpola8(TRAMONTO_ARANCIO_R, BIANCO_CODA, x);
-        tg = interpola8(TRAMONTO_ARANCIO_G, BIANCO_CODA, x);
-        tb = interpola8(TRAMONTO_ARANCIO_B, BIANCO_CODA, x);
-      } else {
-        float x = (t - 0.82f) / 0.18f;
-        x = constrain(x, 0.0f, 1.0f);
-        x = x * x * (3.0f - 2.0f * x);
-        uint8_t bianco = interpola8(cfg.biancoCoda, 0, x);
-        tr = bianco;
-        tg = bianco;
-        tb = bianco;
-      }
-      break;
-    }
-
-    case CREPUSCOLO: {
-      float t = progresso(p, P_CREPU, P_NOTTE);
-
-      // Il cielo e' gia' al colore della NOTTE. Durante il crepuscolo
-      // si spegne soltanto l'ultimo bagliore a ovest mentre compaiono
-      // progressivamente le stelle.
-      r = 0;
-      g = 0;
-      b = 0;
-      // TRAMONTO e ALBA sono inattive: PWM esattamente a zero.
-      tr = 0; tg = 0; tb = 0;
-      ar = 0; ag = 0; ab = 0;
-      livelloStelle = interpola8(0, cfg.livelloNotte, t);
-      break;
-    }
-
     case NOTTE:
-      // Notte completamente buia sulla striscia CIELO.
-      r = 0;
-      g = 0;
-      b = 0;
-      tr = 0; tg = 0; tb = 0;
-      ar = 0; ag = 0; ab = 0;
       livelloStelle = cfg.livelloNotte;
       break;
-
     case ALBA: {
       float t = progresso(p, P_ALBA, 100.0f);
-
-      // Il CIELO resta completamente spento fino al picco dell'ALBA (38%).
-      // Da quel momento si accende appena e cresce molto dolcemente fino
-      // a raggiungere esattamente il colore iniziale della fase GIORNO.
-      if (t < 0.38f) {
-        r = 0; g = 0; b = 0;
-      } else {
-        const uint8_t CIELO_MIN_R = cfg.cieloMinimo.r;
-        const uint8_t CIELO_MIN_G = cfg.cieloMinimo.g;
-        const uint8_t CIELO_MIN_B = cfg.cieloMinimo.b;
-        float tGiorno = (t - 0.38f) / 0.62f;
-        tGiorno = constrain(tGiorno, 0.0f, 1.0f);
-        tGiorno = tGiorno * tGiorno * (3.0f - 2.0f * tGiorno);
-        r = interpola8(CIELO_MIN_R, cfg.giornoCaldo.r, tGiorno);
-        g = interpola8(CIELO_MIN_G, cfg.giornoCaldo.g, tGiorno);
-        b = interpola8(CIELO_MIN_B, cfg.giornoCaldo.b, tGiorno);
-      }
-
-      // Le stelle invece iniziano a dissolversi fin dall'inizio dell'ALBA,
-      // indipendentemente dall'accensione tardiva del CIELO centrale.
       float tStelle = t * t * (3.0f - 2.0f * t);
       livelloStelle = interpola8(cfg.livelloNotte, 0, tStelle);
-
-      // Alba direzionale dalla striscia destra.
-      // Parte con pochissima luce, ma gia' di tonalita' chiara e calda;
-      // cresce verso un arancio chiaro e poi si dissolve lentamente fino
-      // allo spegnimento completo. CIELO e TRAMONTO restano indipendenti.
-      {
-        const uint8_t ALBA_CHIARA_R = cfg.albaChiara.r;
-        const uint8_t ALBA_CHIARA_G = cfg.albaChiara.g;
-        const uint8_t ALBA_CHIARA_B = cfg.albaChiara.b;
-        const uint8_t ALBA_ARANCIO_R = cfg.albaArancio.r;
-        const uint8_t ALBA_ARANCIO_G = cfg.albaArancio.g;
-        const uint8_t ALBA_ARANCIO_B = cfg.albaArancio.b;
-
-        if (t < 0.38f) {
-          float x = t / 0.38f;
-          x = x * x * (3.0f - 2.0f * x);
-          ar = interpola8(ALBA_CHIARA_R, ALBA_ARANCIO_R, x);
-          ag = interpola8(ALBA_CHIARA_G, ALBA_ARANCIO_G, x);
-          ab = interpola8(ALBA_CHIARA_B, ALBA_ARANCIO_B, x);
-        } else if (t < 0.82f) {
-          // Dopo il picco arancio la luce cala e contemporaneamente
-          // perde colore fino a diventare un bianco tenue.
-          float x = (t - 0.38f) / (0.82f - 0.38f);
-          x = constrain(x, 0.0f, 1.0f);
-          x = x * x * (3.0f - 2.0f * x);
-          const uint8_t BIANCO_CODA = cfg.biancoCoda;
-          ar = interpola8(ALBA_ARANCIO_R, BIANCO_CODA, x);
-          ag = interpola8(ALBA_ARANCIO_G, BIANCO_CODA, x);
-          ab = interpola8(ALBA_ARANCIO_B, BIANCO_CODA, x);
-        } else {
-          // Ultimo tratto rigorosamente neutro: R=G=B in ogni istante.
-          // I tre canali scendono quindi insieme fino allo spegnimento.
-          float x = (t - 0.82f) / 0.18f;
-          x = constrain(x, 0.0f, 1.0f);
-          x = x * x * (3.0f - 2.0f * x);
-          uint8_t bianco = interpola8(cfg.biancoCoda, 0, x);
-          ar = bianco;
-          ag = bianco;
-          ab = bianco;
-        }
-      }
       break;
     }
-
+    default:
+      livelloStelle = 0;
+      break;
   }
 
-  setCielo(r, g, b);
-  setTramonto(tr, tg, tb);
-  setAlba(ar, ag, ab);
+  setCielo(cielo.r, cielo.g, cielo.b);
+  setTramonto(tram.r, tram.g, tram.b);
+  setAlba(alba.r, alba.g, alba.b);
   setStelle(livelloStelle);
 }
 

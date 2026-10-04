@@ -303,7 +303,7 @@ Libraries: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (with Adafruit BusI
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Size: 56.3 kB flash (22 %), 3.2 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
+Size: 55.9 kB flash (22 %), 3.7 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
 
 ### Build
 
@@ -314,7 +314,7 @@ Size: 56.3 kB flash (22 %), 3.2 kB static RAM. The LED and OLED buffers are allo
   arduino-cli core install arduino:avr
   arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
   firmware/tools/fw_compile.sh                       # -> firmware/PSN-Presepe/build/PSN-Presepe.ino.hex
-  firmware/tools/run_tests.sh                        # 33 host-side checks of the INI reader (CONFIG block)
+  firmware/tools/run_tests.sh                        # 54 host-side checks of the INI reader and colour tappe
   ```
 
 The sketch declares its prototypes explicitly, so it does not depend on the IDE's automatic prototype generation.
@@ -363,14 +363,15 @@ The firmware runs unchanged in the Wokwi simulator, with the Rev D wiring: RGB b
 
 Copy [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) to the **root** of a microSD or microSDHC card (2–32 GB, FAT16/FAT32). Cards of 64 GB and more come formatted exFAT, which the Arduino SD library cannot read, so reformat them as FAT32 first.
 
-The card is read **once, at power-on**. If `PRESEPE.INI` is missing, the firmware looks for `PRESEPE.TXT` with the same content (handy for Wokwi, or when Windows saved the file as `.txt`). The example file contains exactly the built-in defaults, with every key commented.
+The card is read **once, at power-on**. If `PRESEPE.INI` is missing, the firmware looks for `PRESEPE.TXT` with the same content (handy for Wokwi, or when Windows saved the file as `.txt`). The example file contains exactly the built-in defaults; every key is explained in Italian in its comments.
 
 | Section | Keys |
 |---|---|
 | `[CICLO]` | `durata1..3` (s, 10–86400), `pot_min`, `pot_max`, `pot_invertito`, `partenza = marcia / pausa` |
 | `[FASI]` | start % of `tramonto`, `crepuscolo`, `notte`, `alba` (must be strictly increasing) |
 | `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 characters), `forza1..16 = auto / on / off`, `evento = PHASE, RELAY, ON/OFF, %` (up to 64) |
-| `[COLORI]` | RGB key colours of the curves, `bianco_coda`, `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
+| `[CIELO]`, `[TRAMONTO]`, `[ALBA]` | `tappa = PHASE, %, R, G, B [, morbida / lineare]` (up to 20 per strip), see below |
+| `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tint %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = off), `colore`, `accendi = PHASE, %`, `spegni = PHASE, %` (may wrap past the end of the cycle), `fuoco` (0–100), `dissolvenza_ms` |
 | `[SISTEMA]` | `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio`, `oled`, `debug_ms` |
@@ -385,6 +386,48 @@ nome1  = Mulino
 evento = GIORNO, Mulino, ON, 10
 evento = NOTTE,  Mulino, OFF, 0
 ```
+
+### RGB strip colours: "tappe" (keyframes)
+
+The colour of each analog strip over the cycle is a list of **tappe** (stops) in its own section, `[CIELO]`, `[TRAMONTO]` or `[ALBA]`. A tappa says: *at this point of the cycle the strip has exactly this colour*. Between two consecutive tappe the firmware fades gradually from one colour to the next.
+
+```ini
+tappa = PHASE, % of the phase, R, G, B [, curve]
+```
+
+- **PHASE, %:** where the tappa is. For example, `TRAMONTO, 38` is 38 % into the sunset phase. Decimals use a dot: `33.33`.
+- **R, G, B:** the colour at that point, 0–255. `0, 0, 0` is off.
+- **curve** (optional) is how the strip *arrives* at this tappa from the previous one:
+  - `morbida` (default): smooth start and smooth arrival (smoothstep), the natural fade used so far;
+  - `lineare`: constant speed over the whole stretch.
+
+Rules:
+- Write the tappe in time order, from GIORNO to ALBA. A tappa that goes back in time is skipped and counted as an error.
+- The list wraps around: after the last tappa the strip fades towards the first tappa of the next cycle.
+- **Two tappe at the same point make an instant change** (a step): the strip reaches the first colour and restarts from the second.
+- To keep a strip off for a stretch, put a `0, 0, 0` tappa at the start and another at the end of that stretch.
+- Up to 20 tappe per strip. A single tappa means a fixed colour for the whole cycle.
+- If a section contains at least one valid tappa, the file's tappe replace **all** the default tappe of that strip. Strips without tappe in the file keep their defaults.
+
+The default tappe reproduce the historical curves of the firmware. For example, the sunset strip:
+
+```ini
+[TRAMONTO]
+tappa = TRAMONTO,   0,   0,  0,  0     ; off until the sunset starts
+tappa = TRAMONTO,   0,  18, 10,  4     ; step: switches on, faint and warm
+tappa = TRAMONTO,  38, 155, 92, 16     ; orange peak
+tappa = TRAMONTO,  82,  16, 16, 16     ; fades to a faint white
+tappa = TRAMONTO, 100,   0,  0,  0     ; off at the end of the sunset, until the next cycle
+```
+
+To add an intermediate colour, for example a red stage between the orange peak and the faint white, add a tappa in between: `tappa = TRAMONTO, 60, 140, 30, 10`.
+
+The default tappe were checked against the previous hard-coded firmware at 1,000,000 points of the cycle:
+- the sunset and dawn strips differ by at most 1 step out of 255 (float rounding), at 15 points out of a million;
+- the sky strip differs by 1 step out of 255 at 0.5 % of the points;
+- the only larger difference (10 steps) is at the single instant of the dawn "step" at 38 %, where the old and the new code round the boundary differently.
+
+None of this is visible.
 
 How errors are handled:
 - A bad line is skipped and counted, and that key keeps its default.
