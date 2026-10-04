@@ -1,0 +1,80 @@
+PASS no copper shorts (0 found)
+PASS all clearances met (0 violations)
+INFO min clearance    COIL <-> COIL        :  0.202 mm (required 0.2 mm)
+INFO min clearance    COIL <-> Default     :  0.254 mm (required 0.2 mm)
+INFO min clearance    COIL <-> MAINS       :  6.470 mm (required 6.0 mm)
+INFO min clearance    COIL <-> POWER       :  0.302 mm (required 0.3 mm)
+INFO min clearance    COIL <-> RGB         : 28.962 mm (required 0.3 mm)
+INFO min clearance Default <-> Default     :  0.202 mm (required 0.2 mm)
+INFO min clearance Default <-> MAINS       :  6.698 mm (required 6.0 mm)
+INFO min clearance Default <-> P3V3        :  0.202 mm (required 0.2 mm)
+INFO min clearance Default <-> P5V         :  0.252 mm (required 0.25 mm)
+INFO min clearance Default <-> POWER       :  0.302 mm (required 0.3 mm)
+INFO min clearance Default <-> RGB         :  0.302 mm (required 0.3 mm)
+INFO min clearance   MAINS <-> MAINS-inter :  5.230 mm (required 5.0 mm)
+INFO min clearance   MAINS <-> MAINS-intra :  2.150 mm (required 2.0 mm)
+INFO min clearance   MAINS <-> P5V         :  6.750 mm (required 6.0 mm)
+INFO min clearance   MAINS <-> POWER       :  6.674 mm (required 6.0 mm)
+INFO min clearance    P3V3 <-> P5V         :  9.951 mm (required 0.25 mm)
+INFO min clearance    P3V3 <-> POWER       :  0.302 mm (required 0.3 mm)
+INFO min clearance     P5V <-> POWER       :  0.311 mm (required 0.3 mm)
+INFO min clearance     P5V <-> RGB         :  3.696 mm (required 0.3 mm)
+INFO min clearance   POWER <-> POWER       :  0.302 mm (required 0.3 mm)
+INFO min clearance   POWER <-> RGB         :  0.302 mm (required 0.3 mm)
+INFO min clearance     RGB <-> RGB         :  0.302 mm (required 0.3 mm)
+PASS hole clearance (0.25 mm; 6 mm MAINS to non-MAINS holes) (0 violations)
+PASS every net is one connected copper island (131 nets checked; split: {})
+PASS copper-to-edge >= 0.5 mm (MAINS >= 3.0 mm) (0 violations)
+INFO board outline 300.0 x 180.0 mm
+PASS track widths meet net-class minimum (0 too narrow)
+INFO widths COIL     {0.4: 41}
+INFO widths Default  {0.25: 528}
+INFO widths MAINS    {2: 208}
+INFO widths P3V3     {0.4: 30}
+INFO widths P5V      {0.8: 23}
+INFO widths POWER    {0.5: 7, 0.601: 7, 1: 215, 1.5: 9, 3: 25}
+INFO widths RGB      {1.5: 50}
+PASS all 48 relay-contact nets routed on both copper layers at 2 mm
+PASS 3 mm +12V/GND trunks present (25 segments)
+PASS no vias on MAINS nets
+PASS pad-net map == Rev B netlist + documented Rev D changes (0 differences)
+PASS K1/JR1: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K2/JR2: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K3/JR3: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K4/JR4: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K5/JR5: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K6/JR6: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K7/JR7: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K8/JR8: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K9/JR9: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K10/JR10: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K11/JR11: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K12/JR12: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K13/JR13: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K14/JR14: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K15/JR15: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS K16/JR16: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
+PASS all 16 relays match the Omron G5Q-1 hole pattern (KiCad library, top view, not mirrored)
+PASS reference G5Q-1 pattern equals installed KiCad library footprint
+PASS U1: DIP-18 300 mil (row 7.62 mm, pitch 2.54), pin 9 GND, pin 10 COM=+12V
+PASS U2: DIP-18 300 mil (row 7.62 mm, pitch 2.54), pin 9 GND, pin 10 COM=+12V
+PASS Q1 IRLZ44N G-D-S = 1-2-3
+PASS Q2 IRLZ44N G-D-S = 1-2-3
+PASS Q3 IRLZ44N G-D-S = 1-2-3
+PASS Q4 IRLZ44N G-D-S = 1-2-3
+PASS Q5 IRLZ44N G-D-S = 1-2-3
+PASS Q6 IRLZ44N G-D-S = 1-2-3
+PASS Q7 IRLZ44N G-D-S = 1-2-3
+PASS Q8 IRLZ44N G-D-S = 1-2-3
+PASS Q9 IRLZ44N G-D-S = 1-2-3
+PASS back-side COM/NO/NC labels sit behind the right pads ([])
+PASS firmware pins (17 PIN_ constants + 16 relays) all land on the expected Mega pads
+PASS D25..D40 -> ULN2803 input n -> output (19-n) -> relay coil chain consistent
+PASS microSD: CS=D53 / CD=D49 match firmware, card and buffer on +3V3, buffer outputs enabled, LDO from +12V
+PASS J_POT terminal carries 5V / A0 / GND (on-board pot removed)
+PASS no through-hole component courtyard over the Arduino Mega body ([])
+PASS no vias above the Mega USB-B shell ([])
+INFO courtyard bounding-box overlaps (coarse): [('MCU1', 'J_SD')]
+
+
+RESULT: ALL CHECKS PASSED

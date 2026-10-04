@@ -1,0 +1,19 @@
+{
+  "name": "PSN RGB Strip",
+  "author": "Vanni Brutto / PSN-Presepe",
+  "pins": ["R", "G", "B"],
+  "display": {
+    "width": 180,
+    "height": 104
+  },
+  "controls": [
+    {
+      "id": "labelId",
+      "label": "Label (0=ALBA, 1=CIELO, 2=TRAMONTO)",
+      "type": "range",
+      "min": 0,
+      "max": 2,
+      "step": 1
+    }
+  ]
+}

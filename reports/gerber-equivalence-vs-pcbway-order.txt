@@ -1,0 +1,10 @@
+PSN-Presepe-Mega-RevD-B_Cu.gbl: 1059 primitives - geometry identical
+PSN-Presepe-Mega-RevD-B_Mask.gbs: 377 primitives - geometry identical
+PSN-Presepe-Mega-RevD-B_Silkscreen.gbo: 1608 primitives - geometry identical
+PSN-Presepe-Mega-RevD-Edge_Cuts.gm1: 4 primitives - geometry identical
+PSN-Presepe-Mega-RevD-F_Cu.gtl: 1242 primitives - geometry identical
+PSN-Presepe-Mega-RevD-F_Mask.gts: 697 primitives - geometry identical
+PSN-Presepe-Mega-RevD-F_Silkscreen.gto: 7193 primitives - geometry identical
+PSN-Presepe-Mega-RevD-NPTH.drl: 15 primitives - geometry identical
+PSN-Presepe-Mega-RevD-PTH.drl: 419 primitives - geometry identical
+RESULT: GERBER GEOMETRY IDENTICAL

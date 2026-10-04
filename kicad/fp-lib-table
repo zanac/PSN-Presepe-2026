@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "PSN_RevD")(type "KiCad")(uri "${KIPRJMOD}/lib/PSN_RevD.pretty")(options "")(descr "PSN-Presepe Rev D local footprints"))
+)

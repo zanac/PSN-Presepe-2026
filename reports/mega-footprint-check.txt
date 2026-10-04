@@ -1,0 +1,9 @@
+UNO R3 reference (KiCad Module library): 32/32 header pins coincide
+UNO R3 mounting holes, distance to board holes (mm): 0.000, 0.000, 0.000, 0.000
+Mega hole (90.17, 50.80): 0.000 mm
+Mega hole (96.52, 2.54): 0.000 mm
+Mega 2x18 first pin (93.98, 50.80): 0.000 mm
+Mega 2x18 last pin (96.52, 7.62): 0.000 mm
+Mega D14-D21 header first pin (68.58, 50.80): 0.000 mm
+Mega A8-A15 header first pin (73.66, 2.54): 0.000 mm
+MEGA FOOTPRINT CHECK PASSED

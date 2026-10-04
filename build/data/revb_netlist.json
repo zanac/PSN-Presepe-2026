@@ -1,0 +1,469 @@
+{
+ "BZ1": {
+  "1": "D6_BUZZER",
+  "2": "GND"
+ },
+ "C1": {
+  "1": "+12V",
+  "2": "GND"
+ },
+ "C2": {
+  "1": "+12V",
+  "2": "GND"
+ },
+ "C3": {
+  "1": "+12V",
+  "2": "GND"
+ },
+ "J1": {
+  "1": "+12V",
+  "2": "GND"
+ },
+ "JR1": {
+  "1": "R1_COM",
+  "2": "R1_NO",
+  "3": "R1_NC"
+ },
+ "JR10": {
+  "1": "R10_COM",
+  "2": "R10_NO",
+  "3": "R10_NC"
+ },
+ "JR11": {
+  "1": "R11_COM",
+  "2": "R11_NO",
+  "3": "R11_NC"
+ },
+ "JR12": {
+  "1": "R12_COM",
+  "2": "R12_NO",
+  "3": "R12_NC"
+ },
+ "JR13": {
+  "1": "R13_COM",
+  "2": "R13_NO",
+  "3": "R13_NC"
+ },
+ "JR14": {
+  "1": "R14_COM",
+  "2": "R14_NO",
+  "3": "R14_NC"
+ },
+ "JR15": {
+  "1": "R15_COM",
+  "2": "R15_NO",
+  "3": "R15_NC"
+ },
+ "JR16": {
+  "1": "R16_COM",
+  "2": "R16_NO",
+  "3": "R16_NC"
+ },
+ "JR2": {
+  "1": "R2_COM",
+  "2": "R2_NO",
+  "3": "R2_NC"
+ },
+ "JR3": {
+  "1": "R3_COM",
+  "2": "R3_NO",
+  "3": "R3_NC"
+ },
+ "JR4": {
+  "1": "R4_COM",
+  "2": "R4_NO",
+  "3": "R4_NC"
+ },
+ "JR5": {
+  "1": "R5_COM",
+  "2": "R5_NO",
+  "3": "R5_NC"
+ },
+ "JR6": {
+  "1": "R6_COM",
+  "2": "R6_NO",
+  "3": "R6_NC"
+ },
+ "JR7": {
+  "1": "R7_COM",
+  "2": "R7_NO",
+  "3": "R7_NC"
+ },
+ "JR8": {
+  "1": "R8_COM",
+  "2": "R8_NO",
+  "3": "R8_NC"
+ },
+ "JR9": {
+  "1": "R9_COM",
+  "2": "R9_NO",
+  "3": "R9_NC"
+ },
+ "J_ALBA": {
+  "1": "+12V",
+  "2": "ALBA_R_NEG",
+  "3": "ALBA_G_NEG",
+  "4": "ALBA_B_NEG"
+ },
+ "J_CASETTE": {
+  "1": "+12V",
+  "2": "GND",
+  "3": "D8_CASETTE_DATA"
+ },
+ "J_CIELO": {
+  "1": "+12V",
+  "2": "CIELO_R_NEG",
+  "3": "CIELO_G_NEG",
+  "4": "CIELO_B_NEG"
+ },
+ "J_NEXT": {
+  "1": "D23_NEXT",
+  "2": "GND"
+ },
+ "J_OLED": {
+  "1": "+5V_MEGA",
+  "2": "GND",
+  "3": "D20_SDA",
+  "4": "D21_SCL"
+ },
+ "J_START": {
+  "1": "D22_START",
+  "2": "GND"
+ },
+ "J_STELLE": {
+  "1": "+12V",
+  "2": "GND",
+  "3": "D5_STELLE_DATA"
+ },
+ "J_TEST": {
+  "1": "D24_TEST",
+  "2": "GND"
+ },
+ "J_TRAMONTO": {
+  "1": "+12V",
+  "2": "TRAM_R_NEG",
+  "3": "TRAM_G_NEG",
+  "4": "TRAM_B_NEG"
+ },
+ "K1": {
+  "1": "+12V",
+  "2": "R1_COM",
+  "3": "R1_NC",
+  "4": "R1_NO",
+  "5": "RELAY1_COIL_LOW"
+ },
+ "K10": {
+  "1": "+12V",
+  "2": "R10_COM",
+  "3": "R10_NC",
+  "4": "R10_NO",
+  "5": "RELAY10_COIL_LOW"
+ },
+ "K11": {
+  "1": "+12V",
+  "2": "R11_COM",
+  "3": "R11_NC",
+  "4": "R11_NO",
+  "5": "RELAY11_COIL_LOW"
+ },
+ "K12": {
+  "1": "+12V",
+  "2": "R12_COM",
+  "3": "R12_NC",
+  "4": "R12_NO",
+  "5": "RELAY12_COIL_LOW"
+ },
+ "K13": {
+  "1": "+12V",
+  "2": "R13_COM",
+  "3": "R13_NC",
+  "4": "R13_NO",
+  "5": "RELAY13_COIL_LOW"
+ },
+ "K14": {
+  "1": "+12V",
+  "2": "R14_COM",
+  "3": "R14_NC",
+  "4": "R14_NO",
+  "5": "RELAY14_COIL_LOW"
+ },
+ "K15": {
+  "1": "+12V",
+  "2": "R15_COM",
+  "3": "R15_NC",
+  "4": "R15_NO",
+  "5": "RELAY15_COIL_LOW"
+ },
+ "K16": {
+  "1": "+12V",
+  "2": "R16_COM",
+  "3": "R16_NC",
+  "4": "R16_NO",
+  "5": "RELAY16_COIL_LOW"
+ },
+ "K2": {
+  "1": "+12V",
+  "2": "R2_COM",
+  "3": "R2_NC",
+  "4": "R2_NO",
+  "5": "RELAY2_COIL_LOW"
+ },
+ "K3": {
+  "1": "+12V",
+  "2": "R3_COM",
+  "3": "R3_NC",
+  "4": "R3_NO",
+  "5": "RELAY3_COIL_LOW"
+ },
+ "K4": {
+  "1": "+12V",
+  "2": "R4_COM",
+  "3": "R4_NC",
+  "4": "R4_NO",
+  "5": "RELAY4_COIL_LOW"
+ },
+ "K5": {
+  "1": "+12V",
+  "2": "R5_COM",
+  "3": "R5_NC",
+  "4": "R5_NO",
+  "5": "RELAY5_COIL_LOW"
+ },
+ "K6": {
+  "1": "+12V",
+  "2": "R6_COM",
+  "3": "R6_NC",
+  "4": "R6_NO",
+  "5": "RELAY6_COIL_LOW"
+ },
+ "K7": {
+  "1": "+12V",
+  "2": "R7_COM",
+  "3": "R7_NC",
+  "4": "R7_NO",
+  "5": "RELAY7_COIL_LOW"
+ },
+ "K8": {
+  "1": "+12V",
+  "2": "R8_COM",
+  "3": "R8_NC",
+  "4": "R8_NO",
+  "5": "RELAY8_COIL_LOW"
+ },
+ "K9": {
+  "1": "+12V",
+  "2": "R9_COM",
+  "3": "R9_NC",
+  "4": "R9_NO",
+  "5": "RELAY9_COIL_LOW"
+ },
+ "MCU1": {
+  "5V1": "+5V_MEGA",
+  "5V2": "+5V_MEGA",
+  "5V3": "+5V_MEGA",
+  "5V4": "+5V_MEGA",
+  "A0": "A0_POT",
+  "D11": "D11_TRAM_G",
+  "D12": "D12_TRAM_B",
+  "D2": "D2_CIELO_R",
+  "D20": "D20_SDA",
+  "D21": "D21_SCL",
+  "D22": "D22_START",
+  "D23": "D23_NEXT",
+  "D24": "D24_TEST",
+  "D25": "D25_RELAY1",
+  "D26": "D26_RELAY2",
+  "D27": "D27_RELAY3",
+  "D28": "D28_RELAY4",
+  "D29": "D29_RELAY5",
+  "D3": "D3_CIELO_G",
+  "D30": "D30_RELAY6",
+  "D31": "D31_RELAY7",
+  "D32": "D32_RELAY8",
+  "D33": "D33_RELAY9",
+  "D34": "D34_RELAY10",
+  "D35": "D35_RELAY11",
+  "D36": "D36_RELAY12",
+  "D37": "D37_RELAY13",
+  "D38": "D38_RELAY14",
+  "D39": "D39_RELAY15",
+  "D4": "D4_CIELO_B",
+  "D40": "D40_RELAY16",
+  "D44": "D44_ALBA_R",
+  "D45": "D45_ALBA_G",
+  "D46": "D46_ALBA_B",
+  "D5": "D5_STELLE_DATA",
+  "D6": "D6_BUZZER",
+  "D7": "D7_TRAM_R",
+  "D8": "D8_CASETTE_DATA",
+  "GND1": "GND",
+  "GND2": "GND",
+  "GND3": "GND",
+  "GND4": "GND",
+  "GND5": "GND",
+  "GND6": "GND",
+  "VIN": "+12V"
+ },
+ "Q1": {
+  "1": "GATE_Q1",
+  "2": "CIELO_R_NEG",
+  "3": "GND"
+ },
+ "Q2": {
+  "1": "GATE_Q2",
+  "2": "CIELO_G_NEG",
+  "3": "GND"
+ },
+ "Q3": {
+  "1": "GATE_Q3",
+  "2": "CIELO_B_NEG",
+  "3": "GND"
+ },
+ "Q4": {
+  "1": "GATE_Q4",
+  "2": "TRAM_R_NEG",
+  "3": "GND"
+ },
+ "Q5": {
+  "1": "GATE_Q5",
+  "2": "TRAM_G_NEG",
+  "3": "GND"
+ },
+ "Q6": {
+  "1": "GATE_Q6",
+  "2": "TRAM_B_NEG",
+  "3": "GND"
+ },
+ "Q7": {
+  "1": "GATE_Q7",
+  "2": "ALBA_R_NEG",
+  "3": "GND"
+ },
+ "Q8": {
+  "1": "GATE_Q8",
+  "2": "ALBA_G_NEG",
+  "3": "GND"
+ },
+ "Q9": {
+  "1": "GATE_Q9",
+  "2": "ALBA_B_NEG",
+  "3": "GND"
+ },
+ "RG1": {
+  "1": "D2_CIELO_R",
+  "2": "GATE_Q1"
+ },
+ "RG2": {
+  "1": "D3_CIELO_G",
+  "2": "GATE_Q2"
+ },
+ "RG3": {
+  "1": "D4_CIELO_B",
+  "2": "GATE_Q3"
+ },
+ "RG4": {
+  "1": "D7_TRAM_R",
+  "2": "GATE_Q4"
+ },
+ "RG5": {
+  "1": "D11_TRAM_G",
+  "2": "GATE_Q5"
+ },
+ "RG6": {
+  "1": "D12_TRAM_B",
+  "2": "GATE_Q6"
+ },
+ "RG7": {
+  "1": "D44_ALBA_R",
+  "2": "GATE_Q7"
+ },
+ "RG8": {
+  "1": "D45_ALBA_G",
+  "2": "GATE_Q8"
+ },
+ "RG9": {
+  "1": "D46_ALBA_B",
+  "2": "GATE_Q9"
+ },
+ "RPD1": {
+  "1": "GATE_Q1",
+  "2": "GND"
+ },
+ "RPD2": {
+  "1": "GATE_Q2",
+  "2": "GND"
+ },
+ "RPD3": {
+  "1": "GATE_Q3",
+  "2": "GND"
+ },
+ "RPD4": {
+  "1": "GATE_Q4",
+  "2": "GND"
+ },
+ "RPD5": {
+  "1": "GATE_Q5",
+  "2": "GND"
+ },
+ "RPD6": {
+  "1": "GATE_Q6",
+  "2": "GND"
+ },
+ "RPD7": {
+  "1": "GATE_Q7",
+  "2": "GND"
+ },
+ "RPD8": {
+  "1": "GATE_Q8",
+  "2": "GND"
+ },
+ "RPD9": {
+  "1": "GATE_Q9",
+  "2": "GND"
+ },
+ "RV1": {
+  "1": "GND",
+  "2": "A0_POT",
+  "3": "+5V_MEGA"
+ },
+ "U1": {
+  "1": "D25_RELAY1",
+  "10": "+12V",
+  "11": "RELAY8_COIL_LOW",
+  "12": "RELAY7_COIL_LOW",
+  "13": "RELAY6_COIL_LOW",
+  "14": "RELAY5_COIL_LOW",
+  "15": "RELAY4_COIL_LOW",
+  "16": "RELAY3_COIL_LOW",
+  "17": "RELAY2_COIL_LOW",
+  "18": "RELAY1_COIL_LOW",
+  "2": "D26_RELAY2",
+  "3": "D27_RELAY3",
+  "4": "D28_RELAY4",
+  "5": "D29_RELAY5",
+  "6": "D30_RELAY6",
+  "7": "D31_RELAY7",
+  "8": "D32_RELAY8",
+  "9": "GND"
+ },
+ "U2": {
+  "1": "D33_RELAY9",
+  "10": "+12V",
+  "11": "RELAY16_COIL_LOW",
+  "12": "RELAY15_COIL_LOW",
+  "13": "RELAY14_COIL_LOW",
+  "14": "RELAY13_COIL_LOW",
+  "15": "RELAY12_COIL_LOW",
+  "16": "RELAY11_COIL_LOW",
+  "17": "RELAY10_COIL_LOW",
+  "18": "RELAY9_COIL_LOW",
+  "2": "D34_RELAY10",
+  "3": "D35_RELAY11",
+  "4": "D36_RELAY12",
+  "5": "D37_RELAY13",
+  "6": "D38_RELAY14",
+  "7": "D39_RELAY15",
+  "8": "D40_RELAY16",
+  "9": "GND"
+ }
+}

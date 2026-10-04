@@ -1,0 +1,21 @@
+Item #,Designator,Qty,Manufacturer,Mfg Part #,Description / Value,Package / Footprint,Type,Instructions
+1,BZ1,1,,,"Passive buzzer/transducer 12 mm, 7.6 mm pitch (not an active/self-oscillating buzzer)",Buzzer_12x9.5RM7.6,THT,+ marked pad = pin 1
+2,C1,1,,,"Radial electrolytic 470 uF >= 25 V, D10 mm, 5.0 mm pitch",C_Radial_D10.0mm_H12.5mm_P5.00mm,THT,Polarised: + = square pad
+3,"C2,C3",2,,,"Radial ceramic 100 nF >= 50 V, 5.0 mm pitch",C_Disc_D5.0mm_W2.5mm_P5.00mm,THT,
+4,C4,1,,,"MLCC 10 uF >= 25 V X5R/X7R, 0805",C_0805_2012Metric,SMD,
+5,C5,1,,,"MLCC 22 uF >= 10 V X5R/X7R, 0805",C_0805_2012Metric,SMD,
+6,"C6,C7",2,,,"MLCC 100 nF >= 16 V X7R, 0805",C_0805_2012Metric,SMD,
+7,"J1,J_NEXT,J_START,J_TEST",4,Phoenix Contact,1715721,"Screw terminal 2-pole 5.08 mm, horizontal wire entry, >= 250 V / >= 10 A (e.g. Phoenix 1715721, KEFA KF128-5.08-2P)","TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal",THT,
+8,"JR1,JR2,JR3,JR4,JR5,JR6,JR7,JR8,JR9,JR10,JR11,JR12,JR13,JR14,JR15,JR16,J_CASETTE,J_POT,J_STELLE",19,Phoenix Contact,1715734,"Screw terminal 3-pole 5.08 mm, horizontal wire entry, >= 250 V / >= 10 A (e.g. Phoenix 1715734, KEFA KF128-5.08-3P)","TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal",THT,
+9,"J_ALBA,J_CIELO,J_OLED,J_TRAMONTO",4,Phoenix Contact,1715747,"Screw terminal 4-pole 5.08 mm, horizontal wire entry, >= 250 V / >= 10 A (e.g. Phoenix 1715747, KEFA KF128-5.08-4P)","TerminalBlock_Phoenix_MKDS-1,5-4-5.08_1x04_P5.08mm_Horizontal",THT,
+10,J_SD,1,Hirose,DM3AT-SF-PEJM5,Hirose DM3AT-SF-PEJM5 microSD push-push with card detect (verified LCSC C114218),microSD_HC_Hirose_DM3AT-SF-PEJM5,SMD,"Push-push microSD at board edge, card opening towards the edge"
+11,"K1,K2,K3,K4,K5,K6,K7,K8,K9,K10,K11,K12,K13,K14,K15,K16",16,Omron,G5Q-1 DC12,"Omron G5Q-1 DC12, SPDT 10 A 250 VAC, 12 V coil (verified LCSC C397244)",Relay_SPDT_Omron-G5Q-1,THT,Polarised footprint: pin 1 (square pad) = coil +12V. Contacts may carry 230 VAC.
+12,"Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9",9,Infineon,IRLZ44NPBF,"Infineon IRLZ44NPBF, TO-220AB logic-level N-MOSFET (verified LCSC C38774)",TO-220-3_Vertical,THT,Metal tab towards the silkscreen tab line
+13,RBZ1,1,,,"Axial resistor 220 R 1/4 W, 10.16 mm lead spacing",R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal,THT,
+14,"RG1,RG2,RG3,RG4,RG5,RG6,RG7,RG8,RG9",9,,,"Axial resistor 100 R 1/4 W, 10.16 mm (0.4 in) lead spacing",R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal,THT,
+15,"RPD1,RPD2,RPD3,RPD4,RPD5,RPD6,RPD7,RPD8,RPD9",9,,,"Axial resistor 100 k 1/4 W, 10.16 mm lead spacing",R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal,THT,
+16,"RSD1,RSD2,RSD3,RSD4",4,,,"Resistor 10 k 1 %, 0805",R_0805_2012Metric,SMD,
+17,"U1,U2",2,STMicroelectronics,ULN2803A,"ST ULN2803A, DIP-18 300 mil (verified LCSC C73936)",DIP-18_W7.62mm,THT,Pin 1 notch as on silkscreen
+18,U3,1,Advanced Monolithic Systems,AMS1117-3.3,"AMS1117-3.3 LDO, SOT-223 (verified LCSC C6186)",SOT-223-3_TabPin2,SMD,
+19,U4,1,Nexperia,"74LVC125AD,118","Nexperia 74LVC125AD,118 quad buffer, SOIC-14, 5 V tolerant inputs (verified LCSC C6057)",SOIC-14_3.9x8.7mm_P1.27mm,SMD,
+20,MCU1,1,any,"2.54 mm male pin headers: 1x10, 5x 1x8, 1x 2x18 (or Arduino Mega shield header set)",Arduino Mega 2560 R3 shield headers,Arduino_Mega2560_R3_Shield,THT,"MOUNT ON THE BOTTOM SIDE: plastic body under the board, long pins pointing DOWN (they plug into the Arduino Mega), solder on the top side. Use an Arduino Mega as alignment jig."

@@ -1,0 +1,99 @@
+(version 1)
+
+(rule "MAINS to SELV 6.0mm"
+  (layer outer)
+  (condition "(A.NetClass == 'MAINS' && B.NetClass != 'MAINS') || (B.NetClass == 'MAINS' && A.NetClass != 'MAINS')")
+  (constraint clearance (min 6.0mm)))
+
+(rule "MAINS inter-relay 5.0mm"
+  (layer outer)
+  (condition "A.NetClass == 'MAINS' && B.NetClass == 'MAINS'")
+  (constraint clearance (min 5.0mm)))
+
+(rule "MAINS intra-relay R1 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R1_*' && B.NetName == 'R1_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R2 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R2_*' && B.NetName == 'R2_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R3 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R3_*' && B.NetName == 'R3_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R4 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R4_*' && B.NetName == 'R4_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R5 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R5_*' && B.NetName == 'R5_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R6 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R6_*' && B.NetName == 'R6_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R7 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R7_*' && B.NetName == 'R7_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R8 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R8_*' && B.NetName == 'R8_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R9 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R9_*' && B.NetName == 'R9_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R10 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R10_*' && B.NetName == 'R10_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R11 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R11_*' && B.NetName == 'R11_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R12 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R12_*' && B.NetName == 'R12_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R13 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R13_*' && B.NetName == 'R13_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R14 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R14_*' && B.NetName == 'R14_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R15 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R15_*' && B.NetName == 'R15_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS intra-relay R16 2.0mm"
+  (layer outer)
+  (condition "A.NetName == 'R16_*' && B.NetName == 'R16_*'")
+  (constraint clearance (min 2.0mm)))
+
+(rule "MAINS to board edge 3.0mm"
+  (condition "A.NetClass == 'MAINS'")
+  (constraint edge_clearance (min 3.0mm)))
+
+(rule "MAINS to non-MAINS holes 6.0mm"
+  (condition "A.NetClass == 'MAINS' && B.NetClass != 'MAINS'")
+  (constraint hole_clearance (min 6.0mm)))

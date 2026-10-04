@@ -1,0 +1,23 @@
+Qty,References,Value / part,Footprint,Notes
+1,BZ1,BUZZER_PASSIVE_RM7.6,Buzzer_12x9.5RM7.6,"12 mm passive buzzer, 7.6 mm pitch (piezo or 16-42 R magnetic)"
+1,C1,470uF_25V_RELAY_BULK,C_Radial_D10.0mm_H12.5mm_P5.00mm,"470 uF 25 V electrolytic, D10 mm, 5 mm pitch"
+2,C2 C3,"100 nF 50 V ceramic, 5 mm pitch",C_Disc_D5.0mm_W2.5mm_P5.00mm,
+1,C4,10uF_25V,C_0805_2012Metric,MLCC 0805 X5R
+1,C5,22uF_10V,C_0805_2012Metric,MLCC 0805 X5R
+2,C6 C7,100nF,C_0805_2012Metric,MLCC 0805 X7R
+4,J1 J_NEXT J_START J_TEST,"Phoenix MKDS 1,5/2-5,08 (or equivalent 5.08 mm screw terminal rated >= 250 V AC / >= 10 A)","TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal",
+19,JR1 JR10 JR11 JR12 JR13 JR14 JR15 JR16 JR2 JR3 JR4 JR5 JR6 JR7 JR8 JR9 J_CASETTE J_POT J_STELLE,"Phoenix MKDS 1,5/3-5,08 (or equivalent 5.08 mm screw terminal rated >= 250 V AC / >= 10 A)","TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal",
+4,J_ALBA J_CIELO J_OLED J_TRAMONTO,"Phoenix MKDS 1,5/4-5,08 (or equivalent 5.08 mm screw terminal rated >= 250 V AC / >= 10 A)","TerminalBlock_Phoenix_MKDS-1,5-4-5.08_1x04_P5.08mm_Horizontal",
+1,J_SD,DM3AT-SF-PEJM5,microSD_HC_Hirose_DM3AT-SF-PEJM5,Hirose push-push microSD with card detect
+16,K1 K10 K11 K12 K13 K14 K15 K16 K2 K3 K4 K5 K6 K7 K8 K9,G5Q-1_DC12,Relay_SPDT_Omron-G5Q-1,Omron G5Q-1 DC12 (contact rating 10 A 250 VAC; verify suffix)
+1,MCU1,Arduino Mega R3 shield headers: 1x10 + 5x 1x8 + 2x18 (stackable or male),Arduino_Mega2560_R3_Shield,
+9,Q1 Q2 Q3 Q4 Q5 Q6 Q7 Q8 Q9,IRLZ44N,TO-220-3_Vertical,
+1,RBZ1,220R,R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal,220 R 1/4 W axial
+9,RG1 RG2 RG3 RG4 RG5 RG6 RG7 RG8 RG9,100R_GATE,R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal,100 R 1/4 W axial
+9,RPD1 RPD2 RPD3 RPD4 RPD5 RPD6 RPD7 RPD8 RPD9,100K_PULLDOWN,R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal,100 k 1/4 W axial
+4,RSD1 RSD2 RSD3 RSD4,10k,R_0805_2012Metric,0805 1 %
+2,U1 U2,ULN2803A,DIP-18_W7.62mm,"TI ULN2803A / ST ULN2803A (DIP-18, 300 mil)"
+1,U3,AMS1117-3.3,SOT-223-3_TabPin2,3.3 V LDO SOT-223
+1,U4,74LVC125A,SOIC-14_3.9x8.7mm_P1.27mm,"Nexperia 74LVC125AD,118 (SOIC-14)"
+1,-,Arduino Mega 2560 R3 (sits under the board),,not soldered to this PCB
+6,H1-H6,M3 mounting hole (NPTH 3.2 mm),MountingHole_3.2mm_M3,no part

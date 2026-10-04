@@ -1,0 +1,5 @@
+[wokwi]
+version = 1
+# built by firmware/tools/fw_compile.sh (default output folder)
+firmware = '../firmware/PSN-Presepe/build/PSN-Presepe.ino.hex'
+elf = '../firmware/PSN-Presepe/build/PSN-Presepe.ino.elf'
