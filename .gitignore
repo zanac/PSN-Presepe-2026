@@ -1,0 +1,19 @@
+# build outputs (./build.sh, arduino-cli)
+/out/
+firmware/PSN-Presepe/build/
+# KiCad local state and backups
+*.kicad_prl
+*-backups/
+fp-info-cache
+_autosave-*
+*.bak
+# Python / OS
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+# arduino-cli files created by flash-windows.bat
+firmware/PSN-Presepe/arduino-cli.exe
+firmware/PSN-Presepe/arduino-cli.yaml
+firmware/PSN-Presepe/.arduino-*/
+simulation/wokwi-bundle/

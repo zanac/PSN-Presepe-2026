@@ -1,0 +1,31 @@
+name: firmware
+
+on:
+  push:
+    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+  pull_request:
+    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install AVR core and libraries
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr
+          arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
+      - name: Parser tests (host)
+        run: firmware/tools/run_tests.sh
+      - name: Compile for Arduino Mega 2560
+        run: firmware/tools/fw_compile.sh firmware/PSN-Presepe "$RUNNER_TEMP/fw"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PSN-Presepe-firmware
+          path: ${{ runner.temp }}/fw/PSN-Presepe.ino.*
