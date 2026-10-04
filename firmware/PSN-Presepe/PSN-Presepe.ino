@@ -1448,7 +1448,7 @@ bool inizializzaOled() {
   display.setTextSize(1);
   // Startup splash: PSN-Presepe! by Vanni
   display.setCursor(27,18); display.print(F("PSN-Presepe!"));
-  display.setCursor(30,30); display.print(F("by Vanni 037"));
+  display.setCursor(30,30); display.print(F("by Vanni 038"));
   display.setCursor(18,46);
   stampaDurataOled(durataCicloStabile);
   display.print(F(" (mm:ss)"));
