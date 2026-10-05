@@ -61,6 +61,7 @@ firmware/
   PSN-Presepe/                  the whole firmware in one sketch (PSN-Presepe.ino), example PRESEPE.INI, prebuilt HEX, Windows flasher
   tools/                        fw_compile.sh, flash.sh (Linux/macOS), run_tests.sh, test_config.cpp
 simulation/                     Wokwi simulation of the Rev D wiring (diagram, custom RGB chip, bundle script)
+simulation_web/                 browser simulator of the PRESEPE.INI light cycle (open index.html)
 .github/workflows/firmware.yml  CI: parser tests + firmware compile
 ```
 
@@ -373,6 +374,8 @@ Press **TEST during the 3 s splash** ("by Vanni", bottom line `TEST = modo color
 
 The firmware runs unchanged in the Wokwi simulator, with the Rev D wiring: RGB bars, stars, houses, relays as LEDs, OLED, buttons, potentiometer and a microSD card. Paste `PSN-Presepe.ino` into Wokwi's `sketch.ino` as it is. Wokwi does not accept `.ini` files, so the configuration goes in a project file named `PRESEPE.TXT`; the firmware reads it when `PRESEPE.INI` is missing. See [simulation/README.md](simulation/README.md).
 
+To try `PRESEPE.INI` values without any hardware, open [`simulation_web/index.html`](simulation_web/index.html) in a browser: paste the file and watch the CIELO, TRAMONTO and ALBA strips, stars, houses and relays over the cycle. See [simulation_web/README.md](simulation_web/README.md).
+
 ## 10. SD-card configuration (PRESEPE.INI)
 
 Copy [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) to the **root** of a microSD or microSDHC card (2–32 GB, FAT16/FAT32). Cards of 64 GB and more come formatted exFAT, which the Arduino SD library cannot read, so reformat them as FAT32 first.
@@ -423,7 +426,7 @@ cielo    =  38,   0,   0,   0     ; off...
 cielo    = 100,   0,   0,   0     ; ...until the end of the sunset
 tramonto =   0,   0,   0,   0     ; off at the start of the sunset
 tramonto =   1,  18,  10,   4     ; switches on quickly, faint and warm
-tramonto =  38, 155,  92,  16     ; orange peak
+tramonto =  10, 155,  92,  16     ; orange peak
 tramonto =  82,  16,  16,  16     ; fades to a faint white
 tramonto = 100,   0,   0,   0     ; off at the end of the sunset
 rele     = 3, ON, 30              ; relay 3 on at 30 % of the sunset

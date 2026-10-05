@@ -309,7 +309,7 @@ static void cfgTappeDefault(PresepeConfig &c) {
   // TRAMONTO (striscia sinistra): accesa solo nella fase TRAMONTO, accensione rapida (1 %).
   tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,   0.0f,   0,  0,  0);
   tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,   1.0f,  18, 10,  4);
-  tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,  38.0f, 155, 92, 16);
+  tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,  10.0f, 155, 92, 16);
   tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,  82.0f,  16, 16, 16);
   tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO, 100.0f,   0,  0,  0);
   // ALBA (striscia destra): accesa solo nella fase ALBA, accensione rapida (1 %).

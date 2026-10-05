@@ -61,6 +61,7 @@ firmware/
   PSN-Presepe/                  tutto il firmware in un solo sketch (PSN-Presepe.ino), PRESEPE.INI di esempio, HEX compilato, flasher Windows
   tools/                        fw_compile.sh, flash.sh (Linux/macOS), run_tests.sh, test_config.cpp
 simulation/                     simulazione Wokwi del cablaggio Rev D (diagramma, chip RGB personalizzato, script del pacchetto)
+simulation_web/                 simulatore nel browser del ciclo luci di PRESEPE.INI (apri index.html)
 .github/workflows/firmware.yml  CI: test del parser + compilazione del firmware
 ```
 
@@ -373,6 +374,8 @@ Premi **TEST durante i 3 s della schermata iniziale** ("by Vanni", in basso `TES
 
 Il firmware gira invariato nel simulatore Wokwi con il cablaggio Rev D: barre RGB, stelle, casette, relè come LED, OLED, pulsanti, potenziometro e microSD. `PSN-Presepe.ino` si incolla così com'è nel `sketch.ino` di Wokwi. Wokwi non accetta file `.ini`, quindi la configurazione va in un file del progetto chiamato `PRESEPE.TXT`, che il firmware legge quando manca `PRESEPE.INI`. Vedi [simulation/README.md](simulation/README.md).
 
+Per provare i valori di `PRESEPE.INI` senza hardware, apri [`simulation_web/index.html`](simulation_web/index.html) nel browser: incolli il file e vedi lungo il ciclo le strisce CIELO, TRAMONTO e ALBA, le stelle, le casette e i relè. Vedi [simulation_web/README.md](simulation_web/README.md).
+
 ## 10. Configurazione da microSD (PRESEPE.INI)
 
 Copia [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) nella **radice** di una microSD o microSDHC (2–32 GB, FAT16/FAT32). Le schede da 64 GB in su escono formattate exFAT, che la libreria SD di Arduino non legge: riformattale prima in FAT32.
@@ -423,7 +426,7 @@ cielo    =  38,   0,   0,   0     ; spenta...
 cielo    = 100,   0,   0,   0     ; ...fino a fine tramonto
 tramonto =   0,   0,   0,   0     ; spenta all'inizio del tramonto
 tramonto =   1,  18,  10,   4     ; si accende rapidamente, tenue e calda
-tramonto =  38, 155,  92,  16     ; picco arancio
+tramonto =  10, 155,  92,  16     ; picco arancio
 tramonto =  82,  16,  16,  16     ; perde colore fino a un bianco tenue
 tramonto = 100,   0,   0,   0     ; spenta a fine tramonto
 rele     = 3, ON, 30              ; relè 3 acceso al 30 % del tramonto

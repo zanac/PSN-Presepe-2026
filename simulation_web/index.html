@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>html,body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Simulatore PRESEPE.INI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: banco di prova a due colonne — a sinistra il file INI, a destra il palco con le tre strisce e la linea del ciclo */
+:root {
+  --bg: #eef0f4;          /* grigio-blu chiaro, come una parete di laboratorio */
+  --panel: #ffffff;
+  --ink: #1b2130;
+  --muted: #5b6478;
+  --line: #d5dae4;
+  --accent: #c9781a;      /* ambra lanterna */
+  --accent-ink: #ffffff;
+  --stage: #07090e;       /* il palco resta buio in entrambi i temi: le strisce si vedono nel presepe al buio */
+  --stage-ink: #c9d0e0;
+  --stage-line: #252b38;
+  --err: #b42318;
+  --err-bg: #fdecea;
+  --ok: #1f7a4d;
+  --ok-bg: #e5f4ec;
+  --code-bg: #f7f8fb;
+  --f-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11141b; --panel: #181c26; --ink: #e6e9f0; --muted: #9aa3b6; --line: #2a3040;
+    --accent: #e59a3c; --accent-ink: #1a1206; --err: #ff8a7a; --err-bg: #3a1a17; --ok: #6fd3a0; --ok-bg: #12291f;
+    --code-bg: #12161f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11141b; --panel: #181c26; --ink: #e6e9f0; --muted: #9aa3b6; --line: #2a3040;
+  --accent: #e59a3c; --accent-ink: #1a1206; --err: #ff8a7a; --err-bg: #3a1a17; --ok: #6fd3a0; --ok-bg: #12291f;
+  --code-bg: #12161f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45; padding: 20px 16px 32px; }
+.wrap { max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: 1.9rem; letter-spacing: .01em; margin: 0; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.sub { color: var(--muted); margin: 0; max-width: 70ch; }
+.grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.card h2 { font-family: var(--f-display); font-weight: 600; font-size: 1.05rem; text-transform: uppercase; letter-spacing: .08em; margin: 0; color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+textarea { width: 100%; min-height: 520px; resize: vertical; font-family: var(--f-mono); font-size: 12.5px; line-height: 1.5; background: var(--code-bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px; tab-size: 4; white-space: pre; overflow: auto; }
+textarea:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button, select { font-family: var(--f-body); font-size: 14px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 7px 12px; cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; min-width: 92px; }
+button:hover, select:hover { border-color: var(--accent); }
+.status { font-size: 13.5px; padding: 8px 10px; border-radius: 7px; }
+.status.ok { background: var(--ok-bg); color: var(--ok); }
+.status.bad { background: var(--err-bg); color: var(--err); }
+.errlist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow: auto; }
+.errlist li { font-size: 13px; color: var(--err); font-family: var(--f-mono); }
+.errlist li b { font-family: var(--f-body); }
+/* palco */
+.stage { background: var(--stage); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px; color: var(--stage-ink); }
+.strips { display: grid; grid-template-columns: 1fr 1.6fr 1fr; gap: 12px; }
+@media (max-width: 520px) { .strips { grid-template-columns: 1fr; } }
+.strip { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.glow { height: 150px; border-radius: 8px; border: 1px solid var(--stage-line); position: relative; overflow: hidden; background: #000; }
+.glow .bar { position: absolute; left: 8%; right: 8%; top: 46%; height: 8%; border-radius: 6px; }
+.glow .halo { position: absolute; inset: 0; }
+.slabel { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-family: var(--f-display); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; font-size: .95rem; }
+.slabel small { font-family: var(--f-body); text-transform: none; letter-spacing: 0; font-weight: 400; color: #8790a6; font-size: 12px; }
+.rgb { font-family: var(--f-mono); font-size: 13px; font-variant-numeric: tabular-nums; color: #e9edf6; }
+.clock { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
+.phase { font-family: var(--f-display); font-weight: 700; font-size: 1.6rem; letter-spacing: .04em; color: #f3d7a8; }
+.clock .meta { font-family: var(--f-mono); font-size: 13px; font-variant-numeric: tabular-nums; color: #aeb6c8; }
+.tlwrap { position: relative; }
+canvas#tl { width: 100%; height: 150px; display: block; border-radius: 6px; cursor: pointer; touch-action: none; }
+.extras { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font-size: 13px; color: #aeb6c8; }
+.meter { width: 120px; height: 8px; background: #1b2130; border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
+.meter i { display: block; height: 100%; background: #dfe6ff; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--stage-line); }
+.pill.on { background: #f0b45a; color: #1a1206; border-color: #f0b45a; }
+.relays { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 4px; }
+@media (max-width: 520px) { .relays { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+.relay { text-align: center; font-family: var(--f-mono); font-size: 11px; padding: 4px 0; border-radius: 4px; border: 1px solid var(--stage-line); color: #7d869b; }
+.relay.on { background: #3fbf7f; color: #04140b; border-color: #3fbf7f; font-weight: 600; }
+.transport { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.transport label { font-size: 13px; color: var(--muted); }
+.note { font-size: 13px; color: var(--muted); margin: 0; max-width: 80ch; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Simulatore <span>PRESEPE.INI</span></h1>
+    <p class="sub">Incolla o modifica il file: il palco mostra le strisce CIELO, TRAMONTO e ALBA lungo il ciclo, con stelle, casette e relè. Stesse regole del firmware (release 038).</p>
+  </header>
+
+  <div class="grid">
+    <section class="card" aria-label="File INI">
+      <h2>File INI</h2>
+      <textarea id="ini" spellcheck="false" aria-label="Contenuto di PRESEPE.INI"></textarea>
+      <div class="row">
+        <button id="reset" type="button">Ripristina il file predefinito</button>
+        <button id="copy" type="button">Copia il file</button>
+      </div>
+      <div id="status" class="status ok" role="status"></div>
+      <ul id="errors" class="errlist"></ul>
+    </section>
+
+    <section class="card" aria-label="Simulazione">
+      <h2>Palco</h2>
+      <div class="stage">
+        <div class="clock">
+          <span class="phase" id="phase">GIORNO</span>
+          <span class="meta" id="meta"></span>
+        </div>
+        <div class="strips">
+          <div class="strip" id="s1"><div class="slabel">Tramonto <small>sinistra</small></div><div class="glow"><div class="halo"></div><div class="bar"></div></div><div class="rgb"></div></div>
+          <div class="strip" id="s0"><div class="slabel">Cielo <small>centrale</small></div><div class="glow"><div class="halo"></div><div class="bar"></div></div><div class="rgb"></div></div>
+          <div class="strip" id="s2"><div class="slabel">Alba <small>destra</small></div><div class="glow"><div class="halo"></div><div class="bar"></div></div><div class="rgb"></div></div>
+        </div>
+        <div class="tlwrap"><canvas id="tl" aria-label="Linea del ciclo: clicca o trascina per spostarti"></canvas></div>
+        <div class="extras">
+          <span>Stelle <span class="meter"><i id="stars"></i></span> <span id="starsv"></span></span>
+          <span>Casette <span class="pill" id="houses">spente</span></span>
+        </div>
+        <div class="relays" id="relays"></div>
+      </div>
+      <div class="transport">
+        <button class="primary" id="play" type="button">Pausa</button>
+        <label for="speed">Durata del ciclo</label>
+        <select id="speed"></select>
+        <button id="prev" type="button">Fase precedente</button>
+        <button id="next" type="button">Fase successiva</button>
+      </div>
+      <p class="note">Sulla linea del ciclo: una fascia per striscia (dall'alto Tramonto, Cielo, Alba) e in basso il livello delle stelle; i trattini bianchi sono le tappe. Lo schermo non riproduce esattamente i LED: le strisce reali sono più sature e i valori bassi rendono diversamente. Usalo per forma e tempi, poi rifinisci i colori sulla striscia vera o con la modalità colore.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+"use strict";
+const DEFAULT_INI = "; =============================================================================\n; PSN-Presepe - parametri della scenografia\n; =============================================================================\n; Copia questo file nella RADICE della microSD (non in una cartella).\n; Viene letto UNA SOLA VOLTA, all'accensione: dopo una modifica riavvia la centralina.\n;\n; Se una chiave manca, e' scritta male o ha un valore fuori dai limiti, quella\n; chiave mantiene il valore predefinito (i valori scritti qui SONO i predefiniti).\n; Senza microSD, o senza questo file, la centralina usa solo i predefiniti.\n;\n; Dopo l'avvio il display mostra l'esito della lettura:\n;   \"PRESEPE.INI OK\"        file letto senza errori\n;   \"INI CON ERRORI\"        alcune righe ignorate: numero di errori e prima riga sbagliata\n;   \"MANCA PRESEPE.INI\"     microSD presente ma file non trovato\n;   \"SD ASSENTE\"            nessuna microSD\n; Il monitor seriale (115200 baud) stampa tutta la configurazione in uso.\n;\n; Nome del file: PRESEPE.INI. Se manca, la centralina cerca anche PRESEPE.TXT\n; con lo stesso contenuto (serve per il simulatore Wokwi, che non accetta .ini).\n; microSD: FAT16 o FAT32 (SD/SDHC fino a 32 GB).\n;\n; SINTASSI\n;   [SEZIONE]            inizio di una sezione\n;   chiave = valore      un parametro per riga\n;   ; oppure #           da qui a fine riga e' un commento\n;   Maiuscole e minuscole sono indifferenti. Massimo 127 caratteri per riga.\n;   Numeri con decimali: usa il PUNTO (33.33), perche' la virgola separa i campi.\n;   Si/no: 1/0, si/no, on/off, true/false.\n;   Colori: R, G, B con valori da 0 (spento) a 255 (massimo).\n;   Fasi: GIORNO, TRAMONTO, CREPUSCOLO, NOTTE, ALBA.\n;   \"% della fase\": 0 = inizio della fase, 50 = meta', 100 = fine della fase.\n; =============================================================================\n\n[CICLO]\n; Il potenziometro sceglie fra tre durate del ciclo completo (in secondi, 10..86400).\ndurata1 = 60          ; primo terzo della corsa della manopola\ndurata2 = 180         ; terzo centrale\ndurata3 = 300         ; ultimo terzo\n; Corsa utile della manopola, letta su A0 (0..1023). Con il potenziometro alimentato\n; a 5 V dalla scheda Rev D la corsa e' 0..1023. Vecchi cablaggi misuravano 0..680.\npot_min = 0\npot_max = 1023\npot_invertito = 1     ; 1 = manopola tutta a destra = ciclo piu' corto (cablaggio storico)\npartenza = marcia     ; marcia = il ciclo parte subito dopo l'avvio, pausa = parte in pausa\n\n[FASI]\n; Inizio di ogni fase, in % del ciclo completo. Il GIORNO parte sempre da 0 e\n; l'ALBA finisce a 100. I valori devono essere crescenti, altrimenti tornano\n; tutti e quattro ai predefiniti.\ntramonto   = 40\ncrepuscolo = 50\nnotte      = 55\nalba       = 85\n\n[RELE]\n; Logica delle uscite: alta = livello HIGH eccita il rele'.\n; Con la scheda Rev D (ULN2803) lascia \"alta\". Usa \"bassa\" solo con moduli\n; rele' del commercio attivi bassi (montaggio su breadboard).\nlogica = alta\n; Nomi facoltativi (massimo 12 caratteri), mostrati sul display in TEST e sul seriale.\n; Definisci i nomi PRIMA degli eventi che li usano.\n;nome1  = Mulino\n;nome2  = Pompa\n;nome3  = Casa luce\n; Forzatura di un'uscita, indipendente dalla schedulazione: auto | on | off\n;forza16 = off\n; Gli eventi dei rele' si scrivono nelle sezioni delle fasi (rele = ...).\n\n; =============================================================================\n; LE FASI: [GIORNO]  [TRAMONTO]  [CREPUSCOLO]  [NOTTE]  [ALBA]\n; =============================================================================\n; Ogni sezione descrive cosa succede in quella fase: colori delle strisce RGB\n; (cielo, tramonto, alba) e accensioni dei rele'. Il % e' sempre riferito alla\n; fase della sezione: 0 = inizio della fase, 50 = meta', 100 = fine.\n;\n; STRISCE RGB - una riga = una \"tappa\":\n;   cielo    = %, R, G, B [, curva]\n;   tramonto = %, R, G, B [, curva]\n;   alba     = %, R, G, B [, curva]\n; In quel punto la striscia ha esattamente quel colore (0..255, 0,0,0 = spenta);\n; fra una tappa e la successiva della stessa striscia il colore cambia gradualmente,\n; anche attraversando piu' fasi. Dopo l'ultima tappa del ciclo la striscia va\n; verso la prima tappa del ciclo successivo.\n;   curva (facoltativa) = come si ARRIVA a questa tappa dalla precedente:\n;     morbida  (predefinita) parte piano, accelera e rallenta arrivando\n;     lineare  velocita' costante per tutto il tratto\n;   Per tenere una striscia spenta in un tratto: una tappa 0,0,0 all'inizio e una\n;   alla fine del tratto.\n;   Per un'accensione rapida: una tappa 0,0,0 e, poco dopo (es. all'1 %), il colore\n;   acceso. Piu' le due tappe sono vicine, piu' l'accensione e' rapida (anche 0.5).\n;   Il 100 % di una fase e' lo stesso istante dello 0 % della fase successiva:\n;   conviene scrivere sia il colore di inizio (0) sia quello di fine (100) di ogni\n;   fase, cosi' ogni sezione si legge da sola. Nei due punti scrivi lo stesso colore.\n;   Le righe delle diverse strisce si possono mescolare in qualsiasi ordine: il\n;   firmware ordina da solo le tappe di ogni striscia. Massimo 20 tappe per striscia.\n;   Le righe di una striscia in una fase sostituiscono le tappe predefinite di\n;   QUELLA striscia in QUELLA fase; le altre fasi restano predefinite.\n;\n; RELE' - una riga = un evento:\n;   rele = RELE', ON|OFF, %\n;   RELE' = 1..16, Grp_GG_RR o un nome definito in [RELE]. Il rele' resta nello\n;   stato raggiunto fino al suo evento successivo. Massimo 64 eventi in tutto.\n;\n; PER TROVARE I VALORI R, G, B: \"modalita' colore\". Premi TEST durante la\n; schermata iniziale \"by Vanni\" (3 s). AVANTI sceglie la striscia (bianca), START\n; conferma; poi START / AVANTI / TEST = canale R / G / B, la manopola lo regola\n; (prima va \"agganciata\"); due clic entro 1 s = regolazione fine (+/-16).\n; START tenuto 2 s = torna alla scelta; TEST tenuto 2 s = esce.\n\n[GIORNO]\n; Cielo: dal caldo al quasi bianco, bianco pieno a mezzogiorno, di nuovo caldo.\ncielo    =   0,    210,  82,  18     ; inizio giorno: luce calda\ncielo    =  30,    246, 220, 208     ; quasi bianca (80 % fra caldo e bianco)\ncielo    =  45,    255, 255, 255     ; bianco pieno...\ncielo    =  55,    255, 255, 255     ; ...tenuto fino a mezzogiorno\ncielo    =  70,    246, 220, 208     ; di nuovo quasi bianca...\ncielo    = 100,    210,  82,  18     ; ...e a fine giorno di nuovo calda\n\n[TRAMONTO]\n; Il cielo sbiadisce e si spegne; la striscia sinistra fa il tramonto arancio.\ncielo    =   0,    210,  82,  18     ; calda all'inizio del tramonto (come a fine giorno)\ncielo    =  30,     16,  16,  16     ; perde colore fino a un bianco tenue\ncielo    =  38,      0,   0,   0     ; spenta...\ncielo    = 100,      0,   0,   0     ; ...fino a fine tramonto\ntramonto =   0,      0,   0,   0     ; spenta all'inizio del tramonto\ntramonto =   1,     18,  10,   4     ; si accende rapidamente, tenue e calda\ntramonto =  10,    155,  92,  16     ; picco arancio\ntramonto =  82,     16,  16,  16     ; perde colore fino a un bianco tenue\ntramonto = 100,      0,   0,   0     ; spenta a fine tramonto\nrele     = 3, ON, 30                 ; Grp_01_03 acceso al 30 % del tramonto\n\n[CREPUSCOLO]\n; Nessuna tappa: cielo, tramonto e alba restano spente (l'ultima tappa di ognuna\n; e' 0,0,0 e la successiva anche). Compaiono le stelle (vedi [STELLE]).\n\n[NOTTE]\n; Nessuna tappa: le strisce restano spente; stelle accese (vedi [STELLE]).\nrele     = 3, OFF, 50                ; Grp_01_03 spento a meta' notte\n\n[ALBA]\n; La striscia destra fa l'alba; il cielo si riaccende al 38 % e sale fino al giorno.\nalba     =   0,      0,   0,   0     ; spenta all'inizio dell'alba\nalba     =   1,     18,  12,   5     ; si accende rapidamente, tenue e chiara\nalba     =  38,    155,  78,  22     ; picco arancio chiaro\nalba     =  82,     16,  16,  16     ; perde colore fino a un bianco tenue\nalba     = 100,      0,   0,   0     ; spenta a fine alba\ncielo    =   0,      0,   0,   0     ; cielo spento all'inizio dell'alba...\ncielo    =  38,      0,   0,   0     ; ...e fino al 38 %\ncielo    =  39,     10,   4,   1     ; si accende rapidamente a un minimo caldo...\ncielo    = 100,    210,  82,  18     ; ...e sale fino al caldo del GIORNO\n\n[COLORI]\n; Limite di luminosita' per striscia, in % (0..100). Abbassa tutta la striscia in\n; proporzione, compresa la modalita' TEST; limita anche la corrente assorbita.\nlum_cielo    = 100\nlum_tramonto = 100\nlum_alba     = 100\n; Correzione \"gamma\": 1 = i valori 0..255 vengono convertiti in modo che l'occhio\n; percepisca passi di luminosita' regolari (senza, le luci basse salgono troppo in\n; fretta e quelle alte sembrano tutte uguali). 0 = il valore va diretto sul PWM.\ngamma = 1\n; 1 = uscite PWM invertite. Solo per moduli MOSFET del commercio \"attivi bassi\";\n; con la scheda Rev D lascia 0.\npwm_invertito = 0\n\n[STELLE]\nnumero  = 50          ; pixel WS2811 della catena STELLE (massimo 100)\nattive  = 20          ; quante stelle si accendono ogni notte, scelte a caso\nlum_min = 22          ; luminosita' minima e massima di ogni stella (0..255, tienile tenui)\nlum_max = 75\nlivello_notte = 235   ; luminosita' complessiva delle stelle a notte piena (0..255)\n; Scintillio: ogni stella si spegne e si riaccende piano con un proprio periodo,\n; scelto fra questi due valori (in millisecondi). Valori alti = scintillio lento.\nscintillio_min = 6400\nscintillio_max = 12200\n; Tinta delle stelle in % per canale R, G, B (100 = pieno): 100,72,38 = bianco caldo.\ncolore = 100,72,38\n\n[CASETTE]\nnumero  = 50              ; pixel WS2811 della catena CASETTE (massimo 100, 0 = non usata)\ncolore  = 90,55,20        ; colore delle finestre, R, G, B (0..255): luce calda\naccendi = TRAMONTO, 50    ; si accendono al 50 % del TRAMONTO\nspegni  = ALBA, 50        ; si spengono al 50 % dell'ALBA (puo' scavalcare la fine del ciclo)\nfuoco   = 20              ; tremolio di ogni casa, 0..100 (0 = luce fissa, 100 = fuoco vivace)\ndissolvenza_ms = 3000     ; durata dell'accensione e dello spegnimento morbidi, in ms\n\n[SISTEMA]\n; Avvio rapido. 1 = dopo la schermata iniziale \"by Vanni\" (3 s, sempre presente:\n; in quei secondi TEST attiva la modalita' colore) la centralina parte subito\n; dall'inizio del GIORNO: niente schermata della microSD (compare solo se\n; PRESEPE.INI contiene errori), niente autotest luci e niente melodia.\n; 0 = avvio completo: schermata iniziale, esito della microSD, poi autotest e\n; melodia secondo autotest_avvio e melodia_avvio qui sotto.\nfastboot = 1\nbuzzer = 1            ; 0 = silenzio totale (nessun bip, nessuna melodia)\nbeep_hz = 900         ; tono del bip dei tasti, in Hz\nbeep_ms = 90          ; durata del bip, in ms\nmelodia_avvio = 1     ; \"Astro del ciel\" durante l'autotest (solo con fastboot = 0)\nautotest_avvio = 1    ; autotest luci di circa 22 s all'accensione (solo con fastboot = 0)\noled = 1              ; 0 = non usare il display anche se collegato\ndebug_ms = 5000       ; ogni quanti ms il seriale stampa lo stato (0 = mai)\n";
+const FASI = ["GIORNO", "TRAMONTO", "CREPUSCOLO", "NOTTE", "ALBA"];
+const STRISCE = ["cielo", "tramonto", "alba"];
+const MAX_TAPPE = 20, MAX_EVENTI = 64;
+
+// ---------------------------------------------------------------- default (identici al firmware)
+function defaults() {
+  const t = (fase, pct, r, g, b) => ({ fase, pct, col: [r, g, b], curva: 0 });
+  return {
+    durate: [60, 180, 300], fasi: [40, 50, 55, 85],
+    nomi: Array(16).fill(""), forza: Array(16).fill(0),
+    eventi: [{ fase: 1, rele: 2, acceso: 1, pct: 30 }, { fase: 3, rele: 2, acceso: 0, pct: 50 }], eventiDaFile: false,
+    tappe: [
+      [t(0,0,210,82,18), t(0,30,246,220,208), t(0,45,255,255,255), t(0,55,255,255,255), t(0,70,246,220,208), t(0,100,210,82,18),
+       t(1,0,210,82,18), t(1,30,16,16,16), t(1,38,0,0,0), t(1,100,0,0,0),
+       t(4,0,0,0,0), t(4,38,0,0,0), t(4,39,10,4,1), t(4,100,210,82,18)],
+      [t(1,0,0,0,0), t(1,1,18,10,4), t(1,10,155,92,16), t(1,82,16,16,16), t(1,100,0,0,0)],
+      [t(4,0,0,0,0), t(4,1,18,12,5), t(4,38,155,78,22), t(4,82,16,16,16), t(4,100,0,0,0)],
+    ],
+    tappeDaFile: [0, 0, 0],
+    lum: [100, 100, 100], gamma: 1,
+    livelloNotte: 235, numStelle: 50, stelleAttive: 20,
+    accendi: [1, 50], spegni: [4, 50], numCasette: 50, coloreCasette: [90, 55, 20],
+  };
+}
+
+// ---------------------------------------------------------------- lettura del file (stesse regole del firmware)
+const ci = (a, b) => a.toLowerCase() === b.toLowerCase();
+function intIn(s, lo, hi) { if (!/^\s*[+-]?\d+\s*$/.test(s)) return null; const v = parseInt(s, 10); return v >= lo && v <= hi ? v : null; }
+function floatIn(s, lo, hi) { if (!/^\s*[+-]?(\d+\.?\d*|\.\d+)\s*$/.test(s)) return null; const v = parseFloat(s); return v >= lo && v <= hi ? v : null; }
+function bool(s) { s = s.trim().toLowerCase(); if (["1","si","on","true","acceso"].includes(s)) return 1; if (["0","no","off","false","spento"].includes(s)) return 0; return null; }
+function faseIdx(s) { const i = FASI.findIndex(f => ci(f, s.trim())); return i >= 0 ? i : null; }
+function fields(v) { return v.split(",").map(x => x.trim()); }
+function rgb(v, max = 255) { const f = fields(v); if (f.length !== 3) return null; const c = f.map(x => intIn(x, 0, max)); return c.includes(null) ? null : c; }
+function releIdx(c, s) {
+  s = s.trim(); const n = intIn(s, 1, 16); if (n !== null) return n - 1;
+  const m = /^grp_(\d\d)_(\d\d)$/i.exec(s);
+  if (m) { const g = +m[1], r = +m[2]; return (g >= 1 && g <= 4 && r >= 1 && r <= 4) ? (g - 1) * 4 + r - 1 : null; }
+  const i = c.nomi.findIndex(n => n && ci(n, s)); return i >= 0 ? i : null;
+}
+const prima = (a, b) => a.fase < b.fase || (a.fase === b.fase && a.pct < b.pct);
+
+function parse(text) {
+  const c = defaults(); const errors = []; let sez = "";
+  const err = (n, line, msg) => errors.push({ n, line: line.trim(), msg });
+  text.split(/\n/).forEach((raw, i) => {
+    const n = i + 1; let line = raw.replace(/\r$/, "");
+    if (line.length > 127) return err(n, line.slice(0, 60) + "…", "riga più lunga di 127 caratteri");
+    const cut = line.search(/[;#]/); if (cut >= 0) line = line.slice(0, cut);
+    const s = line.trim(); if (!s) return;
+    if (s[0] === "[") {
+      const m = /^\[([^\]]*)\]$/.exec(s); if (!m) { sez = ""; return err(n, s, "sezione scritta male"); }
+      const name = m[1].trim();
+      const known = ["CICLO","FASI","RELE","COLORI","STELLE","CASETTE","SISTEMA", ...FASI];
+      if (name.length > 15 || !known.some(k => ci(k, name))) { sez = ""; return err(n, s, "sezione sconosciuta"); }
+      sez = name.toUpperCase(); return;
+    }
+    const eq = s.indexOf("="); if (eq < 0 || !sez) return err(n, s, eq < 0 ? "manca il segno =" : "chiave fuori da una sezione valida");
+    const k = s.slice(0, eq).trim(), v = s.slice(eq + 1).trim(), kl = k.toLowerCase();
+    let ok = false;
+    if (sez === "CICLO") {
+      const d = /^durata([123])$/.exec(kl);
+      if (d) { const x = intIn(v, 10, 86400); if (x !== null) { c.durate[+d[1] - 1] = x; ok = true; } }
+      else if (kl === "pot_min" || kl === "pot_max") ok = intIn(v, 0, 1023) !== null;
+      else if (kl === "pot_invertito") ok = bool(v) !== null;
+      else if (kl === "partenza") ok = ci(v, "marcia") || ci(v, "pausa");
+    } else if (sez === "FASI") {
+      const idx = ["tramonto","crepuscolo","notte","alba"].indexOf(kl);
+      if (idx >= 0) { const x = floatIn(v, 1, 99); if (x !== null) { c.fasi[idx] = x; ok = true; } }
+    } else if (sez === "RELE") {
+      if (kl === "logica") ok = ci(v, "alta") || ci(v, "bassa");
+      else if (/^nome([1-9]|1[0-6])$/.test(kl)) { if (v && v.length < 13 && !v.includes(",")) { c.nomi[+kl.slice(4) - 1] = v; ok = true; } }
+      else if (/^forza([1-9]|1[0-6])$/.test(kl)) { const m = { auto: 0, on: 1, acceso: 1, off: 2, spento: 2 }[v.toLowerCase()]; if (m !== undefined) { c.forza[+kl.slice(5) - 1] = m; ok = true; } }
+    } else if (sez === "COLORI") {
+      const li = ["lum_cielo","lum_tramonto","lum_alba"].indexOf(kl);
+      if (li >= 0) { const x = intIn(v, 0, 100); if (x !== null) { c.lum[li] = x; ok = true; } }
+      else if (kl === "gamma") { const b = bool(v); if (b !== null) { c.gamma = b; ok = true; } }
+      else if (kl === "pwm_invertito") ok = bool(v) !== null;
+    } else if (sez === "STELLE") {
+      const lim = { numero: [0,100], attive: [0,100], lum_min: [0,255], lum_max: [0,255], livello_notte: [0,255], scintillio_min: [500,60000], scintillio_max: [500,60000] }[kl];
+      if (lim) { const x = intIn(v, lim[0], lim[1]); if (x !== null) { ok = true; if (kl === "livello_notte") c.livelloNotte = x; if (kl === "numero") c.numStelle = x; if (kl === "attive") c.stelleAttive = x; } }
+      else if (kl === "colore") ok = rgb(v, 100) !== null;
+    } else if (sez === "CASETTE") {
+      if (kl === "numero") { const x = intIn(v, 0, 100); if (x !== null) { c.numCasette = x; ok = true; } }
+      else if (kl === "colore") { const x = rgb(v); if (x) { c.coloreCasette = x; ok = true; } }
+      else if (kl === "accendi" || kl === "spegni") { const f = fields(v); if (f.length === 2) { const fa = faseIdx(f[0]), p = intIn(f[1], 0, 100); if (fa !== null && p !== null) { c[kl] = [fa, p]; ok = true; } } }
+      else if (kl === "fuoco") ok = intIn(v, 0, 100) !== null;
+      else if (kl === "dissolvenza_ms") ok = intIn(v, 0, 60000) !== null;
+    } else if (sez === "SISTEMA") {
+      if (["buzzer","melodia_avvio","autotest_avvio","fastboot","oled"].includes(kl)) ok = bool(v) !== null;
+      else if (kl === "beep_hz") ok = intIn(v, 100, 8000) !== null;
+      else if (kl === "beep_ms") ok = intIn(v, 10, 2000) !== null;
+      else if (kl === "debug_ms") ok = intIn(v, 0, 3600000) !== null;
+    } else { // sezione di fase
+      const fase = FASI.indexOf(sez); const s_ = STRISCE.indexOf(kl);
+      if (s_ >= 0) {
+        const f = fields(v);
+        if (f.length === 4 || f.length === 5) {
+          const pct = floatIn(f[0], 0, 100), r = intIn(f[1], 0, 255), g = intIn(f[2], 0, 255), b = intIn(f[3], 0, 255);
+          let curva = 0, cOk = true;
+          if (f.length === 5) { if (ci(f[4], "morbida")) curva = 0; else if (ci(f[4], "lineare")) curva = 1; else cOk = false; }
+          if (pct !== null && r !== null && g !== null && b !== null && cOk) {
+            const L = c.tappe[s_];
+            if (!(c.tappeDaFile[s_] & (1 << fase))) { c.tappe[s_] = L.filter(t => t.fase !== fase); c.tappeDaFile[s_] |= 1 << fase; }
+            const T = c.tappe[s_];
+            if (T.length < MAX_TAPPE) {
+              const t = { fase, pct, col: [r, g, b], curva };
+              let pos = T.length; while (pos > 0 && prima(t, T[pos - 1])) pos--;
+              T.splice(pos, 0, t); ok = true;
+            }
+          }
+        }
+      } else if (kl === "rele") {
+        const f = fields(v);
+        if (f.length === 3) {
+          const r = releIdx(c, f[0]), st = bool(f[1]), p = intIn(f[2], 0, 100);
+          if (r !== null && st !== null && p !== null) {
+            if (!c.eventiDaFile) { c.eventi = []; c.eventiDaFile = true; }
+            if (c.eventi.length < MAX_EVENTI) { c.eventi.push({ fase, rele: r, acceso: st, pct: p }); ok = true; }
+          }
+        }
+      }
+    }
+    if (!ok) err(n, s, "chiave sconosciuta o valore non valido");
+  });
+  const f = c.fasi;
+  if (!(f[0] < f[1] && f[1] < f[2] && f[2] < f[3])) { c.fasi = [40, 50, 55, 85]; errors.push({ n: 0, line: "[FASI]", msg: "le fasi non sono crescenti: uso i valori predefiniti" }); }
+  return { c, errors };
+}
+
+// ---------------------------------------------------------------- motore (stessa aritmetica del firmware)
+function inizio(c, fa) { return [0, ...c.fasi][fa]; }
+function fine(c, fa) { return [...c.fasi, 100][fa]; }
+function posizione(c, fa, pct) { const a = inizio(c, fa), b = fine(c, fa); return a + (b - a) * pct / 100; }
+function faseDi(c, p) { const f = c.fasi; return p < f[0] ? 0 : p < f[1] ? 1 : p < f[2] ? 2 : p < f[3] ? 3 : 4; }
+const interp8 = (a, b, t) => Math.trunc(a + (b - a) * Math.min(1, Math.max(0, t)));
+function colore(c, s, p) {
+  const T = c.tappe[s], n = T.length;
+  if (!n) return [0, 0, 0]; if (n === 1) return T[0].col.slice();
+  let prec = -1; for (let i = 0; i < n; i++) if (posizione(c, T[i].fase, T[i].pct) <= p) prec = i;
+  let pP, pS, succ;
+  if (prec < 0) { prec = n - 1; succ = 0; pP = posizione(c, T[prec].fase, T[prec].pct) - 100; pS = posizione(c, T[0].fase, T[0].pct); }
+  else { pP = posizione(c, T[prec].fase, T[prec].pct); if (prec + 1 < n) { succ = prec + 1; pS = posizione(c, T[succ].fase, T[succ].pct); } else { succ = 0; pS = posizione(c, T[0].fase, T[0].pct) + 100; } }
+  let x = pS > pP ? (p - pP) / (pS - pP) : 1; x = Math.min(1, Math.max(0, x));
+  if (T[succ].curva === 0) x = x * x * (3 - 2 * x);
+  return [0, 1, 2].map(k => interp8(T[prec].col[k], T[succ].col[k], x));
+}
+function stelle(c, p) {
+  const fa = faseDi(c, p), prog = (a, b) => b <= a ? 0 : Math.min(1, Math.max(0, (p - a) / (b - a)));
+  if (fa === 2) return interp8(0, c.livelloNotte, prog(c.fasi[1], c.fasi[2]));
+  if (fa === 3) return c.livelloNotte;
+  if (fa === 4) { const t = prog(c.fasi[3], 100); return interp8(c.livelloNotte, 0, t * t * (3 - 2 * t)); }
+  return 0;
+}
+function casette(c, p) {
+  if (!c.numCasette) return false;
+  const a = posizione(c, c.accendi[0], c.accendi[1]), b = posizione(c, c.spegni[0], c.spegni[1]);
+  if (a === b) return false; return a < b ? (p >= a && p < b) : (p >= a || p < b);
+}
+function rele(c, p) {
+  const fa = faseDi(c, p), a = inizio(c, fa), b = fine(c, fa);
+  const pf = b > a ? Math.min(100, Math.max(0, (p - a) * 100 / (b - a))) : 0;
+  const out = [];
+  for (let r = 0; r < 16; r++) {
+    if (c.forza[r] === 1) { out.push(true); continue; } if (c.forza[r] === 2) { out.push(false); continue; }
+    let st = false, best = -1;
+    for (const e of c.eventi) {
+      if (e.rele !== r) continue;
+      if (!(e.fase < fa || (e.fase === fa && pf >= e.pct))) continue;
+      const pos = e.fase * 101 + e.pct; if (pos >= best) { best = pos; st = !!e.acceso; }
+    }
+    out.push(st);
+  }
+  return out;
+}
+// valore di scena -> colore a schermo (lum_* come nel firmware; senza gamma il LED rende le basse luci più chiare)
+function schermo(c, s, col) {
+  return col.map(v => {
+    let x = c.lum[s] >= 100 ? v : Math.trunc((v * c.lum[s] + 50) / 100);
+    if (!c.gamma) x = Math.round(255 * Math.pow(x / 255, 1 / 2.2));
+    return x;
+  });
+}
+
+// ---------------------------------------------------------------- interfaccia
+const $ = id => document.getElementById(id);
+const ta = $("ini"), canvas = $("tl"), ctx = canvas.getContext("2d");
+let cfg = parse(DEFAULT_INI).c, p = 0, playing = true, last = performance.now(), durata = 60;
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+ta.value = store.get("presepe-ini") || DEFAULT_INI;
+
+for (let i = 0; i < 16; i++) { const d = document.createElement("div"); d.className = "relay"; d.textContent = i + 1; $("relays").appendChild(d); }
+
+function fillSpeed() {
+  const sel = $("speed"), prev = sel.value;
+  const opts = cfg.durate.map((d, i) => [String(d), `durata${i + 1}: ${fmt(d)}`]).concat([["20", "veloce: 20 s"], ["8", "rapidissimo: 8 s"]]);
+  sel.innerHTML = ""; opts.forEach(([v, t]) => { const o = document.createElement("option"); o.value = v; o.textContent = t; sel.appendChild(o); });
+  sel.value = opts.some(o => o[0] === prev) ? prev : opts[0][0]; durata = +sel.value;
+}
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+function rebuild() {
+  const { c, errors } = parse(ta.value); cfg = c;
+  const st = $("status"), ul = $("errors");
+  ul.innerHTML = "";
+  const nt = cfg.tappe.map(t => t.length).join(" / ");
+  if (errors.length) {
+    st.className = "status bad"; st.textContent = `${errors.length} righe con errori: vengono ignorate (come fa la centralina). Tappe cielo / tramonto / alba: ${nt}.`;
+    errors.forEach(e => { const li = document.createElement("li"); li.innerHTML = `<b>${e.n ? "riga " + e.n : "controllo"}:</b> `; li.appendChild(document.createTextNode(`${e.line} — ${e.msg}`)); ul.appendChild(li); });
+  } else {
+    st.className = "status ok"; st.textContent = `File letto senza errori. Tappe cielo / tramonto / alba: ${nt}; eventi relè: ${cfg.eventi.length}.`;
+  }
+  fillSpeed(); drawTimeline(); render();
+}
+
+function drawTimeline() {
+  const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  const top = 18, rowH = 30, gap = 6, order = [1, 0, 2];
+  order.forEach((s, row) => {
+    const y = top + row * (rowH + gap);
+    for (let x = 0; x < w; x++) { const col = schermo(cfg, s, colore(cfg, s, (x + 0.5) / w * 100)); ctx.fillStyle = `rgb(${col})`; ctx.fillRect(x, y, 1, rowH); }
+    ctx.fillStyle = "#ffffff";
+    cfg.tappe[s].forEach(t => { const x = posizione(cfg, t.fase, t.pct) / 100 * w; ctx.fillRect(Math.min(w - 2, Math.max(0, x - 1)), y + rowH - 6, 2, 6); });
+  });
+  const ys = top + 3 * (rowH + gap), sh = 12;
+  for (let x = 0; x < w; x++) { const l = stelle(cfg, (x + 0.5) / w * 100); ctx.fillStyle = `rgb(${l},${l},${Math.min(255, l + 20)})`; ctx.fillRect(x, ys, 1, sh); }
+  ctx.font = "600 11px 'Barlow Semi Condensed', sans-serif"; ctx.textBaseline = "top";
+  [0, ...cfg.fasi].forEach((a, i) => {
+    const x = a / 100 * w; ctx.fillStyle = "rgba(201,208,224,0.55)"; ctx.fillRect(x, 0, 1, h);
+    const b = (i < 4 ? cfg.fasi[i] : 100) / 100 * w; const label = FASI[i];
+    ctx.fillStyle = "#c9d0e0"; const tw = ctx.measureText(label).width;
+    if (b - x > tw + 6) ctx.fillText(label, x + 4, 3);
+  });
+}
+
+function render() {
+  const fa = faseDi(cfg, p), a = inizio(cfg, fa), b = fine(cfg, fa), pf = b > a ? (p - a) * 100 / (b - a) : 0;
+  $("phase").textContent = FASI[fa];
+  $("meta").textContent = `${pf.toFixed(1)} % della fase · ${p.toFixed(1)} % del ciclo · ${fmt(p / 100 * durata)} / ${fmt(durata)}`;
+  [0, 1, 2].forEach(s => {
+    const val = colore(cfg, s, p), col = schermo(cfg, s, val), el = $("s" + s);
+    el.querySelector(".bar").style.background = `rgb(${col})`;
+    el.querySelector(".bar").style.boxShadow = `0 0 24px 8px rgba(${col},0.75)`;
+    el.querySelector(".halo").style.background = `radial-gradient(ellipse 70% 60% at 50% 50%, rgba(${col},0.55), rgba(${col},0.08) 70%, transparent)`;
+    el.querySelector(".rgb").textContent = `${val[0]}, ${val[1]}, ${val[2]}`;
+  });
+  const lv = stelle(cfg, p); $("stars").style.width = (lv / 255 * 100) + "%"; $("starsv").textContent = lv;
+  const h = casette(cfg, p), hp = $("houses"); hp.textContent = h ? "accese" : "spente"; hp.classList.toggle("on", h);
+  const rs = rele(cfg, p); [...$("relays").children].forEach((d, i) => { d.classList.toggle("on", rs[i]); d.title = cfg.nomi[i] || `relè ${i + 1}`; });
+  drawCursor();
+}
+let cursorX = -1;
+function drawCursor() {
+  // ridisegna solo la linea del cursore sopra la timeline già pronta
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (cursorX >= 0 && saved) ctx.putImageData(saved, 0, 0);
+  saved = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  cursorX = p / 100 * w; const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = "#f3d7a8"; ctx.fillRect(Math.round(cursorX) - 1, 0, 2, h);
+}
+let saved = null;
+const origDraw = drawTimeline;
+drawTimeline = function () { saved = null; cursorX = -1; origDraw(); };
+
+function tick(now) {
+  const dt = (now - last) / 1000; last = now;
+  if (playing) { p = (p + dt / durata * 100) % 100; render(); }
+  requestAnimationFrame(tick);
+}
+
+let timer = null;
+ta.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => { store.set("presepe-ini", ta.value); rebuild(); }, 250); });
+$("reset").addEventListener("click", () => { ta.value = DEFAULT_INI; store.set("presepe-ini", ta.value); rebuild(); });
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(ta.value); $("copy").textContent = "Copiato"; }
+  catch (e) { ta.focus(); ta.select(); $("copy").textContent = "Selezionato: premi Ctrl+C"; }
+  setTimeout(() => { $("copy").textContent = "Copia il file"; }, 2000);
+});
+$("play").addEventListener("click", () => { playing = !playing; $("play").textContent = playing ? "Pausa" : "Avvia"; last = performance.now(); });
+$("speed").addEventListener("change", e => { durata = +e.target.value; render(); });
+function salta(dir) {
+  const fa = faseDi(cfg, p); const next = (fa + (dir > 0 ? 1 : 4)) % 5;
+  p = inizio(cfg, dir > 0 ? next : (p - inizio(cfg, fa) > 0.5 ? fa : next)); render();
+}
+$("next").addEventListener("click", () => salta(1));
+$("prev").addEventListener("click", () => salta(-1));
+function scrub(e) { const r = canvas.getBoundingClientRect(); p = Math.min(99.999, Math.max(0, (e.clientX - r.left) / r.width * 100)); render(); }
+let dragging = false;
+canvas.addEventListener("pointerdown", e => { dragging = true; canvas.setPointerCapture(e.pointerId); scrub(e); });
+canvas.addEventListener("pointermove", e => { if (dragging) scrub(e); });
+canvas.addEventListener("pointerup", () => { dragging = false; });
+window.addEventListener("resize", () => { drawTimeline(); render(); });
+
+rebuild();
+requestAnimationFrame(tick);
+</script>
+
+</body>
+</html>
