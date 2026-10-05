@@ -303,7 +303,7 @@ Librerie: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (con Adafruit BusIO)
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Occupazione: 59,3 kB di flash (23 %), 3,8 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
+Occupazione: 59,6 kB di flash (23 %), 3,7 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
 
 ### Compilazione
 
@@ -314,7 +314,7 @@ Occupazione: 59,3 kB di flash (23 %), 3,8 kB di RAM statica. I buffer dei LED e 
   arduino-cli core install arduino:avr
   arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
   firmware/tools/fw_compile.sh                       # -> firmware/PSN-Presepe/build/PSN-Presepe.ino.hex
-  firmware/tools/run_tests.sh                        # 68 controlli su PRESEPE.INI e tappe + simulazione della modalità colore
+  firmware/tools/run_tests.sh                        # 76 controlli su PRESEPE.INI e tappe + simulazione della modalità colore
   ```
 
 Lo sketch dichiara i suoi prototipi esplicitamente, quindi non dipende dalla generazione automatica dei prototipi dell'IDE.
@@ -383,65 +383,70 @@ La scheda viene letta **una sola volta, all'accensione**. Se `PRESEPE.INI` manca
 |---|---|
 | `[CICLO]` | `durata1..3` (s, 10–86400), `pot_min`, `pot_max`, `pot_invertito`, `partenza = marcia / pausa` |
 | `[FASI]` | % di inizio di `tramonto`, `crepuscolo`, `notte`, `alba` (devono essere strettamente crescenti) |
-| `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 caratteri), `forza1..16 = auto / on / off`, `evento = FASE, RELÈ, ON/OFF, %` (fino a 64) |
-| `[CIELO]`, `[TRAMONTO]`, `[ALBA]` | `tappa = FASE, %, R, G, B [, morbida / lineare]` (fino a 20 per striscia), vedi sotto |
+| `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 caratteri), `forza1..16 = auto / on / off` |
+| `[GIORNO]`, `[TRAMONTO]`, `[CREPUSCOLO]`, `[NOTTE]`, `[ALBA]` | cosa succede in quella fase: `cielo` / `tramonto` / `alba = %, R, G, B [, morbida / lineare]` (colori delle strisce, fino a 20 tappe per striscia) e `rele = RELÈ, ON/OFF, %` (fino a 64 eventi in tutto), vedi sotto |
 | `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tinta in %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = spente), `colore`, `accendi = FASE, %`, `spegni = FASE, %` (può scavalcare la fine del ciclo), `fuoco` (0–100), `dissolvenza_ms` |
 | `[SISTEMA]` | `fastboot` (predefinito 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (entrambi solo con `fastboot = 0`), `oled`, `debug_ms` |
 
-Gli eventi dei relè restano validi finché non arriva il successivo: un relè mantiene lo stato fino al suo prossimo evento. Un relè si può indicare col numero (1–16), col nome, o come `Grp_GG_RR`, dove relè = (GG − 1) × 4 + RR. La prima riga `evento` valida sostituisce tutta la tabella di default.
+### Le sezioni di fase: colori delle strisce e relè
+
+Tutto quello che succede in una fase si scrive nella sezione di quella fase: `[GIORNO]`, `[TRAMONTO]`, `[CREPUSCOLO]`, `[NOTTE]` o `[ALBA]`. Ogni `%` è riferito a quella fase: 0 = inizio della fase, 50 = metà, 100 = fine.
+
+**Colori delle strisce ("tappe").** Una riga è una tappa:
+
+```ini
+cielo    = %, R, G, B [, curva]
+tramonto = %, R, G, B [, curva]
+alba     = %, R, G, B [, curva]
+```
+
+In quel punto la striscia ha esattamente quel colore (0–255, `0, 0, 0` = spenta). Fra due tappe consecutive della stessa striscia il colore cambia gradualmente, anche attraversando più fasi; dopo l'ultima tappa del ciclo la striscia va verso la prima tappa del ciclo successivo. I decimali si scrivono col punto (`33.33`).
+
+La **curva** (facoltativa) indica come la striscia *arriva* a questa tappa dalla precedente: `morbida` (predefinita) parte piano, accelera e rallenta arrivando (smoothstep); `lineare` mantiene una velocità costante.
+
+Regole:
+- Il 100 % di una fase è lo stesso istante dello 0 % della successiva. Scrivi sia il colore di inizio (0) sia quello di fine (100) di ogni fase in cui la striscia lavora, con lo stesso colore nei due punti, così ogni sezione si legge da sola.
+- Per tenere spenta una striscia in un tratto, metti una tappa `0, 0, 0` all'inizio e una alla fine del tratto.
+- Per un'accensione rapida, metti una tappa `0, 0, 0` e, poco dopo, il colore acceso, per esempio a 0 e all'1 %. Più le due tappe sono vicine, più l'accensione è rapida (va bene anche `0.5`).
+- Le righe di strisce diverse si possono mescolare in qualsiasi ordine, e anche le sezioni di fase possono stare in qualsiasi ordine: il firmware ordina da solo nel tempo le tappe di ogni striscia. Due tappe della stessa striscia nello stesso punto mantengono l'ordine del file e fanno un cambio istantaneo.
+- Le righe di una striscia in una fase sostituiscono le tappe predefinite **solo di quella striscia in quella fase**; le altre fasi restano predefinite. Fino a 20 tappe per striscia in tutto.
+
+Per esempio il tramonto (valori predefiniti):
+
+```ini
+[TRAMONTO]
+cielo    =   0, 210,  82,  18     ; calda all'inizio del tramonto (come a fine giorno)
+cielo    =  30,  16,  16,  16     ; perde colore fino a un bianco tenue
+cielo    =  38,   0,   0,   0     ; spenta...
+cielo    = 100,   0,   0,   0     ; ...fino a fine tramonto
+tramonto =   0,   0,   0,   0     ; spenta all'inizio del tramonto
+tramonto =   1,  18,  10,   4     ; si accende rapidamente, tenue e calda
+tramonto =  38, 155,  92,  16     ; picco arancio
+tramonto =  82,  16,  16,  16     ; perde colore fino a un bianco tenue
+tramonto = 100,   0,   0,   0     ; spenta a fine tramonto
+rele     = 3, ON, 30              ; relè 3 acceso al 30 % del tramonto
+```
+
+Per aggiungere un colore intermedio, per esempio un passaggio rosso fra il picco arancio e il bianco tenue, basta una riga in mezzo: `tramonto = 60, 140, 30, 10`.
+
+**Relè.** Una riga è un evento: `rele = RELÈ, ON|OFF, %`. RELÈ è 1–16, `Grp_GG_RR` (relè = (GG − 1) × 4 + RR) o un nome definito in `[RELE]`. Un relè mantiene lo stato fino al suo evento successivo. La prima riga `rele` valida sostituisce tutta la tabella di eventi predefinita (predefinito: relè 3 acceso al 30 % del TRAMONTO, spento al 50 % della NOTTE). Fino a 64 eventi.
 
 Esempio: il motorino del mulino sul relè 1 gira dal 10 % del GIORNO fino a quando arriva la notte.
 
 ```ini
 [RELE]
-nome1  = Mulino
-evento = GIORNO, Mulino, ON, 10
-evento = NOTTE,  Mulino, OFF, 0
+nome1 = Mulino
+
+[GIORNO]
+rele = Mulino, ON, 10
+
+[NOTTE]
+rele = Mulino, OFF, 0
 ```
 
-### Colori delle strisce RGB: le "tappe"
-
-Il colore di ogni striscia analogica lungo il ciclo è una lista di **tappe**, nella sezione della striscia: `[CIELO]`, `[TRAMONTO]` o `[ALBA]`. Una tappa dice: *in questo punto del ciclo la striscia ha esattamente questo colore*. Fra due tappe consecutive il firmware passa gradualmente da un colore all'altro.
-
-```ini
-tappa = FASE, % della fase, R, G, B [, curva]
-```
-
-- **FASE, %:** dove si trova la tappa. Per esempio `TRAMONTO, 38` è al 38 % della fase del tramonto. I decimali si scrivono col punto: `33.33`.
-- **R, G, B:** il colore in quel punto, da 0 a 255. `0, 0, 0` vuol dire spenta.
-- **curva** (facoltativa) indica come la striscia *arriva* a questa tappa dalla precedente:
-  - `morbida` (predefinita): parte piano, accelera a metà e rallenta arrivando (smoothstep), la dissolvenza naturale usata finora;
-  - `lineare`: velocità costante per tutto il tratto.
-
-Regole:
-- Scrivi le tappe in ordine di tempo, dal GIORNO all'ALBA. Una tappa che torna indietro nel tempo viene ignorata e conta come errore.
-- La lista fa il giro: dopo l'ultima tappa la striscia va gradualmente verso la prima tappa del ciclo successivo.
-- **Due tappe nello stesso punto fanno un cambio istantaneo** (uno scatto): la striscia arriva al primo colore e riparte dal secondo.
-- Per tenere una striscia spenta in un tratto, metti una tappa `0, 0, 0` all'inizio e una alla fine di quel tratto.
-- Fino a 20 tappe per striscia. Una sola tappa vuol dire colore fisso per tutto il ciclo.
-- Se una sezione contiene almeno una tappa valida, le tappe del file sostituiscono **tutte** quelle predefinite di quella striscia. Le strisce senza tappe nel file restano con quelle predefinite.
-
-Le tappe predefinite di TRAMONTO e ALBA riproducono le curve storiche del firmware. La curva diurna del CIELO è stata ridisegnata nella release 038: al 30 % del GIORNO è quasi bianca (80 % della strada fra caldo e bianco), tiene il bianco pieno dal 45 % al 55 %, torna all'80 % al 70 % e rientra nel colore caldo all'inizio del TRAMONTO. Per esempio la striscia del tramonto:
-
-```ini
-[TRAMONTO]
-tappa = TRAMONTO,   0,   0,  0,  0     ; spenta fino all'inizio del tramonto
-tappa = TRAMONTO,   0,  18, 10,  4     ; scatto: si accende tenue e calda
-tappa = TRAMONTO,  38, 155, 92, 16     ; picco arancio
-tappa = TRAMONTO,  82,  16, 16, 16     ; perde colore fino a un bianco tenue
-tappa = TRAMONTO, 100,   0,  0,  0     ; spenta a fine tramonto, fino al giro dopo
-```
-
-Per aggiungere un colore intermedio, per esempio un passaggio rosso fra il picco arancio e il bianco tenue, basta inserire una tappa in mezzo: `tappa = TRAMONTO, 60, 140, 30, 10`.
-
-Quando sono state introdotte le tappe (prima della modifica al cielo della release 038), quelle predefinite sono state confrontate con il firmware precedente, che aveva le curve scritte nel codice, in 1.000.000 di punti del ciclo:
-- le strisce TRAMONTO e ALBA differiscono al massimo di 1 gradino su 255 (arrotondamenti), in 15 punti su un milione;
-- il CIELO differisce di 1 gradino su 255 nello 0,5 % dei punti;
-- l'unica differenza maggiore (10 gradini) cade nel solo istante dello "scatto" dell'alba al 38 %, dove il codice vecchio e il nuovo arrotondano il confine in modo diverso.
-
-Niente di tutto questo è visibile.
+Il cielo predefinito è: caldo a inizio GIORNO, quasi bianco (80 % della strada) al 30 %, bianco pieno dal 45 % al 55 %, di nuovo quasi bianco al 70 %, caldo a fine GIORNO; nel TRAMONTO sbiadisce e si spegne, resta spento fino al 38 % dell'ALBA, poi si accende rapidamente a un minimo caldo e sale fino al colore caldo del giorno. Le strisce del tramonto e dell'alba si accendono solo nella loro fase.
 
 Gestione degli errori:
 - Una riga sbagliata viene saltata e contata, e quella chiave mantiene il valore di default.
