@@ -237,7 +237,7 @@ struct PresepeConfig {
   uint8_t  sdStato;
   uint16_t righeLette, errori, primaRigaErrata;
   uint8_t  eventiDaFile;                  // 1 = la schedulazione arriva dal file
-  uint8_t  tappeDaFile[CFG_NUM_STRISCE];  // 1 = le tappe di quella striscia arrivano dal file
+  uint8_t  tappeDaFile[CFG_NUM_STRISCE];  // bit f = le tappe di quella striscia nella fase f arrivano dal file
 };
 
 extern PresepeConfig cfg;
@@ -288,28 +288,33 @@ static void tappa(PresepeConfig &c, uint8_t s, uint8_t fase, float pct, uint8_t 
 // Curve storiche (fino al firmware Rev D senza tappe), tutte con curva morbida.
 static void cfgTappeDefault(PresepeConfig &c) {
   for (uint8_t s = 0; s < CFG_NUM_STRISCE; s++) c.numTappe[s] = 0;
-  // CIELO (dalla release 038): caldo -> 80 % del bianco al 30 % del GIORNO -> bianco pieno
-  // dal 45 % al 55 % -> di nuovo 80 % al 70 % -> caldo all'inizio del TRAMONTO; si spegne
-  // nel TRAMONTO, resta spento fino al 38 % dell'ALBA, poi riparte da un minimo caldo.
-  tappa(c, CFG_S_CIELO, CFG_GIORNO,    0.0f, 210,  82,  18);
-  tappa(c, CFG_S_CIELO, CFG_GIORNO,   30.0f, 246, 220, 208);
-  tappa(c, CFG_S_CIELO, CFG_GIORNO,   45.0f, 255, 255, 255);
-  tappa(c, CFG_S_CIELO, CFG_GIORNO,   55.0f, 255, 255, 255);
-  tappa(c, CFG_S_CIELO, CFG_GIORNO,   70.0f, 246, 220, 208);
-  tappa(c, CFG_S_CIELO, CFG_TRAMONTO,  0.0f, 210,  82,  18);
-  tappa(c, CFG_S_CIELO, CFG_TRAMONTO, 30.0f,  16,  16,  16);
-  tappa(c, CFG_S_CIELO, CFG_TRAMONTO, 38.0f,   0,   0,   0);
-  tappa(c, CFG_S_CIELO, CFG_ALBA,     38.0f,   0,   0,   0);
-  tappa(c, CFG_S_CIELO, CFG_ALBA,     38.0f,  10,   4,   1);
-  // TRAMONTO (striscia sinistra): accesa solo nella fase TRAMONTO.
+  // In ordine di tempo; ogni fase in cui la striscia lavora ha la tappa di inizio (0) e di fine (100).
+  // CIELO: caldo -> quasi bianco al 30 % del GIORNO -> bianco pieno 45..55 % -> quasi bianco
+  // al 70 % -> caldo a fine giorno; nel TRAMONTO sbiadisce e si spegne; resta spento fino al
+  // 38 % dell'ALBA, si accende rapidamente (1 %) a un minimo caldo e sale fino al GIORNO.
+  tappa(c, CFG_S_CIELO, CFG_GIORNO,     0.0f, 210,  82,  18);
+  tappa(c, CFG_S_CIELO, CFG_GIORNO,    30.0f, 246, 220, 208);
+  tappa(c, CFG_S_CIELO, CFG_GIORNO,    45.0f, 255, 255, 255);
+  tappa(c, CFG_S_CIELO, CFG_GIORNO,    55.0f, 255, 255, 255);
+  tappa(c, CFG_S_CIELO, CFG_GIORNO,    70.0f, 246, 220, 208);
+  tappa(c, CFG_S_CIELO, CFG_GIORNO,   100.0f, 210,  82,  18);
+  tappa(c, CFG_S_CIELO, CFG_TRAMONTO,   0.0f, 210,  82,  18);
+  tappa(c, CFG_S_CIELO, CFG_TRAMONTO,  30.0f,  16,  16,  16);
+  tappa(c, CFG_S_CIELO, CFG_TRAMONTO,  38.0f,   0,   0,   0);
+  tappa(c, CFG_S_CIELO, CFG_TRAMONTO, 100.0f,   0,   0,   0);
+  tappa(c, CFG_S_CIELO, CFG_ALBA,       0.0f,   0,   0,   0);
+  tappa(c, CFG_S_CIELO, CFG_ALBA,      38.0f,   0,   0,   0);
+  tappa(c, CFG_S_CIELO, CFG_ALBA,      39.0f,  10,   4,   1);
+  tappa(c, CFG_S_CIELO, CFG_ALBA,     100.0f, 210,  82,  18);
+  // TRAMONTO (striscia sinistra): accesa solo nella fase TRAMONTO, accensione rapida (1 %).
   tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,   0.0f,   0,  0,  0);
-  tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,   0.0f,  18, 10,  4);
+  tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,   1.0f,  18, 10,  4);
   tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,  38.0f, 155, 92, 16);
   tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO,  82.0f,  16, 16, 16);
   tappa(c, CFG_S_TRAMONTO, CFG_TRAMONTO, 100.0f,   0,  0,  0);
-  // ALBA (striscia destra): accesa solo nella fase ALBA.
+  // ALBA (striscia destra): accesa solo nella fase ALBA, accensione rapida (1 %).
   tappa(c, CFG_S_ALBA, CFG_ALBA,   0.0f,   0,  0,  0);
-  tappa(c, CFG_S_ALBA, CFG_ALBA,   0.0f,  18, 12,  5);
+  tappa(c, CFG_S_ALBA, CFG_ALBA,   1.0f,  18, 12,  5);
   tappa(c, CFG_S_ALBA, CFG_ALBA,  38.0f, 155, 78, 22);
   tappa(c, CFG_S_ALBA, CFG_ALBA,  82.0f,  16, 16, 16);
   tappa(c, CFG_S_ALBA, CFG_ALBA, 100.0f,   0,  0,  0);
@@ -510,15 +515,6 @@ static bool sezRele(PresepeConfig &c, const char *k, char *v) {
     else return false;
     return true;
   }
-  if (ugualeCI(k, "evento")) {
-    char *f[5]; if (campi(v, f, 5) != 4) return false;
-    CfgEvento e; uint8_t st; long pct;
-    if (!leggiFase(f[0], e.fase) || !leggiRele(c, f[1], e.rele) || !leggiBool(f[2], st) || !leggiLong(f[3], pct, 0, 100)) return false;
-    e.acceso = st; e.pct = (uint8_t)pct;
-    if (!c.eventiDaFile) { c.numEventi = 0; c.eventiDaFile = 1; }   // il file sostituisce la tabella di default
-    if (c.numEventi >= CFG_MAX_EVENTI) return false;
-    c.eventi[c.numEventi++] = e; return true;
-  }
   return false;
 }
 static bool sezColori(PresepeConfig &c, const char *k, char *v) {
@@ -530,27 +526,54 @@ static bool sezColori(PresepeConfig &c, const char *k, char *v) {
   if (ugualeCI(k, "pwm_invertito")) return leggiBool(v, c.pwmInvertito);
   return false;
 }
-// [CIELO] / [TRAMONTO] / [ALBA]:  tappa = FASE, %, R, G, B [, morbida|lineare]
-static bool sezStriscia(PresepeConfig &c, uint8_t s, const char *k, char *v) {
-  if (!ugualeCI(k, "tappa")) return false;
-  char *f[7]; uint8_t nf = campi(v, f, 7);
-  if (nf != 5 && nf != 6) return false;
-  CfgTappa t; memset(&t, 0, sizeof(t)); float pct; long r, g, b;
-  if (!leggiFase(f[0], t.fase) || !leggiFloat(f[1], pct, 0.0f, 100.0f) ||
-      !leggiLong(f[2], r, 0, 255) || !leggiLong(f[3], g, 0, 255) || !leggiLong(f[4], b, 0, 255)) return false;
-  t.pct = pct; t.col = rgb((uint8_t)r, (uint8_t)g, (uint8_t)b); t.curva = CURVA_MORBIDA;
-  if (nf == 6) {
-    if (ugualeCI(f[5], "morbida")) t.curva = CURVA_MORBIDA;
-    else if (ugualeCI(f[5], "lineare")) t.curva = CURVA_LINEARE;
-    else return false;
+// Sezioni di fase [GIORNO] [TRAMONTO] [CREPUSCOLO] [NOTTE] [ALBA]:
+//   cielo | tramonto | alba = %, R, G, B [, morbida|lineare]     (tappa di colore)
+//   rele = RELE', ON|OFF, %                                      (evento rele')
+static bool tappaPrima(const CfgTappa &a, const CfgTappa &b) {   // a viene prima di b nel ciclo?
+  return a.fase < b.fase || (a.fase == b.fase && a.pct < b.pct);
+}
+static bool sezFase(PresepeConfig &c, uint8_t fase, const char *k, char *v) {
+  int8_t s = -1;
+  if (ugualeCI(k, "cielo")) s = CFG_S_CIELO;
+  else if (ugualeCI(k, "tramonto")) s = CFG_S_TRAMONTO;
+  else if (ugualeCI(k, "alba")) s = CFG_S_ALBA;
+  if (s >= 0) {
+    char *f[6]; uint8_t nf = campi(v, f, 6);
+    if (nf != 4 && nf != 5) return false;
+    CfgTappa t; memset(&t, 0, sizeof(t)); float pct; long r, g, b;
+    if (!leggiFloat(f[0], pct, 0.0f, 100.0f) ||
+        !leggiLong(f[1], r, 0, 255) || !leggiLong(f[2], g, 0, 255) || !leggiLong(f[3], b, 0, 255)) return false;
+    t.fase = fase; t.pct = pct; t.col = rgb((uint8_t)r, (uint8_t)g, (uint8_t)b); t.curva = CURVA_MORBIDA;
+    if (nf == 5) {
+      if (ugualeCI(f[4], "morbida")) t.curva = CURVA_MORBIDA;
+      else if (ugualeCI(f[4], "lineare")) t.curva = CURVA_LINEARE;
+      else return false;
+    }
+    CfgTappa *lista = c.tappe[s];
+    uint8_t &n = c.numTappe[s];
+    if (!(c.tappeDaFile[s] & (1 << fase))) {         // prima riga di questa striscia in questa fase:
+      uint8_t j = 0;                                   // toglie le tappe predefinite di questa fase
+      for (uint8_t i = 0; i < n; i++) if (lista[i].fase != fase) lista[j++] = lista[i];
+      for (uint8_t i = j; i < n; i++) memset(&lista[i], 0, sizeof(CfgTappa));
+      n = j;
+      c.tappeDaFile[s] |= (uint8_t)(1 << fase);
+    }
+    if (n >= CFG_MAX_TAPPE) return false;
+    uint8_t pos = n;                                   // inserimento in ordine di tempo; a pari punto
+    while (pos > 0 && tappaPrima(t, lista[pos - 1])) { lista[pos] = lista[pos - 1]; pos--; }   // resta l'ordine del file
+    lista[pos] = t; n++;
+    return true;
   }
-  if (!c.tappeDaFile[s]) { c.numTappe[s] = 0; c.tappeDaFile[s] = 1; }   // il file sostituisce le tappe di default
-  if (c.numTappe[s] >= CFG_MAX_TAPPE) return false;
-  if (c.numTappe[s] > 0) {                                              // devono essere in ordine di tempo
-    const CfgTappa &u = c.tappe[s][c.numTappe[s] - 1];
-    if (t.fase < u.fase || (t.fase == u.fase && t.pct < u.pct)) return false;
+  if (ugualeCI(k, "rele")) {
+    char *f[4]; if (campi(v, f, 4) != 3) return false;
+    CfgEvento e; uint8_t st; long pct;
+    if (!leggiRele(c, f[0], e.rele) || !leggiBool(f[1], st) || !leggiLong(f[2], pct, 0, 100)) return false;
+    e.fase = fase; e.acceso = st; e.pct = (uint8_t)pct;
+    if (!c.eventiDaFile) { c.numEventi = 0; c.eventiDaFile = 1; }   // il file sostituisce la tabella di default
+    if (c.numEventi >= CFG_MAX_EVENTI) return false;
+    c.eventi[c.numEventi++] = e; return true;
   }
-  c.tappe[s][c.numTappe[s]++] = t; return true;
+  return false;
 }
 static bool sezStelle(PresepeConfig &c, const char *k, char *v) {
   long n;
@@ -608,7 +631,8 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
     if (strlen(n) > 15) { errore(c, numeroRiga); sezione[0] = 0; return; }
     strcpy(sezione, n);
     if (!(ugualeCI(n, "CICLO") || ugualeCI(n, "FASI") || ugualeCI(n, "RELE") || ugualeCI(n, "COLORI") ||
-          ugualeCI(n, "CIELO") || ugualeCI(n, "TRAMONTO") || ugualeCI(n, "ALBA") ||
+          ugualeCI(n, "GIORNO") || ugualeCI(n, "TRAMONTO") || ugualeCI(n, "CREPUSCOLO") ||
+          ugualeCI(n, "NOTTE") || ugualeCI(n, "ALBA") ||
           ugualeCI(n, "STELLE") || ugualeCI(n, "CASETTE") || ugualeCI(n, "SISTEMA"))) { errore(c, numeroRiga); sezione[0] = 0; }
     return;
   }
@@ -621,12 +645,13 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
   else if (ugualeCI(sezione, "FASI")) ok = sezFasi(c, k, v);
   else if (ugualeCI(sezione, "RELE")) ok = sezRele(c, k, v);
   else if (ugualeCI(sezione, "COLORI")) ok = sezColori(c, k, v);
-  else if (ugualeCI(sezione, "CIELO")) ok = sezStriscia(c, CFG_S_CIELO, k, v);
-  else if (ugualeCI(sezione, "TRAMONTO")) ok = sezStriscia(c, CFG_S_TRAMONTO, k, v);
-  else if (ugualeCI(sezione, "ALBA")) ok = sezStriscia(c, CFG_S_ALBA, k, v);
   else if (ugualeCI(sezione, "STELLE")) ok = sezStelle(c, k, v);
   else if (ugualeCI(sezione, "CASETTE")) ok = sezCasette(c, k, v);
   else if (ugualeCI(sezione, "SISTEMA")) ok = sezSistema(c, k, v);
+  else {
+    uint8_t fase;
+    if (leggiFase(sezione, fase)) ok = sezFase(c, fase, k, v);   // [GIORNO] .. [ALBA]
+  }
   if (!ok) errore(c, numeroRiga);
 }
 
@@ -1560,7 +1585,7 @@ void stampaConfig() {
     static const char *const NOMI_STRISCE[CFG_NUM_STRISCE] = { "CIELO", "TRAMONTO", "ALBA" };
     for (uint8_t s = 0; s < CFG_NUM_STRISCE; s++) {
       Serial.print(F("Tappe ")); Serial.print(NOMI_STRISCE[s]); Serial.print(F(": "));
-      Serial.print(cfg.numTappe[s]); Serial.println(cfg.tappeDaFile[s] ? F(" (dal file)") : F(" (predefinite)"));
+      Serial.print(cfg.numTappe[s]); Serial.println(cfg.tappeDaFile[s] ? F(" (in parte o tutte dal file)") : F(" (predefinite)"));
       for (uint8_t i = 0; i < cfg.numTappe[s]; i++) {
         const CfgTappa &t = cfg.tappe[s][i];
         Serial.print(F("  ")); Serial.print(cfgNomeFase(t.fase)); Serial.print(' '); Serial.print(t.pct);

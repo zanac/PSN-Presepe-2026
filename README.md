@@ -303,7 +303,7 @@ Libraries: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (with Adafruit BusI
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Size: 59.3 kB flash (23 %), 3.8 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
+Size: 59.6 kB flash (23 %), 3.7 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
 
 ### Build
 
@@ -314,7 +314,7 @@ Size: 59.3 kB flash (23 %), 3.8 kB static RAM. The LED and OLED buffers are allo
   arduino-cli core install arduino:avr
   arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
   firmware/tools/fw_compile.sh                       # -> firmware/PSN-Presepe/build/PSN-Presepe.ino.hex
-  firmware/tools/run_tests.sh                        # 68 checks of the INI reader / tappe + colour-mode simulation
+  firmware/tools/run_tests.sh                        # 76 checks of the INI reader / tappe + colour-mode simulation
   ```
 
 The sketch declares its prototypes explicitly, so it does not depend on the IDE's automatic prototype generation.
@@ -383,65 +383,70 @@ The card is read **once, at power-on**. If `PRESEPE.INI` is missing, the firmwar
 |---|---|
 | `[CICLO]` | `durata1..3` (s, 10–86400), `pot_min`, `pot_max`, `pot_invertito`, `partenza = marcia / pausa` |
 | `[FASI]` | start % of `tramonto`, `crepuscolo`, `notte`, `alba` (must be strictly increasing) |
-| `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 characters), `forza1..16 = auto / on / off`, `evento = PHASE, RELAY, ON/OFF, %` (up to 64) |
-| `[CIELO]`, `[TRAMONTO]`, `[ALBA]` | `tappa = PHASE, %, R, G, B [, morbida / lineare]` (up to 20 per strip), see below |
+| `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 characters), `forza1..16 = auto / on / off` |
+| `[GIORNO]`, `[TRAMONTO]`, `[CREPUSCOLO]`, `[NOTTE]`, `[ALBA]` | what happens in that phase: `cielo` / `tramonto` / `alba = %, R, G, B [, morbida / lineare]` (strip colours, up to 20 tappe per strip) and `rele = RELAY, ON/OFF, %` (up to 64 events in all), see below |
 | `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tint %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = off), `colore`, `accendi = PHASE, %`, `spegni = PHASE, %` (may wrap past the end of the cycle), `fuoco` (0–100), `dissolvenza_ms` |
 | `[SISTEMA]` | `fastboot` (default 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (both only with `fastboot = 0`), `oled`, `debug_ms` |
 
-Relay events are persistent: a relay keeps its state until its next event. Relays can be named by number (1–16), by name, or as `Grp_GG_RR`, where relay = (GG − 1) × 4 + RR. The first valid `evento` line replaces the whole default table.
+### The phase sections: strip colours and relays
+
+Everything that happens in a phase is written in that phase's section, `[GIORNO]`, `[TRAMONTO]`, `[CREPUSCOLO]`, `[NOTTE]` or `[ALBA]`. Every `%` is relative to that phase: 0 = start of the phase, 50 = half way, 100 = end.
+
+**Strip colours ("tappe").** One line is one tappa:
+
+```ini
+cielo    = %, R, G, B [, curve]
+tramonto = %, R, G, B [, curve]
+alba     = %, R, G, B [, curve]
+```
+
+At that point the strip has exactly that colour (0–255, `0, 0, 0` = off). Between two consecutive tappe of the same strip the colour changes gradually, also across phases; after the last tappa of the cycle the strip fades towards the first tappa of the next cycle. Decimals use a dot (`33.33`).
+
+The **curve** (optional) is how the strip *arrives* at this tappa from the previous one: `morbida` (default) starts slowly, speeds up and slows down on arrival (smoothstep); `lineare` keeps a constant speed.
+
+Rules:
+- The 100 % of a phase is the same instant as the 0 % of the next one. Write both the start (0) and the end (100) colour of every phase a strip works in, with the same colour in both places, so each section reads on its own.
+- To keep a strip off for a stretch, put a `0, 0, 0` tappa at the start and another at the end of that stretch.
+- For a quick switch-on, put a `0, 0, 0` tappa and, shortly after, the lit colour, for example at 0 and at 1 %. The closer the two tappe, the faster the switch-on (`0.5` works too).
+- Lines of different strips can be mixed in any order, and the phase sections can come in any order: the firmware sorts each strip's tappe by time. Two tappe of the same strip at the same point keep the file order and make an instant change.
+- The lines of a strip in a phase replace the default tappe of **that strip in that phase only**; the other phases keep their defaults. Up to 20 tappe per strip in total.
+
+For example, the sunset (defaults):
+
+```ini
+[TRAMONTO]
+cielo    =   0, 210,  82,  18     ; warm at the start of the sunset (as at the end of the day)
+cielo    =  30,  16,  16,  16     ; loses its colour down to a faint white
+cielo    =  38,   0,   0,   0     ; off...
+cielo    = 100,   0,   0,   0     ; ...until the end of the sunset
+tramonto =   0,   0,   0,   0     ; off at the start of the sunset
+tramonto =   1,  18,  10,   4     ; switches on quickly, faint and warm
+tramonto =  38, 155,  92,  16     ; orange peak
+tramonto =  82,  16,  16,  16     ; fades to a faint white
+tramonto = 100,   0,   0,   0     ; off at the end of the sunset
+rele     = 3, ON, 30              ; relay 3 on at 30 % of the sunset
+```
+
+To add an intermediate colour, for example a red stage between the orange peak and the faint white, add a line in between: `tramonto = 60, 140, 30, 10`.
+
+**Relays.** One line is one event: `rele = RELAY, ON|OFF, %`. RELAY is 1–16, `Grp_GG_RR` (relay = (GG − 1) × 4 + RR) or a name defined in `[RELE]`. A relay keeps its state until its next event. The first valid `rele` line replaces the whole default event table (default: relay 3 on at 30 % of TRAMONTO, off at 50 % of NOTTE). Up to 64 events.
 
 Example: a mill motor on relay 1 runs from 10 % of GIORNO until night falls.
 
 ```ini
 [RELE]
-nome1  = Mulino
-evento = GIORNO, Mulino, ON, 10
-evento = NOTTE,  Mulino, OFF, 0
+nome1 = Mulino
+
+[GIORNO]
+rele = Mulino, ON, 10
+
+[NOTTE]
+rele = Mulino, OFF, 0
 ```
 
-### RGB strip colours: "tappe" (keyframes)
-
-The colour of each analog strip over the cycle is a list of **tappe** (stops) in its own section, `[CIELO]`, `[TRAMONTO]` or `[ALBA]`. A tappa says: *at this point of the cycle the strip has exactly this colour*. Between two consecutive tappe the firmware fades gradually from one colour to the next.
-
-```ini
-tappa = PHASE, % of the phase, R, G, B [, curve]
-```
-
-- **PHASE, %:** where the tappa is. For example, `TRAMONTO, 38` is 38 % into the sunset phase. Decimals use a dot: `33.33`.
-- **R, G, B:** the colour at that point, 0–255. `0, 0, 0` is off.
-- **curve** (optional) is how the strip *arrives* at this tappa from the previous one:
-  - `morbida` (default): smooth start and smooth arrival (smoothstep), the natural fade used so far;
-  - `lineare`: constant speed over the whole stretch.
-
-Rules:
-- Write the tappe in time order, from GIORNO to ALBA. A tappa that goes back in time is skipped and counted as an error.
-- The list wraps around: after the last tappa the strip fades towards the first tappa of the next cycle.
-- **Two tappe at the same point make an instant change** (a step): the strip reaches the first colour and restarts from the second.
-- To keep a strip off for a stretch, put a `0, 0, 0` tappa at the start and another at the end of that stretch.
-- Up to 20 tappe per strip. A single tappa means a fixed colour for the whole cycle.
-- If a section contains at least one valid tappa, the file's tappe replace **all** the default tappe of that strip. Strips without tappe in the file keep their defaults.
-
-The default tappe of TRAMONTO and ALBA reproduce the historical curves of the firmware. The CIELO day curve was reshaped in release 038: it nearly reaches white (80 % of the way) at 30 % of GIORNO, holds full white from 45 % to 55 %, is back at 80 % at 70 % and returns to the warm colour by the start of TRAMONTO. For example, the sunset strip:
-
-```ini
-[TRAMONTO]
-tappa = TRAMONTO,   0,   0,  0,  0     ; off until the sunset starts
-tappa = TRAMONTO,   0,  18, 10,  4     ; step: switches on, faint and warm
-tappa = TRAMONTO,  38, 155, 92, 16     ; orange peak
-tappa = TRAMONTO,  82,  16, 16, 16     ; fades to a faint white
-tappa = TRAMONTO, 100,   0,  0,  0     ; off at the end of the sunset, until the next cycle
-```
-
-To add an intermediate colour, for example a red stage between the orange peak and the faint white, add a tappa in between: `tappa = TRAMONTO, 60, 140, 30, 10`.
-
-When the tappe were introduced (before the release 038 sky change), their defaults were checked against the previous hard-coded firmware at 1,000,000 points of the cycle:
-- the sunset and dawn strips differ by at most 1 step out of 255 (float rounding), at 15 points out of a million;
-- the sky strip differs by 1 step out of 255 at 0.5 % of the points;
-- the only larger difference (10 steps) is at the single instant of the dawn "step" at 38 %, where the old and the new code round the boundary differently.
-
-None of this is visible.
+The default sky is: warm at dawn's end and at the start of GIORNO, nearly white (80 % of the way) at 30 %, full white from 45 % to 55 %, nearly white again at 70 %, warm at the end of GIORNO; it fades and switches off in TRAMONTO, stays off until 38 % of ALBA, then switches on quickly to a faint warm glow and rises to the warm day colour. The sunset and dawn strips light up only in their own phase.
 
 How errors are handled:
 - A bad line is skipped and counted, and that key keeps its default.
