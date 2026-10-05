@@ -179,7 +179,7 @@ int main(int argc, char **argv) {
     CHECK(g.r == 210 && g.g == 82 && g.b == 18); CHECK(wh.r == 255 && wh.g == 255 && wh.b == 255);   // noon plateau 45..55 %
     CfgRGB q = cfgColoreTappe(d, CFG_S_CIELO, cfgPosizione(d, CFG_GIORNO, 30.0f));
     CHECK(q.r == 246 && q.g == 220 && q.b == 208);
-    CfgRGB pk = cfgColoreTappe(d, CFG_S_TRAMONTO, cfgPosizione(d, CFG_TRAMONTO, 38.0f));
+    CfgRGB pk = cfgColoreTappe(d, CFG_S_TRAMONTO, cfgPosizione(d, CFG_TRAMONTO, 10.0f));
     CHECK(pk.r == 155 && pk.g == 92 && pk.b == 16);
     CfgRGB off = cfgColoreTappe(d, CFG_S_ALBA, 20.0f), on = cfgColoreTappe(d, CFG_S_ALBA, cfgPosizione(d, CFG_ALBA, 1.0f));
     CHECK(off.r == 0 && off.g == 0 && off.b == 0); CHECK(on.r == 18 && on.g == 12 && on.b == 5);   // rapid 1 % switch-on
