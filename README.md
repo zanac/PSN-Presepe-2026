@@ -61,6 +61,7 @@ firmware/
   PSN-Presepe/                  the whole firmware in one sketch (PSN-Presepe.ino), example PRESEPE.INI, prebuilt HEX, Windows flasher
   tools/                        fw_compile.sh, flash.sh (Linux/macOS), run_tests.sh, test_config.cpp
 simulation/                     Wokwi simulation of the Rev D wiring (diagram, custom RGB chip, bundle script)
+simulation_web/                 browser simulator of the PRESEPE.INI light cycle (open index.html)
 .github/workflows/firmware.yml  CI: parser tests + firmware compile
 ```
 
@@ -372,6 +373,8 @@ Press **TEST during the 3 s splash** ("by Vanni", bottom line `TEST = modo color
 ### Simulation
 
 The firmware runs unchanged in the Wokwi simulator, with the Rev D wiring: RGB bars, stars, houses, relays as LEDs, OLED, buttons, potentiometer and a microSD card. Paste `PSN-Presepe.ino` into Wokwi's `sketch.ino` as it is. Wokwi does not accept `.ini` files, so the configuration goes in a project file named `PRESEPE.TXT`; the firmware reads it when `PRESEPE.INI` is missing. See [simulation/README.md](simulation/README.md).
+
+To try `PRESEPE.INI` values without any hardware, open [`simulation_web/index.html`](simulation_web/index.html) in a browser: paste the file and watch the CIELO, TRAMONTO and ALBA strips, stars, houses and relays over the cycle. See [simulation_web/README.md](simulation_web/README.md).
 
 ## 10. SD-card configuration (PRESEPE.INI)
 
