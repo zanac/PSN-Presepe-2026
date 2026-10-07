@@ -169,7 +169,7 @@ Free pins: D9, D10, D13, D14–D19, D41–D43, D47, D48, A1–A15. D9, D10 and D
   - the Mega with OLED (≈ 0.1 A).
 - **Fuse** the 12 V supply output at no more than **8 A**. The 3 mm, 2 oz +12 V / GND trunks carry about 9 A with a 10 °C temperature rise.
 - **RGB channels:** each colour channel is a 1.5 mm, 2 oz trace through an IRLZ44N. Keep each channel at **4 A or less**. A typical 1 m 5050 RGB strip uses about 0.4 A per colour.
-- **Relay contacts:** 10 A / 250 V AC resistive, according to the relay rating. The contact traces are doubled on both layers (2 mm, 2 oz each), so the relay is the limit, not the copper.
+- **Relay contacts:** NO contact 10 A / 250 V AC resistive, NC contact only 3 A / 250 V AC (Omron G5Q-1 rating). Put heavy loads on COM–NO. The contact traces are doubled on both layers (2 mm, 2 oz each), so the relay is the limit, not the copper.
   - Motors and other inductive loads draw an inrush current: keep a good margin.
   - DC loads above about 30 V are not recommended, because DC arcs are hard for these contacts to break.
 - **Small-signal loads:** the G5Q-1 has power contacts with silver alloy, made to switch amperes. Very small currents, such as logic inputs (a few mA), are not switched reliably. Use a signal relay with gold contacts for those; see the Omron datasheet for the minimum load.

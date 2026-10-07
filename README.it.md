@@ -169,7 +169,7 @@ Pin liberi: D9, D10, D13, D14–D19, D41–D43, D47, D48, A1–A15. D9, D10 e D1
   - Mega con OLED (circa 0,1 A).
 - **Fusibile** sull'uscita a 12 V dell'alimentatore: **non più di 8 A**. Le piste principali +12 V / GND da 3 mm, 2 oz, portano circa 9 A con 10 °C di riscaldamento.
 - **Canali RGB:** ogni canale colore è una pista da 1,5 mm, 2 oz, attraverso un IRLZ44N. Tieni ogni canale entro **4 A**. Una tipica striscia RGB 5050 da 1 m assorbe circa 0,4 A per colore.
-- **Contatti dei relè:** 10 A / 250 V AC su carico resistivo, secondo i dati del relè. Le piste dei contatti sono doppie, una per strato (2 mm, 2 oz ciascuna), quindi il limite è il relè e non il rame.
+- **Contatti dei relè:** contatto NO 10 A / 250 V AC su carico resistivo, contatto NC solo 3 A / 250 V AC (dati Omron G5Q-1). I carichi pesanti vanno su COM–NO. Le piste dei contatti sono doppie, una per strato (2 mm, 2 oz ciascuna), quindi il limite è il relè e non il rame.
   - Motori e altri carichi induttivi hanno un picco di corrente all'accensione: tieni un buon margine.
   - Carichi in corrente continua oltre circa 30 V sono sconsigliati, perché in DC questi contatti faticano a spegnere l'arco.
 - **Carichi di segnale:** il G5Q-1 ha contatti di potenza in lega d'argento, fatti per commutare ampere. Correnti molto piccole, come gli ingressi logici (pochi mA), non vengono commutate in modo affidabile. Per quelle usa un relè di segnale con contatti dorati; il carico minimo è nel datasheet Omron.
