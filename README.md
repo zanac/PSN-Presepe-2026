@@ -557,6 +557,7 @@ KiCad 8–10 open the KiCad 7 files, but the scripts were written for the KiCad 
 ## 14. Known limitations and open points
 
 - **BZ1 footprint pitch (fix in Rev E).** The BZ1 footprint (`Buzzer_12x9.5RM7.6`) has its holes 7.6 mm apart, but the buzzer actually bought for assembly, Same Sky CEM-1203(42), has pins 6.5 mm apart (datasheet drawing, confirmed by PCBWay with a caliper). On the Rev D boards PCBWay bent the pins outwards, so the buzzer sits slightly above the board; with 5.3 mm pins this still solders correctly. Rev E: change the footprint to 6.5 mm pitch, or choose a passive buzzer with a verified 7.6 mm pitch.
+- **C1 polarity marking (fix in Rev E).** The C1 footprint (`C_Radial_D10.0mm_H12.5mm_P5.00mm`) has two identical round pads and no "+" on the silkscreen. PCBWay fitted it correctly from the BOM (pad 1 = +12 V, pad 2 = GND), but Rev E should use a polarised footprint (`CP_Radial`, square + pad and "+" mark).
 - **USB plug clearance.** The Mega USB-B socket ends about 1.7 mm inside the edge of the shield, and the shield sits about 11 mm above the Mega. Bulky USB plugs may not seat fully. If that happens, use a slim plug, stacking headers, or unplug the Mega to flash it. There is no copper on the shield above the USB socket or the DC jack.
 - **WS2811 data** has no series resistor on the board: add 330 Ω in the cable ([section 7](#7-wiring-the-loads)).
 - **CIELO blue (D4)** is on Timer0, so it stays 8-bit PWM. TRAMONTO and ALBA (and CIELO R/G) are on 16-bit timers and could move to 10–12-bit PWM in a later firmware.
