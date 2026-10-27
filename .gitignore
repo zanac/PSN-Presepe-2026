@@ -17,3 +17,4 @@ firmware/PSN-Presepe/arduino-cli.exe
 firmware/PSN-Presepe/arduino-cli.yaml
 firmware/PSN-Presepe/.arduino-*/
 simulation/wokwi-bundle/
+firmware/PSN-Presepe-WiFi/build/

@@ -59,10 +59,13 @@ previews/                       immagini della scheda (strati KiCad e rendering 
 reports/                        DRC, verifiche indipendenti di scheda e Gerber, parità schema/PCB, controllo footprint
 firmware/
   PSN-Presepe/                  tutto il firmware in un solo sketch (PSN-Presepe.ino), PRESEPE.INI di esempio, HEX compilato, flasher Windows
-  tools/                        fw_compile.sh, flash.sh (Linux/macOS), run_tests.sh, test_config.cpp
+  PSN-Presepe-WiFi/             firmware dell'ESP8266 di una scheda "Mega + WiFi R3" (pagine web, OTA), BIN compilato
+  web/                          pannello.html, il pannello di controllo servito dall'ESP8266
+  tools/                        fw_compile.sh, esp_compile.sh, flash.sh (Linux/macOS), build_web.py, run_tests.sh, test sul PC
+    e2e/                        test end-to-end: codice di collegamento del Mega + sketch ESP veri su una seriale simulata con perdite
 simulation/                     simulazione Wokwi del cablaggio Rev D (diagramma, chip RGB personalizzato, script del pacchetto)
 simulation_web/                 simulatore nel browser del ciclo luci di PRESEPE.INI (apri index.html)
-.github/workflows/firmware.yml  CI: test del parser + compilazione del firmware
+.github/workflows/firmware.yml  CI: test sul PC + compilazione dei due firmware
 ```
 
 Tutto il contenuto di `kicad/`, `manufacturing/` (tranne la cartella congelata dell'ordine), `previews/` e `reports/` è generato da `./build.sh`. Modifica gli script, non i file generati (vedi [sezione 13](#13-ricostruire-tutto)).
@@ -304,7 +307,7 @@ Librerie: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (con Adafruit BusIO)
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Occupazione: 59,6 kB di flash (23 %), 3,7 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
+Occupazione: 68,8 kB di flash (27 %), 4,6 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
 
 ### Compilazione
 
@@ -315,7 +318,7 @@ Occupazione: 59,6 kB di flash (23 %), 3,7 kB di RAM statica. I buffer dei LED e 
   arduino-cli core install arduino:avr
   arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
   firmware/tools/fw_compile.sh                       # -> firmware/PSN-Presepe/build/PSN-Presepe.ino.hex
-  firmware/tools/run_tests.sh                        # 76 controlli su PRESEPE.INI e tappe + simulazione della modalità colore
+  firmware/tools/run_tests.sh                        # lettura di PRESEPE.INI, modalità colore, collegamento WiFi, test end-to-end ESP <-> Mega
   ```
 
 Lo sketch dichiara i suoi prototipi esplicitamente, quindi non dipende dalla generazione automatica dei prototipi dell'IDE.
@@ -353,7 +356,7 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 |---|---|
 | **START/STOP** | Pausa o ripresa; riparte esattamente da dove si era fermato. In modalità TEST, esce dal TEST. |
 | **AVANTI (NEXT)** | Salta all'inizio della fase successiva. |
-| **TEST** | Entra in modalità TEST, poi scorre 34 prove: ogni colore di ogni striscia, colori di stelle e casette, tutto insieme, poi i relè 1–16 uno alla volta, con il loro nome se definito. Durante il TEST il tempo del ciclo è fermo. |
+| **TEST** | Entra in modalità TEST, poi scorre 34 prove (con `[WIFI] abilitato = 1` la prima schermata mostra l'indirizzo IP, oppure `non collegato`): ogni colore di ogni striscia, colori di stelle e casette, tutto insieme, poi i relè 1–16 uno alla volta, con il loro nome se definito. Durante il TEST il tempo del ciclo è fermo. |
 | **Potenziometro** | Sceglie una delle tre durate del ciclo; la modifica vale quando la manopola si ferma. |
 
 **Monitor seriale** (115200 baud): all'avvio stampa tutta la configurazione in uso, compresi tutti gli eventi dei relè, poi una riga di stato periodica (`debug_ms`).
@@ -376,11 +379,50 @@ Il firmware gira invariato nel simulatore Wokwi con il cablaggio Rev D: barre RG
 
 Per provare i valori di `PRESEPE.INI` senza hardware, apri [`simulation_web/index.html`](simulation_web/index.html) nel browser: incolli il file e vedi lungo il ciclo le strisce CIELO, TRAMONTO e ALBA, le stelle, le casette e i relè. Vedi [simulation_web/README.md](simulation_web/README.md).
 
+### WiFi (scheda Mega + WiFi R3)
+
+Lo stesso firmware e la stessa scheda Rev D funzionano anche con una scheda **"Mega + WiFi R3"** (WeMos / RobotDyn: ATmega2560 ed ESP8266 sulla stessa basetta, stessa impronta del Mega) al posto dell'Arduino Mega. Con `[WIFI] abilitato = 0` (il predefinito) si comporta esattamente come un Mega normale, e lo stesso HEX va bene per entrambi.
+
+Con `abilitato = 1` l'ESP8266 si collega alla rete WPA/WPA2 indicata in `[WIFI]` e offre due pagine, entrambe protette da utente e password di `[AUTENTICAZIONE]`:
+
+- **`http://presepe.local/`** (oppure `http://<IP>/`): il pannello di controllo. Mostra la fase, il punto del ciclo e i colori delle strisce, e ha *Pausa / Avvia*, *Fase successiva*, *Entra in test* e *Modifica configurazione*. In test (dalla pagina, o con TEST sulla scheda) mostra:
+  - le tre strisce: scegli CIELO / TRAMONTO / ALBA, prendi un colore dal gradiente e regola la luminosità con la levetta; la striscia segue subito, e il colore compare come riga `cielo = %, R, G, B` pronta da copiare;
+  - stelle o casette, un pulsante per ogni pixel (`numero` del file) per accenderli e spegnerli uno alla volta, più *Tutti accesi / Tutti spenti*;
+  - i 16 relè con il loro nome, ON/OFF uno per uno;
+  - *Bip del buzzer* ed *Esci dal test* (il ciclo riprende).
+- **`http://presepe.local/config`**: `PRESEPE.INI` così com'è sulla scheda, nello stesso editor del [simulatore web](simulation_web/README.md), con l'anteprima del ciclo e l'elenco degli errori. *Salva sul presepe* scrive il file (il precedente resta come `PRESEPE.BAK`, *Ripristina il file precedente* li scambia); *Riavvia il presepe* fa ripartire il Mega, che rilegge la scheda.
+
+Il Mega resta il padrone di tutto: l'ESP8266 fa solo da ponte tra la rete e la `Serial3` del Mega (D14/D15, non usati dalla scheda). Se la rete non c'è o la password è sbagliata la scheda parte e funziona normalmente; la schermata di TEST mostra `non collegato` e l'ESP continua a provare a collegarsi.
+
+**DIP switch** (sulla scheda WeMos, sotto lo shield una volta montata: impostali prima di innestarla, con il cavo USB scollegato):
+
+| DIP su ON | L'USB è collegata a | Uso |
+|---|---|---|
+| 3, 4 | ATmega2560 | caricare solo il firmware del Mega |
+| 5, 6, 7 | ESP8266, modo programmazione | caricare il firmware dell'ESP |
+| 5, 6 | ESP8266, in funzione | monitor seriale dell'ESP (debug) |
+| 1, 2, 3, 4 | ATmega2560, **e** `Serial3` dell'ATmega ↔ ESP8266 | **uso normale** (il Mega si può ancora caricare via USB) |
+
+Il selettore della seriale accanto ai DIP deve stare su **RXD3 / TXD3**. Tutti gli altri DIP su OFF.
+
+**Prima installazione:**
+1. DIP 3, 4 su ON (gli altri OFF). Carica il firmware del Mega come sopra ([Compilazione](#compilazione) o HEX compilato), scheda *Arduino Mega or Mega 2560*.
+2. Scollega l'USB. DIP 5, 6, 7 su ON (gli altri OFF). Nell'IDE Arduino aggiungi `https://arduino.esp8266.com/stable/package_esp8266com_index.json` in *Impostazioni → URL aggiuntive per il Gestore schede*, installa il pacchetto **esp8266** (3.1.x), apri `firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino`, scegli *Generic ESP8266 Module*, *Flash Size: 4MB (FS:1MB OTA:~1019KB)*, *Upload Speed: 115200*, poi Carica. Senza IDE: `esptool.py --port PORTA write_flash 0x0 firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino.bin`.
+3. Scollega l'USB. DIP 1, 2, 3, 4 su ON (gli altri OFF), selettore su RXD3 / TXD3. Monta la scheda sullo shield.
+4. Sulla microSD, in `PRESEPE.INI`: `[WIFI] abilitato = 1`, `ssid`, `password`; cambia `[AUTENTICAZIONE] password`.
+5. Accendi e premi TEST: la prima schermata mostra l'indirizzo IP e `presepe.local`. Aprilo da un telefono sulla stessa rete. Premendo ancora TEST si prosegue con le prove normali.
+
+Gli aggiornamenti successivi dell'ESP si possono fare via WiFi (IDE Arduino → *Porta* → porta di rete `presepe`, password di `[AUTENTICAZIONE]`), senza togliere la scheda dallo shield. Dopo aver modificato le pagine (`firmware/web/pannello.html` o `simulation_web/simulator.template.html`) esegui `python3 firmware/tools/build_web.py` e ricompila il firmware dell'ESP.
+
+**Sicurezza.** Le pagine usano l'autenticazione HTTP Basic su HTTP semplice: la password viaggia in chiaro sulla rete di casa. Usa la scheda solo su una rete fidata e non riutilizzare una password importante. Il monitor seriale avvisa se è ancora in uso la password predefinita.
+
+**Problemi:** `non collegato` → controlla SSID e password (8–63 caratteri, rete a 2,4 GHz: l'ESP8266 non vede il 5 GHz). La pagina non si apre per nome → alcuni Android non risolvono `.local`, usa l'IP. Il Mega non mostra mai un IP e il monitor seriale non ha righe `WiFi:` → DIP 1, 2 o selettore RXD3, oppure il firmware dell'ESP non è stato caricato.
+
 ## 10. Configurazione da microSD (PRESEPE.INI)
 
 Copia [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) nella **radice** di una microSD o microSDHC (2–32 GB, FAT16/FAT32). Le schede da 64 GB in su escono formattate exFAT, che la libreria SD di Arduino non legge: riformattale prima in FAT32.
 
-La scheda viene letta **una sola volta, all'accensione**. Se `PRESEPE.INI` manca, il firmware cerca `PRESEPE.TXT` con lo stesso contenuto (comodo per Wokwi, o se Windows ha salvato il file come `.txt`). Il file di esempio contiene esattamente i valori di default, e ogni chiave è spiegata in italiano nei commenti.
+La scheda viene letta all'accensione, e di nuovo dopo *Riavvia il presepe* dalla pagina web ([WiFi](#wifi-scheda-mega--wifi-r3)). Se `PRESEPE.INI` manca, il firmware cerca `PRESEPE.TXT` con lo stesso contenuto (comodo per Wokwi, o se Windows ha salvato il file come `.txt`). Il file di esempio contiene esattamente i valori di default, e ogni chiave è spiegata in italiano nei commenti.
 
 | Sezione | Chiavi |
 |---|---|
@@ -392,6 +434,10 @@ La scheda viene letta **una sola volta, all'accensione**. Se `PRESEPE.INI` manca
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tinta in %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = spente), `colore`, `accendi = FASE, %`, `spegni = FASE, %` (può scavalcare la fine del ciclo), `fuoco` (0–100), `dissolvenza_ms` |
 | `[SISTEMA]` | `fastboot` (predefinito 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (entrambi solo con `fastboot = 0`), `oled`, `debug_ms` |
+| `[WIFI]` | `abilitato` (predefinito 0), `ssid` (≤ 32 caratteri), `password` (vuota = rete aperta, altrimenti 8–63 caratteri, WPA/WPA2), `nome` (nome in rete, predefinito `presepe` → `http://presepe.local`) |
+| `[AUTENTICAZIONE]` | `utente` e `password` chiesti dalla pagina web (predefiniti `admin` / `presepe2026`; sono anche la password OTA dell'ESP8266) |
+
+I valori di testo si possono scrivere tra virgolette doppie, così possono contenere `;`, `#` o spazi all'inizio e alla fine: `password = "la;mia#password"`. Le virgolette non fanno parte del valore.
 
 ### Le sezioni di fase: colori delle strisce e relè
 

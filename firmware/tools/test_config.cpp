@@ -212,6 +212,52 @@ int main(int argc, char **argv) {
     CHECK(cfgAggancioAggiorna(a, 100, 100) == 1);                                          // already on the value
   }
 
+  // 10. [WIFI] and [AUTENTICAZIONE]: defaults, quoted values with ; # = and spaces, limits
+  {
+    CHECK(d.wifiAbilitato == 0 && d.wifiSsid[0] == 0 && d.wifiPassword[0] == 0);
+    CHECK(std::strcmp(d.wifiNome, "presepe") == 0);
+    CHECK(std::strcmp(d.webUtente, "admin") == 0 && std::strcmp(d.webPassword, "presepe2026") == 0);
+    PresepeConfig c; cfgDefault(c);
+    cfgParseBuffer(c,
+      "[WIFI]\nabilitato = 1\nssid = Casa Rossi 2.4 ; comment\npassword = \"ab;c#d=e f\" # comment\nnome = Presepe-Sala\n"
+      "[AUTENTICAZIONE]\nutente = vanni\npassword = \"x;y\"\n");
+    CHECK(c.errori == 0);
+    CHECK(c.wifiAbilitato == 1 && std::strcmp(c.wifiSsid, "Casa Rossi 2.4") == 0);
+    CHECK(std::strcmp(c.wifiPassword, "ab;c#d=e f") == 0);
+    CHECK(std::strcmp(c.wifiNome, "presepe-sala") == 0);                      // lower case for mDNS
+    CHECK(std::strcmp(c.webUtente, "vanni") == 0 && std::strcmp(c.webPassword, "x;y") == 0);
+    PresepeConfig e; cfgDefault(e);
+    cfgParseBuffer(e,
+      "[WIFI]\npassword = corta\n"                                             // 1: WPA needs 8..63
+      "password = \"senza fine\n"                                              // 2: unterminated quote
+      "password = \"a\"b\"\n"                                                  // 3: inner quote
+      "nome = sala presepe\n"                                                  // 4: space not allowed
+      "nome = -presepe\n"                                                      // 5: leading '-'
+      "nome = \n"                                                              // 6: empty
+      "ssid = 123456789012345678901234567890123\n"                             // 7: 33 chars
+      "[AUTENTICAZIONE]\nutente = \npassword = \"\"\n"                           // 8, 9: empty
+      "colore = 1\n");                                                         // 10: unknown key
+    CHECK(e.errori == 10 && e.primaRigaErrata == 2);
+    CHECK(e.wifiPassword[0] == 0 && std::strcmp(e.wifiNome, "presepe") == 0 && e.wifiSsid[0] == 0);
+    CHECK(std::strcmp(e.webUtente, "admin") == 0 && std::strcmp(e.webPassword, "presepe2026") == 0);
+    PresepeConfig g; cfgDefault(g);
+    cfgParseBuffer(g, "[WIFI]\nssid = \npassword = \nssid = 12345678901234567890123456789012\n"
+                      "password = 12345678\n");
+    CHECK(g.errori == 0 && std::strlen(g.wifiSsid) == 32 && std::strcmp(g.wifiPassword, "12345678") == 0);
+  }
+
+  // 11. link line check: "@CMD args*HH", HH = byte sum mod 256
+  {
+    char ok[32] = "@T*";  std::snprintf(ok + 3, 3, "%02X", lnkSomma("@T", 2)); CHECK(lnkVerifica(ok) && std::strcmp(ok, "@T") == 0);
+    char r[48]; std::snprintf(r, sizeof r, "@R 3 1*%02X", lnkSomma("@R 3 1", 6));
+    CHECK(lnkVerifica(r) && std::strcmp(r, "@R 3 1") == 0);
+    char bad[48]; std::snprintf(bad, sizeof bad, "@R 3 0*%02X", lnkSomma("@R 3 1", 6)); CHECK(!lnkVerifica(bad));
+    char low[16] = "@T*5d"; CHECK(!lnkVerifica(low));                         // lower-case hex refused
+    char nostar[16] = "@T"; CHECK(!lnkVerifica(nostar));
+    char noat[16]; std::snprintf(noat, sizeof noat, "T*%02X", lnkSomma("T", 1)); CHECK(!lnkVerifica(noat));
+    CHECK(lnkSomma("@HELLO", 6) == (uint8_t)('@' + 'H' + 'E' + 'L' + 'L' + 'O'));
+  }
+
   std::printf("%d checks, %d failures\n", checks, fails);
   return fails ? 1 : 0;
 }
