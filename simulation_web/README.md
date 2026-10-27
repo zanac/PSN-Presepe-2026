@@ -32,7 +32,7 @@ A screen is not an LED strip. Real strips are more saturated and low values look
 | `simulator.template.html` | source of the page, with an `__INI__` placeholder for the default file |
 | `build_simulator.py` | rebuilds `index.html` from the template and `firmware/PSN-Presepe/PRESEPE.INI` |
 
-After every change to `firmware/PSN-Presepe/PRESEPE.INI` or to the template, rebuild:
+After every change to `firmware/PSN-Presepe/PRESEPE.INI` or to the template, rebuild (after a change to `PRESEPE.INI`, also run `python3 firmware/tools/embed_ini.py`, which updates the copy inside the firmware):
 
 ```sh
 python3 simulation_web/build_simulator.py

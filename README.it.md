@@ -61,7 +61,7 @@ firmware/
   PSN-Presepe/                  tutto il firmware in un solo sketch (PSN-Presepe.ino), PRESEPE.INI di esempio, HEX compilato, flasher Windows
   PSN-Presepe-WiFi/             firmware dell'ESP8266 di una scheda "Mega + WiFi R3" (pagine web, OTA), BIN compilato
   web/                          pannello.html, il pannello di controllo servito dall'ESP8266
-  tools/                        fw_compile.sh, esp_compile.sh, flash.sh (Linux/macOS), build_web.py, run_tests.sh, test sul PC
+  tools/                        fw_compile.sh, esp_compile.sh, flash.sh (Linux/macOS), build_web.py, embed_ini.py, run_tests.sh, test sul PC
     e2e/                        test end-to-end: codice di collegamento del Mega + sketch ESP veri su una seriale simulata con perdite
 simulation/                     simulazione Wokwi del cablaggio Rev D (diagramma, chip RGB personalizzato, script del pacchetto)
 simulation_web/                 simulatore nel browser del ciclo luci di PRESEPE.INI (apri index.html)
@@ -307,7 +307,7 @@ Librerie: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (con Adafruit BusIO)
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Occupazione: 70,1 kB di flash (27 %), 4,6 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
+Occupazione: 83,9 kB di flash (33 %, di cui 13,2 kB sono il `PRESEPE.INI` predefinito incorporato), 4,6 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
 
 ### Compilazione
 
@@ -334,7 +334,7 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 
 **Avvio:**
 1. Carica i valori di default.
-2. Legge `/PRESEPE.INI` dalla microSD, oppure `/PRESEPE.TXT` se il primo manca.
+2. Legge `/PRESEPE.INI` dalla microSD, oppure `/PRESEPE.TXT` se il primo manca. Se sulla scheda non c'è nessuno dei due, ci scrive il `PRESEPE.INI` di esempio (valori predefiniti e spiegazioni) e usa quello.
 3. Mostra sull'OLED la schermata iniziale "by Vanni" per 3 s, sempre (anche con `fastboot = 1`). Premendo TEST in questi 3 s si entra nella modalità colore.
 4. Mostra lo stato della SD (con `fastboot = 1` solo se `PRESEPE.INI` contiene errori):
 
@@ -342,7 +342,8 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
    |---|---|
    | `PRESEPE.INI OK` (o `PRESEPE.TXT OK`) | file letto, nessun errore |
    | `INI CON ERRORI` | file letto con errori; indica quanti sono e la prima riga sbagliata |
-   | `MANCA PRESEPE.INI` | scheda presente, nessuno dei due file trovato |
+   | `PRESEPE.INI CREATO` | scheda presente senza file: il file di esempio è appena stato scritto (resta 4 s, anche con `fastboot = 1`) |
+   | `MANCA PRESEPE.INI` | scheda presente, nessun file, e la scheda non si è potuta scrivere (protetta o piena) |
    | `SD ASSENTE` | nessuna scheda |
 
 5. Esegue l'autotest (circa 22 s) con melodia opzionale. Saltato con `fastboot = 1`.
@@ -420,9 +421,9 @@ Gli aggiornamenti successivi dell'ESP si possono fare via WiFi (IDE Arduino → 
 
 ## 10. Configurazione da microSD (PRESEPE.INI)
 
-Copia [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) nella **radice** di una microSD o microSDHC (2–32 GB, FAT16/FAT32). Le schede da 64 GB in su escono formattate exFAT, che la libreria SD di Arduino non legge: riformattale prima in FAT32.
+Copia [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) nella **radice** di una microSD o microSDHC (2–32 GB, FAT16/FAT32), oppure inserisci semplicemente una scheda vuota: all'accensione il firmware ci scrive lo stesso file (con alcune righe iniziali che lo spiegano e i ritorni a capo CR LF di Windows), pronto da modificare sul PC. Le schede da 64 GB in su escono formattate exFAT, che la libreria SD di Arduino non legge: riformattale prima in FAT32.
 
-La scheda viene letta all'accensione, e di nuovo dopo *Riavvia il presepe* dalla pagina web ([WiFi](#wifi-scheda-mega--wifi-r3)). Se `PRESEPE.INI` manca, il firmware cerca `PRESEPE.TXT` con lo stesso contenuto (comodo per Wokwi, o se Windows ha salvato il file come `.txt`). Il file di esempio contiene esattamente i valori di default, e ogni chiave è spiegata in italiano nei commenti.
+La scheda viene letta all'accensione, e di nuovo dopo *Riavvia il presepe* dalla pagina web ([WiFi](#wifi-scheda-mega--wifi-r3)). Se `PRESEPE.INI` manca, il firmware cerca `PRESEPE.TXT` con lo stesso contenuto (comodo per Wokwi, o se Windows ha salvato il file come `.txt`). Il file di esempio contiene esattamente i valori di default, e ogni chiave è spiegata in italiano nei commenti. Il firmware ne tiene una copia in flash (`INI_PREDEFINITO`): dopo aver modificato `PRESEPE.INI` esegui `python3 firmware/tools/embed_ini.py` (la CI controlla che la copia sia aggiornata).
 
 | Sezione | Chiavi |
 |---|---|

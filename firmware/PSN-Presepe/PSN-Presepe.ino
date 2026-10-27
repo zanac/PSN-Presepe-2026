@@ -927,6 +927,8 @@ bool lnkQuiet();
 void lnkInizio();
 void lnkTick();
 bool lnkRecupera();
+bool iniCreaPredefinito();
+extern bool iniCreato;
 void entraTest();
 void entraTestWeb();
 void riavviaSoftware();
@@ -1665,8 +1667,20 @@ bool inizializzaOled() {
 void mostraStatoSD() {
   if (!oledPresente) return;
   // [SISTEMA] fastboot = 1: la schermata compare solo se PRESEPE.INI contiene errori.
-  if (cfg.fastboot && cfg.sdStato != SD_OK_ERRORI) return;
+  if (cfg.fastboot && cfg.sdStato != SD_OK_ERRORI && !iniCreato) return;
   display.clearDisplay();
+  if (iniCreato) {               // primo avvio con questa microSD: si vede sempre, anche con fastboot
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    display.setCursor(0, 0);  display.print(F("MICRO SD"));
+    display.setCursor(0, 16); display.print(F("PRESEPE.INI CREATO"));
+    display.setCursor(0, 28); display.print(F("valori predefiniti"));
+    display.setCursor(0, 40); display.print(F("modificalo dal PC"));
+    display.setCursor(0, 52); display.print(F("e riavvia"));
+    display.display();
+    delay(4000);
+    return;
+  }
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
   display.setCursor(0, 0);  display.print(F("MICRO SD"));
@@ -1696,6 +1710,7 @@ void mostraStatoSD() {
 }
 
 void stampaConfig() {
+  if (iniCreato) Serial.println(F("microSD: PRESEPE.INI mancante -> creato con i valori predefiniti e le spiegazioni"));
   Serial.print(F("microSD: "));
   switch (cfg.sdStato) {
     case SD_OK:        Serial.print(cfgFileLetto); Serial.println(F(" letto senza errori")); break;
@@ -2926,6 +2941,281 @@ void lnkTick() {
 }
 // ==== LINK WIFI END ====
 
+// =============================================================================
+// PRESEPE.INI PREDEFINITO: scritto sulla microSD quando manca
+// =============================================================================
+// ==== INI PREDEFINITO BEGIN ====
+// GENERATED from PRESEPE.INI by firmware/tools/embed_ini.py - do not edit by hand.
+// Scritto sulla microSD come PRESEPE.INI quando manca (vedi iniCreaPredefinito).
+const char INI_PREDEFINITO[] PROGMEM =
+  "; -----------------------------------------------------------------------------\n"
+  "; Questo file l'ha scritto la centralina, perche' sulla microSD non c'era.\n"
+  "; Contiene i valori predefiniti e la spiegazione di ogni parametro.\n"
+  "; Modificalo dal computer con un editor di testo (anche Blocco note), salva e\n"
+  "; riavvia la centralina. Con la scheda Mega + WiFi: imposta [WIFI] in fondo al file,\n"
+  "; poi lo puoi modificare anche dal telefono, su http://presepe.local/config\n"
+  "; -----------------------------------------------------------------------------\n"
+  "; =============================================================================\n"
+  "; PSN-Presepe - parametri della scenografia\n"
+  "; =============================================================================\n"
+  "; Copia questo file nella RADICE della microSD (non in una cartella).\n"
+  "; Viene letto all'accensione: dopo una modifica riavvia la centralina (con la scheda\n"
+  "; WiFi basta il pulsante \"Riavvia il presepe\" della pagina web).\n"
+  ";\n"
+  "; Se una chiave manca, e' scritta male o ha un valore fuori dai limiti, quella\n"
+  "; chiave mantiene il valore predefinito (i valori scritti qui SONO i predefiniti).\n"
+  "; Senza microSD la centralina usa solo i predefiniti. Se la microSD non ha questo\n"
+  "; file, la centralina lo scrive da sola (PRESEPE.INI con i predefiniti) e lo usa.\n"
+  ";\n"
+  "; Dopo l'avvio il display mostra l'esito della lettura:\n"
+  ";   \"PRESEPE.INI OK\"        file letto senza errori\n"
+  ";   \"INI CON ERRORI\"        alcune righe ignorate: numero di errori e prima riga sbagliata\n"
+  ";   \"PRESEPE.INI CREATO\"    file mancante: scritto ora con i predefiniti\n"
+  ";   \"MANCA PRESEPE.INI\"     file mancante e microSD non scrivibile\n"
+  ";   \"SD ASSENTE\"            nessuna microSD\n"
+  "; Il monitor seriale (115200 baud) stampa tutta la configurazione in uso.\n"
+  ";\n"
+  "; Nome del file: PRESEPE.INI. Se manca, la centralina cerca anche PRESEPE.TXT\n"
+  "; con lo stesso contenuto (serve per il simulatore Wokwi, che non accetta .ini).\n"
+  "; microSD: FAT16 o FAT32 (SD/SDHC fino a 32 GB).\n"
+  ";\n"
+  "; SINTASSI\n"
+  ";   [SEZIONE]            inizio di una sezione\n"
+  ";   chiave = valore      un parametro per riga\n"
+  ";   ; oppure #           da qui a fine riga e' un commento\n"
+  ";   Maiuscole e minuscole sono indifferenti. Massimo 127 caratteri per riga.\n"
+  ";   Numeri con decimali: usa il PUNTO (33.33), perche' la virgola separa i campi.\n"
+  ";   Si/no: 1/0, si/no, on/off, true/false.\n"
+  ";   Colori: R, G, B con valori da 0 (spento) a 255 (massimo).\n"
+  ";   Fasi: GIORNO, TRAMONTO, CREPUSCOLO, NOTTE, ALBA.\n"
+  ";   \"% della fase\": 0 = inizio della fase, 50 = meta', 100 = fine della fase.\n"
+  "; =============================================================================\n"
+  "\n"
+  "[CICLO]\n"
+  "; Il potenziometro sceglie fra tre durate del ciclo completo (in secondi, 10..86400).\n"
+  "durata1 = 60          ; primo terzo della corsa della manopola\n"
+  "durata2 = 180         ; terzo centrale\n"
+  "durata3 = 300         ; ultimo terzo\n"
+  "; Corsa utile della manopola, letta su A0 (0..1023). Con il potenziometro alimentato\n"
+  "; a 5 V dalla scheda Rev D la corsa e' 0..1023. Vecchi cablaggi misuravano 0..680.\n"
+  "pot_min = 0\n"
+  "pot_max = 1023\n"
+  "pot_invertito = 1     ; 1 = manopola tutta a destra = ciclo piu' corto (cablaggio storico)\n"
+  "partenza = marcia     ; marcia = il ciclo parte subito dopo l'avvio, pausa = parte in pausa\n"
+  "\n"
+  "[FASI]\n"
+  "; Inizio di ogni fase, in % del ciclo completo. Il GIORNO parte sempre da 0 e\n"
+  "; l'ALBA finisce a 100. I valori devono essere crescenti, altrimenti tornano\n"
+  "; tutti e quattro ai predefiniti.\n"
+  "tramonto   = 40\n"
+  "crepuscolo = 50\n"
+  "notte      = 55\n"
+  "alba       = 85\n"
+  "\n"
+  "[RELE]\n"
+  "; Logica delle uscite: alta = livello HIGH eccita il rele'.\n"
+  "; Con la scheda Rev D (ULN2803) lascia \"alta\". Usa \"bassa\" solo con moduli\n"
+  "; rele' del commercio attivi bassi (montaggio su breadboard).\n"
+  "logica = alta\n"
+  "; Nomi facoltativi (massimo 12 caratteri), mostrati sul display in TEST e sul seriale.\n"
+  "; Definisci i nomi PRIMA degli eventi che li usano.\n"
+  ";nome1  = Mulino\n"
+  ";nome2  = Pompa\n"
+  ";nome3  = Casa luce\n"
+  "; Forzatura di un'uscita, indipendente dalla schedulazione: auto | on | off\n"
+  ";forza16 = off\n"
+  "; Gli eventi dei rele' si scrivono nelle sezioni delle fasi (rele = ...).\n"
+  "\n"
+  "; =============================================================================\n"
+  "; LE FASI: [GIORNO]  [TRAMONTO]  [CREPUSCOLO]  [NOTTE]  [ALBA]\n"
+  "; =============================================================================\n"
+  "; Ogni sezione descrive cosa succede in quella fase: colori delle strisce RGB\n"
+  "; (cielo, tramonto, alba) e accensioni dei rele'. Il % e' sempre riferito alla\n"
+  "; fase della sezione: 0 = inizio della fase, 50 = meta', 100 = fine.\n"
+  ";\n"
+  "; STRISCE RGB - una riga = una \"tappa\":\n"
+  ";   cielo    = %, R, G, B [, curva]\n"
+  ";   tramonto = %, R, G, B [, curva]\n"
+  ";   alba     = %, R, G, B [, curva]\n"
+  "; In quel punto la striscia ha esattamente quel colore (0..255, 0,0,0 = spenta);\n"
+  "; fra una tappa e la successiva della stessa striscia il colore cambia gradualmente,\n"
+  "; anche attraversando piu' fasi. Dopo l'ultima tappa del ciclo la striscia va\n"
+  "; verso la prima tappa del ciclo successivo.\n"
+  ";   curva (facoltativa) = come si ARRIVA a questa tappa dalla precedente:\n"
+  ";     morbida  (predefinita) parte piano, accelera e rallenta arrivando\n"
+  ";     lineare  velocita' costante per tutto il tratto\n"
+  ";   Per tenere una striscia spenta in un tratto: una tappa 0,0,0 all'inizio e una\n"
+  ";   alla fine del tratto.\n"
+  ";   Per un'accensione rapida: una tappa 0,0,0 e, poco dopo (es. all'1 %), il colore\n"
+  ";   acceso. Piu' le due tappe sono vicine, piu' l'accensione e' rapida (anche 0.5).\n"
+  ";   Il 100 % di una fase e' lo stesso istante dello 0 % della fase successiva:\n"
+  ";   conviene scrivere sia il colore di inizio (0) sia quello di fine (100) di ogni\n"
+  ";   fase, cosi' ogni sezione si legge da sola. Nei due punti scrivi lo stesso colore.\n"
+  ";   Le righe delle diverse strisce si possono mescolare in qualsiasi ordine: il\n"
+  ";   firmware ordina da solo le tappe di ogni striscia. Massimo 20 tappe per striscia.\n"
+  ";   Le righe di una striscia in una fase sostituiscono le tappe predefinite di\n"
+  ";   QUELLA striscia in QUELLA fase; le altre fasi restano predefinite.\n"
+  ";\n"
+  "; RELE' - una riga = un evento:\n"
+  ";   rele = RELE', ON|OFF, %\n"
+  ";   RELE' = 1..16, Grp_GG_RR o un nome definito in [RELE]. Il rele' resta nello\n"
+  ";   stato raggiunto fino al suo evento successivo. Massimo 64 eventi in tutto.\n"
+  ";\n"
+  "; PER TROVARE I VALORI R, G, B: \"modalita' colore\". Premi TEST durante la\n"
+  "; schermata iniziale \"by Vanni\" (3 s). AVANTI sceglie la striscia (bianca), START\n"
+  "; conferma; poi START / AVANTI / TEST = canale R / G / B, la manopola lo regola\n"
+  "; (prima va \"agganciata\"); due clic entro 1 s = regolazione fine (+/-16).\n"
+  "; START tenuto 2 s = torna alla scelta; TEST tenuto 2 s = esce.\n"
+  "\n"
+  "[GIORNO]\n"
+  "; Cielo: dal caldo al quasi bianco, bianco pieno a mezzogiorno, di nuovo caldo.\n"
+  "cielo    =   0,    210,  82,  18     ; inizio giorno: luce calda\n"
+  "cielo    =  30,    246, 220, 208     ; quasi bianca (80 % fra caldo e bianco)\n"
+  "cielo    =  45,    255, 255, 255     ; bianco pieno...\n"
+  "cielo    =  55,    255, 255, 255     ; ...tenuto fino a mezzogiorno\n"
+  "cielo    =  70,    246, 220, 208     ; di nuovo quasi bianca...\n"
+  "cielo    = 100,    210,  82,  18     ; ...e a fine giorno di nuovo calda\n"
+  "\n"
+  "[TRAMONTO]\n"
+  "; Il cielo sbiadisce e si spegne; la striscia sinistra fa il tramonto arancio.\n"
+  "cielo    =   0,    210,  82,  18     ; calda all'inizio del tramonto (come a fine giorno)\n"
+  "cielo    =  30,     16,  16,  16     ; perde colore fino a un bianco tenue\n"
+  "cielo    =  38,      0,   0,   0     ; spenta...\n"
+  "cielo    = 100,      0,   0,   0     ; ...fino a fine tramonto\n"
+  "tramonto =   0,      0,   0,   0     ; spenta all'inizio del tramonto\n"
+  "tramonto =   1,     18,  10,   4     ; si accende rapidamente, tenue e calda\n"
+  "tramonto =  10,    155,  92,  16     ; picco arancio\n"
+  "tramonto =  82,     16,  16,  16     ; perde colore fino a un bianco tenue\n"
+  "tramonto = 100,      0,   0,   0     ; spenta a fine tramonto\n"
+  "rele     = 3, ON, 30                 ; Grp_01_03 acceso al 30 % del tramonto\n"
+  "\n"
+  "[CREPUSCOLO]\n"
+  "; Nessuna tappa: cielo, tramonto e alba restano spente (l'ultima tappa di ognuna\n"
+  "; e' 0,0,0 e la successiva anche). Compaiono le stelle (vedi [STELLE]).\n"
+  "\n"
+  "[NOTTE]\n"
+  "; Nessuna tappa: le strisce restano spente; stelle accese (vedi [STELLE]).\n"
+  "rele     = 3, OFF, 50                ; Grp_01_03 spento a meta' notte\n"
+  "\n"
+  "[ALBA]\n"
+  "; La striscia destra fa l'alba; il cielo si riaccende al 38 % e sale fino al giorno.\n"
+  "alba     =   0,      0,   0,   0     ; spenta all'inizio dell'alba\n"
+  "alba     =   1,     18,  12,   5     ; si accende rapidamente, tenue e chiara\n"
+  "alba     =  38,    155,  78,  22     ; picco arancio chiaro\n"
+  "alba     =  82,     16,  16,  16     ; perde colore fino a un bianco tenue\n"
+  "alba     = 100,      0,   0,   0     ; spenta a fine alba\n"
+  "cielo    =   0,      0,   0,   0     ; cielo spento all'inizio dell'alba...\n"
+  "cielo    =  38,      0,   0,   0     ; ...e fino al 38 %\n"
+  "cielo    =  39,     10,   4,   1     ; si accende rapidamente a un minimo caldo...\n"
+  "cielo    = 100,    210,  82,  18     ; ...e sale fino al caldo del GIORNO\n"
+  "\n"
+  "[COLORI]\n"
+  "; Limite di luminosita' per striscia, in % (0..100). Abbassa tutta la striscia in\n"
+  "; proporzione, compresa la modalita' TEST; limita anche la corrente assorbita.\n"
+  "lum_cielo    = 100\n"
+  "lum_tramonto = 100\n"
+  "lum_alba     = 100\n"
+  "; Correzione \"gamma\": 1 = i valori 0..255 vengono convertiti in modo che l'occhio\n"
+  "; percepisca passi di luminosita' regolari (senza, le luci basse salgono troppo in\n"
+  "; fretta e quelle alte sembrano tutte uguali). 0 = il valore va diretto sul PWM.\n"
+  "gamma = 1\n"
+  "; 1 = uscite PWM invertite. Solo per moduli MOSFET del commercio \"attivi bassi\";\n"
+  "; con la scheda Rev D lascia 0.\n"
+  "pwm_invertito = 0\n"
+  "\n"
+  "[STELLE]\n"
+  "numero  = 50          ; pixel WS2811 della catena STELLE (massimo 100)\n"
+  "attive  = 20          ; quante stelle si accendono ogni notte, scelte a caso\n"
+  "lum_min = 22          ; luminosita' minima e massima di ogni stella (0..255, tienile tenui)\n"
+  "lum_max = 75\n"
+  "livello_notte = 235   ; luminosita' complessiva delle stelle a notte piena (0..255)\n"
+  "; Scintillio: ogni stella si spegne e si riaccende piano con un proprio periodo,\n"
+  "; scelto fra questi due valori (in millisecondi). Valori alti = scintillio lento.\n"
+  "scintillio_min = 6400\n"
+  "scintillio_max = 12200\n"
+  "; Tinta delle stelle in % per canale R, G, B (100 = pieno): 100,72,38 = bianco caldo.\n"
+  "colore = 100,72,38\n"
+  "\n"
+  "[CASETTE]\n"
+  "numero  = 50              ; pixel WS2811 della catena CASETTE (massimo 100, 0 = non usata)\n"
+  "colore  = 90,55,20        ; colore delle finestre, R, G, B (0..255): luce calda\n"
+  "accendi = TRAMONTO, 50    ; si accendono al 50 % del TRAMONTO\n"
+  "spegni  = ALBA, 50        ; si spengono al 50 % dell'ALBA (puo' scavalcare la fine del ciclo)\n"
+  "fuoco   = 20              ; tremolio di ogni casa, 0..100 (0 = luce fissa, 100 = fuoco vivace)\n"
+  "dissolvenza_ms = 3000     ; durata dell'accensione e dello spegnimento morbidi, in ms\n"
+  "\n"
+  "[SISTEMA]\n"
+  "; Avvio rapido. 1 = dopo la schermata iniziale \"by Vanni\" (3 s, sempre presente:\n"
+  "; in quei secondi TEST attiva la modalita' colore) la centralina parte subito\n"
+  "; dall'inizio del GIORNO: niente schermata della microSD (compare solo se\n"
+  "; PRESEPE.INI contiene errori), niente autotest luci e niente melodia.\n"
+  "; 0 = avvio completo: schermata iniziale, esito della microSD, poi autotest e\n"
+  "; melodia secondo autotest_avvio e melodia_avvio qui sotto.\n"
+  "fastboot = 1\n"
+  "buzzer = 1            ; 0 = silenzio totale (nessun bip, nessuna melodia)\n"
+  "beep_hz = 900         ; tono del bip dei tasti, in Hz\n"
+  "beep_ms = 90          ; durata del bip, in ms\n"
+  "melodia_avvio = 1     ; \"Astro del ciel\" durante l'autotest (solo con fastboot = 0)\n"
+  "autotest_avvio = 1    ; autotest luci di circa 22 s all'accensione (solo con fastboot = 0)\n"
+  "oled = 1              ; 0 = non usare il display anche se collegato\n"
+  "debug_ms = 5000       ; ogni quanti ms il seriale stampa lo stato (0 = mai)\n"
+  "\n"
+  "[WIFI]\n"
+  "; Solo con la scheda \"Mega + WiFi R3\" (ATmega2560 + ESP8266 sulla stessa basetta):\n"
+  "; sull'ESP8266 va caricato firmware/PSN-Presepe-WiFi, DIP switch 1-2 su ON e\n"
+  "; selettore su RXD3/TXD3 (vedi README). Con un Arduino Mega normale lascia 0.\n"
+  "; 0 = WiFi spento: la centralina si comporta esattamente come senza WiFi.\n"
+  "; 1 = all'avvio il Mega passa SSID e password all'ESP8266, che si collega alla\n"
+  ";     rete in sottofondo (il presepe parte comunque, anche se la rete non c'e').\n"
+  ";     Premendo TEST durante il ciclo, il primo passo mostra l'indirizzo IP\n"
+  ";     (\"none\" = non collegato). Pagina: http://<indirizzo IP>/ oppure\n"
+  ";     http://<nome>.local/ (iPhone, Mac, Windows; su alcuni Android serve l'IP).\n"
+  "; La rete deve essere WPA o WPA2 a 2,4 GHz (l'ESP8266 non vede i 5 GHz e il solo WPA3).\n"
+  "; Se SSID o password contengono ; # oppure spazi all'inizio o alla fine, scrivili\n"
+  "; tra virgolette:  password = \"la;mia#password\"   (le virgolette non sono comprese).\n"
+  "abilitato = 0\n"
+  "ssid =                ; nome della rete WiFi (massimo 32 caratteri)\n"
+  "password =            ; password della rete: 8..63 caratteri, vuota = rete aperta\n"
+  "nome = presepe        ; nome in rete: http://presepe.local (lettere, numeri e -)\n"
+  "\n"
+  "[AUTENTICAZIONE]\n"
+  "; Utente e password chiesti dal browser per aprire la pagina del presepe\n"
+  "; (anche per l'aggiornamento via WiFi del firmware dell'ESP8266).\n"
+  "; CAMBIALI: chi e' collegato alla tua rete WiFi potrebbe aprire la pagina.\n"
+  "; Viaggiano in chiaro sulla rete di casa: non usare una password importante.\n"
+  "utente = admin\n"
+  "password = presepe2026\n";
+// ==== INI PREDEFINITO END ====
+
+// ==== INI SCRIVI BEGIN ====
+bool iniCreato = false;   // a questo avvio PRESEPE.INI e' stato creato (lo dice il display)
+
+// microSD senza PRESEPE.INI ne' PRESEPE.TXT: scrive PRESEPE.INI con il testo di esempio
+// completo (valori predefiniti + spiegazioni), con ritorni a capo CR LF per Blocco note.
+// Se la scrittura non riesce non lascia un file a meta'. Ritorna true se riuscita.
+bool iniCreaPredefinito() {
+  if (!SD.begin(PIN_SD_CS)) return false;
+  if (SD.exists(CFG_FILE_NAME) || SD.exists(CFG_FILE_NAME_ALT)) { SD.end(); return false; }
+  File f = SD.open(CFG_FILE_NAME, FILE_WRITE);
+  bool ok = (bool)f;
+  uint8_t buf[64]; uint8_t n = 0;
+  for (const char *p = INI_PREDEFINITO; ok; p++) {
+    char c = (char)pgm_read_byte(p);
+    if (c == '\n') buf[n++] = '\r';
+    if (c) buf[n++] = (uint8_t)c;
+    if (n >= sizeof(buf) - 1 || !c) {
+      if (n && f.write(buf, n) != n) ok = false;
+      n = 0;
+    }
+    if (!c) break;
+  }
+  if (f) f.close();
+  if (!ok && SD.exists(CFG_FILE_NAME)) SD.remove(CFG_FILE_NAME);
+  SD.end();
+  return ok;
+}
+// ==== INI SCRIVI END ====
+
 // Riavvio senza staccare l'alimentazione (pulsante "Riavvia" della pagina web):
 // rilegge PRESEPE.INI e riparte dallo splash, come all'accensione.
 void riavviaSoftware() {
@@ -2958,6 +3248,12 @@ void setup() {
   cfgCaricaDaSD(PIN_SD_CS, PIN_SD_CD);
   // Salvataggio dalla pagina web interrotto da un'interruzione di corrente: completalo e rileggi.
   if (cfg.sdStato != SD_ASSENTE && lnkRecupera()) { cfgDefault(cfg); cfgCaricaDaSD(PIN_SD_CS, PIN_SD_CD); }
+  // microSD senza file: scrive il PRESEPE.INI di esempio, da modificare poi dal computer.
+  iniCreato = false;
+  if (cfg.sdStato == SD_NO_FILE && iniCreaPredefinito()) {
+    iniCreato = true;
+    cfgDefault(cfg); cfgCaricaDaSD(PIN_SD_CS, PIN_SD_CD);
+  }
   lnkInizio();                 // [WIFI] abilitato: invia SSID e password all'ESP8266 (non blocca)
   stelle.updateLength(cfg.numStelle);
   casette.updateLength(cfg.numCasette);

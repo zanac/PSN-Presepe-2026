@@ -61,7 +61,7 @@ firmware/
   PSN-Presepe/                  the whole firmware in one sketch (PSN-Presepe.ino), example PRESEPE.INI, prebuilt HEX, Windows flasher
   PSN-Presepe-WiFi/             firmware of the ESP8266 on a "Mega + WiFi R3" board (web pages, OTA), prebuilt BIN
   web/                          pannello.html, the control panel served by the ESP8266
-  tools/                        fw_compile.sh, esp_compile.sh, flash.sh (Linux/macOS), build_web.py, run_tests.sh, host tests
+  tools/                        fw_compile.sh, esp_compile.sh, flash.sh (Linux/macOS), build_web.py, embed_ini.py, run_tests.sh, host tests
     e2e/                        end-to-end test: real Mega link code + real ESP sketch over a lossy simulated serial line
 simulation/                     Wokwi simulation of the Rev D wiring (diagram, custom RGB chip, bundle script)
 simulation_web/                 browser simulator of the PRESEPE.INI light cycle (open index.html)
@@ -307,7 +307,7 @@ Libraries: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (with Adafruit BusI
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Size: 70.1 kB flash (27 %), 4.6 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
+Size: 83.9 kB flash (33 %, of which 13.2 kB is the embedded default `PRESEPE.INI`), 4.6 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
 
 ### Build
 
@@ -334,7 +334,7 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
 
 **Boot:**
 1. Load the defaults.
-2. Read `/PRESEPE.INI` from the SD card, or `/PRESEPE.TXT` if the first is missing.
+2. Read `/PRESEPE.INI` from the SD card, or `/PRESEPE.TXT` if the first is missing. If the card has neither, write the example `PRESEPE.INI` (defaults and explanations) to it and use that.
 3. Show the OLED splash "by Vanni" for 3 s, always (also with `fastboot = 1`). Pressing TEST during these 3 s enters the colour mode.
 4. Show the SD status screen (with `fastboot = 1`, only when `PRESEPE.INI` has errors):
 
@@ -342,7 +342,8 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
    |---|---|
    | `PRESEPE.INI OK` (or `PRESEPE.TXT OK`) | file read, no errors |
    | `INI CON ERRORI` | file read with errors; shows the number of errors and the first bad line |
-   | `MANCA PRESEPE.INI` | card present, neither file found |
+   | `PRESEPE.INI CREATO` | card present without a file: the example file has just been written (shown for 4 s, also with `fastboot = 1`) |
+   | `MANCA PRESEPE.INI` | card present, no file, and the card could not be written (write-protected or full) |
    | `SD ASSENTE` | no card |
 
 5. Run the self-test (about 22 s), with an optional melody. Skipped with `fastboot = 1`.
@@ -420,9 +421,9 @@ Later ESP updates can go over WiFi (Arduino IDE → *Port* → network port `pre
 
 ## 10. SD-card configuration (PRESEPE.INI)
 
-Copy [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) to the **root** of a microSD or microSDHC card (2–32 GB, FAT16/FAT32). Cards of 64 GB and more come formatted exFAT, which the Arduino SD library cannot read, so reformat them as FAT32 first.
+Copy [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) to the **root** of a microSD or microSDHC card (2–32 GB, FAT16/FAT32), or simply insert an empty card: at power-on the firmware writes the same file to it (with a short header saying so and Windows CR LF line ends), ready to be edited on a PC. Cards of 64 GB and more come formatted exFAT, which the Arduino SD library cannot read, so reformat them as FAT32 first.
 
-The card is read at power-on, and again after *Riavvia il presepe* on the web page ([WiFi](#wifi-mega--wifi-r3-board)). If `PRESEPE.INI` is missing, the firmware looks for `PRESEPE.TXT` with the same content (handy for Wokwi, or when Windows saved the file as `.txt`). The example file contains exactly the built-in defaults; every key is explained in Italian in its comments.
+The card is read at power-on, and again after *Riavvia il presepe* on the web page ([WiFi](#wifi-mega--wifi-r3-board)). If `PRESEPE.INI` is missing, the firmware looks for `PRESEPE.TXT` with the same content (handy for Wokwi, or when Windows saved the file as `.txt`). The example file contains exactly the built-in defaults; every key is explained in Italian in its comments. The firmware carries a copy of it in flash (`INI_PREDEFINITO`): after editing `PRESEPE.INI` run `python3 firmware/tools/embed_ini.py` (CI checks that the copy is up to date).
 
 | Section | Keys |
 |---|---|

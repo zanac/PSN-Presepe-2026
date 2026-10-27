@@ -7,6 +7,8 @@
 #     mocked buttons/potentiometer/OLED by tools/test_colore.cpp.
 #  3. WiFi link: the "// ==== LINK WIFI BEGIN/END ====" block is driven by
 #     tools/test_link.cpp with a mocked ESP8266 (Serial3), microSD and outputs.
+#  3b. Default file: PRESEPE.INI embedded in the sketch (embed_ini.py --check) and written
+#     to an empty card by iniCreaPredefinito (tools/test_ini.cpp).
 #  4. End to end: the real ESP8266 firmware (PSN-Presepe-WiFi.ino, with mocked WiFi and
 #     web server, tools/e2e/mock) talks to the real Mega link block over a serial line
 #     that loses bytes like the Mega does during WS2811 refreshes (tools/e2e).
@@ -28,6 +30,12 @@ ${CXX:-g++} -std=c++11 -w -I"$T" "$HERE/test_colore.cpp" -o "$T/test_colore"
 "$T/test_colore"
 ${CXX:-g++} -std=c++11 -Wall -Wno-unused-function -I"$T" "$HERE/test_link.cpp" -o "$T/test_link"
 "$T/test_link"
+python3 "$HERE/embed_ini.py" --check
+sed -n '/^\/\/ ==== INI PREDEFINITO BEGIN ====$/,/^\/\/ ==== INI PREDEFINITO END ====$/p' "$INO" > "$T/iniprede.inc"
+sed -n '/^\/\/ ==== INI SCRIVI BEGIN ====$/,/^\/\/ ==== INI SCRIVI END ====$/p' "$INO" > "$T/iniscrivi.inc"
+[ -s "$T/iniprede.inc" ] && [ -s "$T/iniscrivi.inc" ] || { echo "INI PREDEFINITO / INI SCRIVI blocks not found in PSN-Presepe.ino"; exit 1; }
+${CXX:-g++} -std=c++11 -Wall -Wno-unused-function -I"$T" "$HERE/test_ini.cpp" -o "$T/test_ini"
+"$T/test_ini" "$SK/PRESEPE.INI"
 E=$HERE/e2e
 ${CXX:-g++} -std=c++14 -Wall -Wno-unused-function -I"$T" -I"$E" -c "$E/mega_side.cpp" -o "$T/mega_side.o"
 ${CXX:-g++} -std=c++14 -Wall -Wno-unused-function -I"$E/mock" -DESP_INO="\"$HERE/../PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino\"" -c "$E/esp_side.cpp" -o "$T/esp_side.o"
