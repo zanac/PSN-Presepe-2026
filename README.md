@@ -65,6 +65,7 @@ firmware/
     e2e/                        end-to-end test: real Mega link code + real ESP sketch over a lossy simulated serial line
 simulation/                     Wokwi simulation of the Rev D wiring (diagram, custom RGB chip, bundle script)
 simulation_web/                 browser simulator of the PRESEPE.INI light cycle (open index.html)
+demo/                           the WiFi web pages with a simulated board, to try them without hardware (generated)
 .github/workflows/firmware.yml  CI: host tests + compile of both firmwares
 ```
 
@@ -384,6 +385,8 @@ To try `PRESEPE.INI` values without any hardware, open [`simulation_web/index.ht
 
 The same firmware and the same Rev D board also work with a **"Mega + WiFi R3"** board (WeMos / RobotDyn: an ATmega2560 and an ESP8266 on one board, same Mega footprint) in place of the Arduino Mega. With `[WIFI] abilitato = 0` (the default) it behaves exactly like a plain Mega, and the same HEX runs on both.
 
+**Try the pages without hardware:** [demo/](demo/README.md) runs both of them in the browser against a simulated board.
+
 With `abilitato = 1` the ESP8266 joins the WPA/WPA2 network named in `[WIFI]` and serves two pages, both protected by the user and password of `[AUTENTICAZIONE]`:
 
 - **`http://presepe.local/`** (or `http://<IP>/`): the control panel. It shows the phase, the position in the cycle and the strip colours, and has *Pausa / Avvia*, *Fase successiva*, *Entra in test* and *Modifica configurazione*. In test (entered from the page, or with TEST on the board) it shows:
@@ -413,7 +416,7 @@ The serial selector switch next to the DIP switches must be on **RXD3 / TXD3**. 
 4. On the card, in `PRESEPE.INI`: `[WIFI] abilitato = 1`, `ssid`, `password`; change `[AUTENTICAZIONE] password`.
 5. Power on, press TEST: the first screen shows the IP address and `presepe.local`. Open it from a phone on the same network. TEST again continues with the normal tests.
 
-Later ESP updates can go over WiFi (Arduino IDE → *Port* → network port `presepe`, password of `[AUTENTICAZIONE]`), so the board does not need to come off the shield. After changing the pages (`firmware/web/pannello.html` or `simulation_web/simulator.template.html`) run `python3 firmware/tools/build_web.py` and rebuild the ESP firmware.
+Later ESP updates can go over WiFi (Arduino IDE → *Port* → network port `presepe`, password of `[AUTENTICAZIONE]`), so the board does not need to come off the shield. After changing the pages (`firmware/web/pannello.html` or `simulation_web/simulator.template.html`) run `python3 firmware/tools/build_web.py` (it also regenerates [demo/](demo/README.md)) and rebuild the ESP firmware.
 
 **Security.** The pages use HTTP Basic authentication over plain HTTP: the password travels unencrypted on the home network. Use the board only on a trusted network, and do not reuse an important password. The serial monitor warns when the default password is still in use.
 
@@ -423,7 +426,7 @@ Later ESP updates can go over WiFi (Arduino IDE → *Port* → network port `pre
 
 Copy [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) to the **root** of a microSD or microSDHC card (2–32 GB, FAT16/FAT32), or simply insert an empty card: at power-on the firmware writes the same file to it (with a short header saying so and Windows CR LF line ends), ready to be edited on a PC. Cards of 64 GB and more come formatted exFAT, which the Arduino SD library cannot read, so reformat them as FAT32 first.
 
-The card is read at power-on, and again after *Riavvia il presepe* on the web page ([WiFi](#wifi-mega--wifi-r3-board)). If `PRESEPE.INI` is missing, the firmware looks for `PRESEPE.TXT` with the same content (handy for Wokwi, or when Windows saved the file as `.txt`). The example file contains exactly the built-in defaults; every key is explained in Italian in its comments. The firmware carries a copy of it in flash (`INI_PREDEFINITO`): after editing `PRESEPE.INI` run `python3 firmware/tools/embed_ini.py` (CI checks that the copy is up to date).
+The card is read at power-on, and again after *Riavvia il presepe* on the web page ([WiFi](#wifi-mega--wifi-r3-board)). If `PRESEPE.INI` is missing, the firmware looks for `PRESEPE.TXT` with the same content (handy for Wokwi, or when Windows saved the file as `.txt`). The example file contains exactly the built-in defaults; every key is explained in Italian in its comments. The firmware carries a copy of it in flash (`INI_PREDEFINITO`): after editing `PRESEPE.INI` run `python3 firmware/tools/embed_ini.py` and `python3 firmware/tools/build_web.py` (the demo uses the same file) (CI checks that the copy is up to date).
 
 | Section | Keys |
 |---|---|

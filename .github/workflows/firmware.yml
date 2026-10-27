@@ -2,9 +2,9 @@ name: firmware
 
 on:
   push:
-    paths: ["firmware/**", "simulation_web/**", ".github/workflows/firmware.yml"]
+    paths: ["firmware/**", "simulation_web/**", "demo/**", ".github/workflows/firmware.yml"]
   pull_request:
-    paths: ["firmware/**", "simulation_web/**", ".github/workflows/firmware.yml"]
+    paths: ["firmware/**", "simulation_web/**", "demo/**", ".github/workflows/firmware.yml"]
   workflow_dispatch:
 
 permissions:

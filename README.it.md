@@ -65,6 +65,7 @@ firmware/
     e2e/                        test end-to-end: codice di collegamento del Mega + sketch ESP veri su una seriale simulata con perdite
 simulation/                     simulazione Wokwi del cablaggio Rev D (diagramma, chip RGB personalizzato, script del pacchetto)
 simulation_web/                 simulatore nel browser del ciclo luci di PRESEPE.INI (apri index.html)
+demo/                           le pagine web del WiFi con una scheda simulata, per provarle senza hardware (generate)
 .github/workflows/firmware.yml  CI: test sul PC + compilazione dei due firmware
 ```
 
@@ -384,6 +385,8 @@ Per provare i valori di `PRESEPE.INI` senza hardware, apri [`simulation_web/inde
 
 Lo stesso firmware e la stessa scheda Rev D funzionano anche con una scheda **"Mega + WiFi R3"** (WeMos / RobotDyn: ATmega2560 ed ESP8266 sulla stessa basetta, stessa impronta del Mega) al posto dell'Arduino Mega. Con `[WIFI] abilitato = 0` (il predefinito) si comporta esattamente come un Mega normale, e lo stesso HEX va bene per entrambi.
 
+**Prova le pagine senza hardware:** [demo/](demo/README.md) le fa girare nel browser con una scheda simulata.
+
 Con `abilitato = 1` l'ESP8266 si collega alla rete WPA/WPA2 indicata in `[WIFI]` e offre due pagine, entrambe protette da utente e password di `[AUTENTICAZIONE]`:
 
 - **`http://presepe.local/`** (oppure `http://<IP>/`): il pannello di controllo. Mostra la fase, il punto del ciclo e i colori delle strisce, e ha *Pausa / Avvia*, *Fase successiva*, *Entra in test* e *Modifica configurazione*. In test (dalla pagina, o con TEST sulla scheda) mostra:
@@ -413,7 +416,7 @@ Il selettore della seriale accanto ai DIP deve stare su **RXD3 / TXD3**. Tutti g
 4. Sulla microSD, in `PRESEPE.INI`: `[WIFI] abilitato = 1`, `ssid`, `password`; cambia `[AUTENTICAZIONE] password`.
 5. Accendi e premi TEST: la prima schermata mostra l'indirizzo IP e `presepe.local`. Aprilo da un telefono sulla stessa rete. Premendo ancora TEST si prosegue con le prove normali.
 
-Gli aggiornamenti successivi dell'ESP si possono fare via WiFi (IDE Arduino → *Porta* → porta di rete `presepe`, password di `[AUTENTICAZIONE]`), senza togliere la scheda dallo shield. Dopo aver modificato le pagine (`firmware/web/pannello.html` o `simulation_web/simulator.template.html`) esegui `python3 firmware/tools/build_web.py` e ricompila il firmware dell'ESP.
+Gli aggiornamenti successivi dell'ESP si possono fare via WiFi (IDE Arduino → *Porta* → porta di rete `presepe`, password di `[AUTENTICAZIONE]`), senza togliere la scheda dallo shield. Dopo aver modificato le pagine (`firmware/web/pannello.html` o `simulation_web/simulator.template.html`) esegui `python3 firmware/tools/build_web.py` (rigenera anche [demo/](demo/README.md)) e ricompila il firmware dell'ESP.
 
 **Sicurezza.** Le pagine usano l'autenticazione HTTP Basic su HTTP semplice: la password viaggia in chiaro sulla rete di casa. Usa la scheda solo su una rete fidata e non riutilizzare una password importante. Il monitor seriale avvisa se è ancora in uso la password predefinita.
 
@@ -423,7 +426,7 @@ Gli aggiornamenti successivi dell'ESP si possono fare via WiFi (IDE Arduino → 
 
 Copia [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) nella **radice** di una microSD o microSDHC (2–32 GB, FAT16/FAT32), oppure inserisci semplicemente una scheda vuota: all'accensione il firmware ci scrive lo stesso file (con alcune righe iniziali che lo spiegano e i ritorni a capo CR LF di Windows), pronto da modificare sul PC. Le schede da 64 GB in su escono formattate exFAT, che la libreria SD di Arduino non legge: riformattale prima in FAT32.
 
-La scheda viene letta all'accensione, e di nuovo dopo *Riavvia il presepe* dalla pagina web ([WiFi](#wifi-scheda-mega--wifi-r3)). Se `PRESEPE.INI` manca, il firmware cerca `PRESEPE.TXT` con lo stesso contenuto (comodo per Wokwi, o se Windows ha salvato il file come `.txt`). Il file di esempio contiene esattamente i valori di default, e ogni chiave è spiegata in italiano nei commenti. Il firmware ne tiene una copia in flash (`INI_PREDEFINITO`): dopo aver modificato `PRESEPE.INI` esegui `python3 firmware/tools/embed_ini.py` (la CI controlla che la copia sia aggiornata).
+La scheda viene letta all'accensione, e di nuovo dopo *Riavvia il presepe* dalla pagina web ([WiFi](#wifi-scheda-mega--wifi-r3)). Se `PRESEPE.INI` manca, il firmware cerca `PRESEPE.TXT` con lo stesso contenuto (comodo per Wokwi, o se Windows ha salvato il file come `.txt`). Il file di esempio contiene esattamente i valori di default, e ogni chiave è spiegata in italiano nei commenti. Il firmware ne tiene una copia in flash (`INI_PREDEFINITO`): dopo aver modificato `PRESEPE.INI` esegui `python3 firmware/tools/embed_ini.py` e `python3 firmware/tools/build_web.py` (la demo usa lo stesso file) (la CI controlla che la copia sia aggiornata).
 
 | Sezione | Chiavi |
 |---|---|
