@@ -263,6 +263,7 @@ String motivo(const String &r) {
     if (m == "sd") return "microSD assente o non scrivibile";
     if (m == "modo colore") return "sulla scheda e' attiva la modalita' colore";
     if (m == "test") return "comando non disponibile durante il test";
+    if (m == "stop") return "presepe in STOP: premi Play";
     if (m == "lunghezza") return "trasferimento incompleto, riprova";
     if (m == "nessun backup") return "non c'e' una copia precedente (PRESEPE.BAK)";
     if (m == "vuoto") return "file vuoto, non salvato";
@@ -312,7 +313,7 @@ bool comandoAmmesso(const String &c) {
   }
   int sp = c.indexOf(' ');
   String cmd = sp < 0 ? c : c.substring(0, sp);
-  const char *ok[] = { "T", "X", "S", "P", "PA", "PC", "R", "B", "RUN", "NEXT" };
+  const char *ok[] = { "T", "X", "S", "P", "PA", "PC", "R", "B", "RUN", "NEXT", "STOP", "PLAY" };
   for (const char *k : ok) if (cmd == k) return true;
   return false;
 }
@@ -330,7 +331,7 @@ void apiComando() {
   if (!autorizzato() || !daPagina()) return;
   String c = server.arg("plain"); c.trim();
   if (!comandoAmmesso(c)) { rispostaJson(false, "msg", "comando non valido", 400); return; }
-  if (c == "RUN" || c == "NEXT") c += " " + nuovoId();     // non ripetibili: numerati
+  if (c == "RUN" || c == "NEXT" || c == "STOP" || c == "PLAY") c += " " + nuovoId();   // numerati
   String r = comando(c);
   bool ok = r.startsWith("@OK");
   rispostaJson(ok, "msg", ok ? String("") : motivo(r));

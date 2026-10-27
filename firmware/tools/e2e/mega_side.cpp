@@ -93,6 +93,10 @@ int megaAvanti = 0;
 void faseAvanti() { megaAvanti++; }
 void mostraOledTest() {}
 void toggleStartStop() { if (testInCorso) { testInCorso = testWeb = false; spegniRele(); return; } running = !running; }
+bool fermo = false;
+void fermaPresepe() { fermo = true; testInCorso = testWeb = false; running = false; tuttoSpento(); spegniRele(); }
+void avviaPresepe() { fermo = false; running = true; }
+bool megaFermo() { return fermo; }
 void entraTestWeb() { if (!testInCorso) testInCorso = true; testWeb = true; tuttoSpento(); spegniRele(); }
 
 #include "link.inc"

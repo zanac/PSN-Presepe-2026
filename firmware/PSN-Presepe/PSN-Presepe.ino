@@ -25,7 +25,8 @@
     D25..D40    = rele' 1..16 tramite ULN2803A U1/U2 -> morsetti JR1..JR16 (COM/NO/NC)
 
   COMANDI (pulsanti NO verso GND, INPUT_PULLUP: nessuna resistenza esterna)
-    D22 = START/STOP   (morsetto J_START)
+    D22 = START/STOP   (morsetto J_START): breve = pausa/ripresa, tenuto 2 s = STOP
+                       (tutto spento), in STOP breve = PLAY (ciclo dall'inizio del GIORNO)
     D23 = AVANTI/NEXT  (morsetto J_NEXT)
     D24 = TEST         (morsetto J_TEST)
     A0  = potenziometro lineare 10k esterno (morsetto J_POT: 5V / cursore / GND)
@@ -109,7 +110,7 @@ const uint8_t OLED_H = 64;
 Adafruit_SSD1306 display(OLED_W, OLED_H, &Wire, -1);
 bool oledPresente = false;
 unsigned long oledPopupFino = 0;
-enum OledPopup : uint8_t { OLED_NESSUNO, OLED_PAUSA, OLED_RIPRESA, OLED_AVANTI, OLED_TEST, OLED_VELOCITA };
+enum OledPopup : uint8_t { OLED_NESSUNO, OLED_PAUSA, OLED_RIPRESA, OLED_AVANTI, OLED_TEST, OLED_VELOCITA, OLED_PLAY };
 OledPopup oledPopup = OLED_NESSUNO;
 int ultimoPotOled = -1;
 int potRawOled = 0;
@@ -897,6 +898,7 @@ int potRawStabile = 0;
 
 const unsigned long DEBOUNCE_MS = 20;
 #define DEBUG_INTERVAL_MS (cfg.debugMs)   // [SISTEMA] debug_ms (0 = nessun log periodico)
+#define START_STOP_MS 2000UL              // START tenuto cosi' a lungo = STOP
 
 // ============================================================
 // STATO
@@ -924,6 +926,7 @@ void setTramonto(uint8_t r, uint8_t g, uint8_t b);
 void setAlba(uint8_t r, uint8_t g, uint8_t b);
 void generaCieloStellato();
 void mostraStelle(float livello);
+void stelleFlush();
 void setStelle(uint8_t value);
 void tuttoSpento();
 unsigned long durataDaRaw(int raw);
@@ -973,6 +976,9 @@ bool iniCreaPredefinito();
 extern bool iniCreato;
 void entraTest();
 void entraTestWeb();
+void fermaPresepe();
+void avviaPresepe();
+void mostraOledStop();
 void riavviaSoftware();
 void setup();
 
@@ -987,6 +993,7 @@ void setup();
 #define NUM_EVENTI_RELE (cfg.numEventi)
 
 bool running = true;
+bool fermo = false;          // STOP: tutto spento (rele', strisce, stelle, casette) fino a PLAY
 bool testInCorso = false;
 bool testMostraIP = false;   // [WIFI] abilitato: primo passo del test = indirizzo IP
 bool testWeb = false;        // test comandato dalla pagina web (strisce, pixel, rele' uno a uno)
@@ -1195,6 +1202,7 @@ void generaCieloStellato() {
   cieloGenerato = true;
 }
 
+bool stelleInSospeso = false;   // pixel delle stelle cambiati ma non ancora inviati (vedi stelleFlush)
 void mostraStelle(float livello) {
   livello = constrain(livello, 0.0f, 1.0f);
   stelle.clear();
@@ -1255,15 +1263,23 @@ void mostraStelle(float livello) {
       (uint8_t)((v * cfg.coloreStelle.b) / 100U)
     ));
   }
-  // NeoPixel disabilita gli interrupt durante la trasmissione.
-  // Limitiamo il refresh a 50 Hz per non alterare millis()/Timer0.
+  stelleInSospeso = true;
+  stelleFlush();
+}
+
+// NeoPixel disabilita gli interrupt durante la trasmissione.
+// Limitiamo il refresh a 50 Hz per non alterare millis()/Timer0.
+// Mentre arrivano byte dall'ESP8266 (Serial3) niente show(): gli interrupt
+// spenti dalla trasmissione WS2811 farebbero perdere caratteri. Un aggiornamento
+// rimandato resta in sospeso e lo manda loop() appena possibile (serve quando la
+// scena non viene piu' ricalcolata: STOP, test da web).
+void stelleFlush() {
   static unsigned long ultimoShowStelleUs = 0;
   unsigned long adessoUs = micros();
-  // Mentre arrivano byte dall'ESP8266 (Serial3) niente show(): gli interrupt
-  // spenti dalla trasmissione WS2811 farebbero perdere caratteri.
-  if ((unsigned long)(adessoUs - ultimoShowStelleUs) >= 20000UL && !lnkQuiet()) {
+  if (stelleInSospeso && (unsigned long)(adessoUs - ultimoShowStelleUs) >= 20000UL && !lnkQuiet()) {
     stelle.show();
     ultimoShowStelleUs = adessoUs;
+    stelleInSospeso = false;
   }
 }
 
@@ -1650,6 +1666,7 @@ void aggiornaOled(unsigned long durata, float p) {
     switch(oledPopup) {
       case OLED_PAUSA: display.print(F("PAUSA")); break;
       case OLED_RIPRESA: display.print(F("RIPRESA")); break;
+      case OLED_PLAY: display.print(F("PLAY")); break;
       case OLED_AVANTI: display.print(F("AVANTI")); break;
       case OLED_TEST: display.print(F("TEST")); break;
       case OLED_VELOCITA: display.print(F("VELOCITA")); break;
@@ -1664,6 +1681,8 @@ void aggiornaOled(unsigned long durata, float p) {
       display.print(F("Fase: ")); display.print(nomeFase(faseDaPercentuale(p)));
     } else if (oledPopup==OLED_TEST) {
       display.print(F("Test uscite in corso"));
+    } else if (oledPopup==OLED_PLAY) {
+      display.print(F("Ciclo dall'inizio"));
     } else {
       display.print(running ? F("Ciclo in esecuzione") : F("Ciclo fermo"));
     }
@@ -1973,6 +1992,48 @@ void spegniRele() {
     scriviRele(i, false);
 }
 
+// STOP (START tenuto 2 s, o pulsante Stop della pagina web): spegne tutto, anche i
+// rele' forzati con forzaN = on, e resta cosi' finche' non arriva PLAY.
+void fermaPresepe() {
+  if (fermo) return;
+  if (testInCorso) { testInCorso = false; testWeb = false; testMostraIP = false; testIndice = 0; }
+  fermo = true;
+  running = false;
+  pauseStartedMs = millis();
+  oledPopup = OLED_NESSUNO;
+  tuttoSpento();
+  spegniRele();
+  casetteLivello = 0.0f;
+  buzzerBeep();
+  Serial.println(F("STOP: tutto spento (START breve = PLAY)"));
+  mostraOledStop();
+}
+
+// PLAY: riparte dall'inizio del GIORNO, in marcia.
+void avviaPresepe() {
+  if (!fermo) return;
+  fermo = false;
+  running = true;
+  cycleStartMs = millis();
+  cieloGenerato = false; ultimaFaseStelle = GIORNO;
+  casetteLivello = 0.0f;
+  buzzerBeep();
+  Serial.println(F("PLAY: ciclo dall'inizio del GIORNO"));
+  oledMostraPopup(OLED_PLAY);
+}
+
+void mostraOledStop() {
+  if (!oledPresente) return;
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(3);
+  display.setCursor(28, 8); display.print(F("STOP"));
+  display.setTextSize(1);
+  display.setCursor(0, 40); display.print(F("tutto spento"));
+  display.setCursor(0, 54); display.print(F("START = PLAY"));
+  display.display();
+}
+
 void accendiRele(uint8_t indice) {
   spegniRele();
   if (indice < 16)
@@ -2188,7 +2249,7 @@ void stampaStato(unsigned long durata, float p) {
   Serial.print(analogRead(PIN_POT));
 
   Serial.print(F(" | "));
-  Serial.println(running ? F("RUN") : F("PAUSA"));
+  Serial.println(fermo ? F("STOP") : running ? F("RUN") : F("PAUSA"));
 }
 
 // ============================================================
@@ -2644,7 +2705,7 @@ void lnkOk() { LNK_SERIAL.println(F("@OK")); }
 void lnkErr(const __FlashStringHelper *motivo) { LNK_SERIAL.print(F("@ERR ")); LNK_SERIAL.println(motivo); }
 
 // Esiti dei comandi numerati (rimandati uguali a una ritrasmissione).
-enum { ES_OK, ES_OK_INI, ES_OK_TXT, ES_LUNGHEZZA, ES_BACKUP, ES_COPIA, ES_SD, ES_NO_BACKUP, ES_VUOTO, ES_TEST, ES_PUT };
+enum { ES_OK, ES_OK_INI, ES_OK_TXT, ES_LUNGHEZZA, ES_BACKUP, ES_COPIA, ES_SD, ES_NO_BACKUP, ES_VUOTO, ES_TEST, ES_PUT, ES_STOP };
 void lnkRispondi(uint8_t e) {
   switch (e) {
     case ES_OK: lnkOk(); break;
@@ -2657,6 +2718,7 @@ void lnkRispondi(uint8_t e) {
     case ES_NO_BACKUP: lnkErr(F("nessun backup")); break;
     case ES_VUOTO: lnkErr(F("vuoto")); break;
     case ES_TEST: lnkErr(F("test")); break;
+    case ES_STOP: lnkErr(F("stop")); break;
     default: lnkErr(F("put")); break;
   }
 }
@@ -2708,13 +2770,13 @@ void lnkInizio() {
   lnkInviaConfig();
 }
 
-// Modo per la pagina: 0 ciclo, 1 test a passi, 2 test da web, 3 modalita' colore.
+// Modo per la pagina: 0 ciclo, 1 test a passi, 2 test da web, 3 modalita' colore, 4 STOP.
 extern bool modalitaColore;
 void lnkInviaStato() {
   unsigned long durata = durataCiclo();
   float p = percentualeCiclo(durata);
   Fase f = faseDaPercentuale(p);
-  uint8_t modo = modalitaColore ? 3 : (testInCorso ? (testWeb ? 2 : 1) : 0);
+  uint8_t modo = modalitaColore ? 3 : fermo ? 4 : (testInCorso ? (testWeb ? 2 : 1) : 0);
   LNK_SERIAL.print(F("@ST "));
   LNK_SERIAL.print(modo); LNK_SERIAL.print(' ');
   LNK_SERIAL.print(running ? 1 : 0); LNK_SERIAL.print(' ');
@@ -2845,6 +2907,7 @@ void webPixelMostra(uint8_t catena) {
 // Comandi che richiedono il test da web: lo attivano se serve (solo da test o ciclo).
 bool lnkPerTest() {
   if (modalitaColore) { lnkErr(F("modo colore")); return false; }
+  if (fermo) { lnkErr(F("stop")); return false; }
   if (!testWeb) { entraTestWeb(); memset(webPixel, 0, sizeof(webPixel)); }
   return true;
 }
@@ -2910,8 +2973,16 @@ void lnkComando(char *riga) {
   if (!strcmp(cmd, "RUN") || !strcmp(cmd, "NEXT")) {     // RUN [id] | NEXT [id]
     uint16_t id;
     if (lnkGiaFatto(s, id)) return;
+    if (fermo) { lnkFatto(id, ES_STOP); return; }
     if (testInCorso || modalitaColore) { lnkFatto(id, ES_TEST); return; }
     if (cmd[0] == 'R') toggleStartStop(); else faseAvanti();
+    lnkFatto(id, ES_OK); return;
+  }
+  if (!strcmp(cmd, "STOP") || !strcmp(cmd, "PLAY")) {     // STOP [id] | PLAY [id]
+    uint16_t id;
+    if (lnkGiaFatto(s, id)) return;
+    if (modalitaColore) { lnkFatto(id, ES_TEST); return; }
+    if (cmd[0] == 'S') fermaPresepe(); else avviaPresepe();
     lnkFatto(id, ES_OK); return;
   }
   // ---------------------------------------------------------------- file sulla SD
@@ -3323,7 +3394,7 @@ void riavviaSoftware() {
   if (lnkAttivo) LNK_SERIAL.flush();
   noTone(PIN_BUZZER);
   buzzerAttivo = false;
-  running = true; testInCorso = false; testWeb = false; testMostraIP = false; testIndice = 0;
+  running = true; fermo = false; testInCorso = false; testWeb = false; testMostraIP = false; testIndice = 0;
   modalitaColore = false;
   oledPopup = OLED_NESSUNO;
   cieloGenerato = false; ultimaFaseStelle = GIORNO;
@@ -3462,24 +3533,49 @@ void loop() {
 
   lnkTick();                                   // [WIFI]: comandi della pagina web
   if (lnkRiavvio) { riavviaSoftware(); return; }
+  stelleFlush();                               // stelle rimaste da inviare (STOP, test da web)
 
   if (modalitaColore) { loopModalitaColore(); return; }
 
   // ----- comandi fisici -----
 
+  // START: breve (al rilascio) = pausa/ripresa, o uscita dal TEST; tenuto 2 s = STOP
+  // (tutto spento); in STOP una pressione breve = PLAY.
+  static bool startGiu = false, startLungo = false;
+  static unsigned long startGiuMs = 0;
   if (pulsantePremuto(PIN_START,
                       lastStartRead, stableStart, dbStartMs)) {
-    toggleStartStop();
+    startGiu = true; startLungo = false; startGiuMs = millis();
+  }
+  if (startGiu) {
+    if (stableStart == HIGH) {                         // rilasciato
+      startGiu = false;
+      if (!startLungo) { if (fermo) avviaPresepe(); else toggleStartStop(); }
+    } else if (!startLungo && !fermo && !testInCorso && millis() - startGiuMs >= START_STOP_MS) {
+      startLungo = true;                               // il rilascio non fa altro
+      fermaPresepe();
+    }
   }
 
   if (pulsantePremuto(PIN_NEXT,
                       lastNextRead, stableNext, dbNextMs)) {
-    if (!testInCorso) faseAvanti();
+    if (!testInCorso && !fermo) faseAvanti();
   }
 
   if (pulsantePremuto(PIN_TEST,
                       lastTestRead, stableTest, dbTestMs)) {
-    testUscite();
+    if (!fermo) testUscite();
+  }
+
+  // ----- STOP: tutto resta spento -----
+  if (fermo) {
+    static unsigned long stopOledMs = 0;
+    if (millis() - stopOledMs >= 2000) { stopOledMs = millis(); mostraOledStop(); }
+    if (DEBUG_INTERVAL_MS && millis() - lastDebugMs >= DEBUG_INTERVAL_MS) {
+      lastDebugMs = millis();
+      Serial.println(F("STOP (START breve = PLAY)"));
+    }
+    return;
   }
 
   // ----- ciclo scenografico -----

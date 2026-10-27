@@ -53,6 +53,8 @@ button, select, input[type=number] { font-family: var(--f-body); font-size: 15px
 button { cursor: pointer; }
 button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 button:hover { border-color: var(--accent); }
+button.danger { background: var(--err-bg); color: var(--err); border-color: var(--err); font-weight: 600; }
+button.big { min-height: 56px; font-size: 18px; padding: 12px 28px; }
 button:disabled { opacity: .5; cursor: default; }
 button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 a.btn { display: inline-flex; align-items: center; min-height: 42px; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--accent); color: var(--accent); text-decoration: none; font-weight: 600; }
@@ -110,7 +112,15 @@ input[type=range] { flex: 1; accent-color: var(--accent); min-width: 0; height: 
       <button id="bTest" type="button">Entra in test</button>
       <a class="btn" href="/config">Modifica configurazione</a>
     </div>
+    <div class="row"><button class="danger" id="bStop" type="button">Stop: spegni tutto</button>
+      <span class="note">Per le cerimonie: spegne relè, strisce, stelle e casette finché non premi Play (sulla scheda: START tenuto 2 secondi).</span></div>
     <p class="note">La configurazione apre il file della microSD con l'anteprima del ciclo: lì puoi salvarlo e riavviare il presepe.</p>
+  </section>
+
+  <section class="card" id="cardStop" hidden aria-label="Presepe fermo">
+    <h2>Stop</h2>
+    <p class="note">Tutto spento: relè, strisce, stelle e casette. Play fa ripartire il ciclo dall'inizio del GIORNO (sulla scheda: START).</p>
+    <div class="row"><button class="primary big" id="bPlay" type="button">Play</button></div>
   </section>
 
   <section class="card" id="cardColore" hidden>
@@ -206,11 +216,12 @@ function show() {
     ? `rete «${st.ssid}» · ${st.ip} · ${st.clienti} ${st.clienti === 1 ? "dispositivo collegato" : "dispositivi collegati"}`
     : `${st.host}.local · ${st.ip} · segnale ${st.rssi} dBm`;
   $("offline").hidden = st.mega;
-  if (!st.mega) { ["cardCiclo", "cardTest", "cardColore"].forEach(id => { $(id).hidden = true; }); modo = -1;
+  if (!st.mega) { ["cardCiclo", "cardTest", "cardColore", "cardStop"].forEach(id => { $(id).hidden = true; }); modo = -1;
     $("offlineMsg").textContent = "Il presepe non risponde: è in avvio, oppure l'ESP8266 non è collegato alla Serial3 (DIP 1-2 e selettore su RXD3/TXD3)."; return; }
-  $("phase").textContent = FASI[st.fase] || "—";
-  $("meta").textContent = `${st.pctFase} % della fase · ${st.pct.toFixed(1)} % del ciclo · ${st.run ? "in corso" : "in pausa"} · ciclo ${fmt(st.durata)}`;
-  $("prog").style.width = st.pct + "%";
+  $("phase").textContent = st.modo === 4 ? "STOP" : FASI[st.fase] || "—";
+  $("meta").textContent = st.modo === 4 ? "tutto spento · Play riparte dall'inizio del GIORNO"
+    : `${st.pctFase} % della fase · ${st.pct.toFixed(1)} % del ciclo · ${st.run ? "in corso" : "in pausa"} · ciclo ${fmt(st.durata)}`;
+  $("prog").style.width = (st.modo === 4 ? 0 : st.pct) + "%";
   $("swatches").innerHTML = "";
   STRIP.forEach(s => {
     const c = st[s.k], d = document.createElement("div");
@@ -225,6 +236,7 @@ function show() {
   $("cardCiclo").hidden = modo !== 0;
   $("cardTest").hidden = !(modo === 1 || modo === 2);
   $("cardColore").hidden = modo !== 3;
+  $("cardStop").hidden = modo !== 4;
   if (!$("cardTest").hidden && !grad) drawPicker();
   $("bRun").textContent = st.run ? "Pausa" : "Avvia";
   $("testNote").textContent = modo === 2 ? "Comandi dal telefono: la scheda mostra «TEST DA WEB». START sulla scheda o «Esci dal test» riprendono il ciclo."
@@ -359,6 +371,8 @@ $("bExit").addEventListener("click", () => send("X", "X"));
 $("bTest").addEventListener("click", () => send("T", "T"));
 $("bRun").addEventListener("click", () => send("RUN", "RUN"));
 $("bNext").addEventListener("click", () => send("NEXT", "NEXT"));
+$("bStop").addEventListener("click", () => send("STOP", "STOP"));
+$("bPlay").addEventListener("click", () => send("STOP", "PLAY"));      // stessa chiave: vince l'ultimo
 
 (async () => {
   setTimeout(poll, 1000);

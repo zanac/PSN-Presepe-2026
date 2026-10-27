@@ -308,7 +308,7 @@ Librerie: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (con Adafruit BusIO)
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Occupazione: 88,4 kB di flash (34 %, di cui 15,4 kB sono il `PRESEPE.INI` predefinito incorporato), 4,8 kB di RAM statica. Restano circa 3,4 kB per heap e stack; il buffer dell'OLED (1 kB) e quelli dei LED (3 byte per pixel) sono allocati in esecuzione, dopo di che restano liberi circa 2 kB.
+Occupazione: 89,4 kB di flash (35 %, di cui 15,4 kB sono il `PRESEPE.INI` predefinito incorporato), 4,8 kB di RAM statica. Restano circa 3,4 kB per heap e stack; il buffer dell'OLED (1 kB) e quelli dei LED (3 byte per pixel) sono allocati in esecuzione, dopo di che restano liberi circa 2 kB.
 
 ### Compilazione
 
@@ -357,7 +357,7 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 
 | Pulsante | Azione |
 |---|---|
-| **START/STOP** | Pausa o ripresa; riparte esattamente da dove si era fermato. In modalità TEST, esce dal TEST. |
+| **START/STOP** | Pressione breve (al rilascio): pausa o ripresa; riparte esattamente da dove si era fermato. In modalità TEST, esce dal TEST. **Tenuto 2 s: STOP**: tutto spento (relè, anche quelli forzati con `forzaN = on`, strisce, stelle, casette); l'OLED mostra `STOP`, NEXT e TEST sono ignorati. Una pressione breve in STOP è **PLAY**: il ciclo riparte dall'inizio del GIORNO. Pensato per le cerimonie. |
 | **AVANTI (NEXT)** | Salta all'inizio della fase successiva. |
 | **TEST** | Entra in modalità TEST, poi scorre 34 prove (con `[WIFI] abilitato` 1, 2 o 3 la prima schermata mostra lo stato del WiFi: indirizzo IP e `<nome>.local`, in modo access point anche il nome della rete; `non collegato` con 1, `cerco la rete...` con 3 mentre sta ancora provando, `ESP non risponde` in modo access point quando l'ESP8266 non risponde): ogni colore di ogni striscia, colori di stelle e casette, tutto insieme, poi i relè 1–16 uno alla volta, con il loro nome se definito. Durante il TEST il tempo del ciclo è fermo. |
 | **Potenziometro** | Sceglie una delle tre durate del ciclo; la modifica vale quando la manopola si ferma. |
@@ -390,7 +390,7 @@ Lo stesso firmware e la stessa scheda Rev D funzionano anche con una scheda **"M
 
 Con `abilitato = 1` l'ESP8266 si collega alla rete WPA/WPA2 indicata in `[WIFI]`; con `abilitato = 2` invece crea una sua rete (access point, vedi sotto); con `abilitato = 3` prova prima la rete di casa e apre l'access point se non si collega. In tutti i casi offre due pagine, protette da utente e password di `[AUTENTICAZIONE]`:
 
-- **`http://presepe.local/`** (oppure `http://<IP>/`): il pannello di controllo. Mostra la fase, il punto del ciclo e i colori delle strisce, e ha *Pausa / Avvia*, *Fase successiva*, *Entra in test* e *Modifica configurazione*. In test (dalla pagina, o con TEST sulla scheda) mostra:
+- **`http://presepe.local/`** (oppure `http://<IP>/`): il pannello di controllo. Mostra la fase, il punto del ciclo e i colori delle strisce, e ha *Pausa / Avvia*, *Fase successiva*, *Entra in test*, *Modifica configurazione* e *Stop: spegni tutto* (lo stesso STOP di START tenuto 2 s; la pagina mostra allora solo il pulsante *Play*, e i comandi di test sono rifiutati fino a Play). In test (dalla pagina, o con TEST sulla scheda) mostra:
   - le tre strisce: scegli TRAMONTO / CIELO / ALBA, prendi un colore dal gradiente e regola la luminosità con la levetta, oppure scrivi R, G, B (*Spegni* spegne la striscia); la striscia segue subito, e il colore compare come riga `cielo = %, R, G, B` pronta da copiare;
   - stelle o casette, un pulsante per ogni pixel (`numero` del file) per accenderli e spegnerli uno alla volta, più *Tutti accesi / Tutti spenti*;
   - i 16 relè con il loro nome, ON/OFF uno per uno;

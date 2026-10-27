@@ -308,7 +308,7 @@ Libraries: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (with Adafruit BusI
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Size: 88.4 kB flash (34 %, of which 15.4 kB is the embedded default `PRESEPE.INI`), 4.8 kB static RAM. That leaves about 3.4 kB for heap and stack; the OLED buffer (1 kB) and the LED buffers (3 bytes per pixel) are allocated at run time, after which about 2 kB stay free.
+Size: 89.4 kB flash (35 %, of which 15.4 kB is the embedded default `PRESEPE.INI`), 4.8 kB static RAM. That leaves about 3.4 kB for heap and stack; the OLED buffer (1 kB) and the LED buffers (3 bytes per pixel) are allocated at run time, after which about 2 kB stay free.
 
 ### Build
 
@@ -357,7 +357,7 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
 
 | Button | Action |
 |---|---|
-| **START/STOP** | Pause or resume; resumes exactly where it stopped. In TEST mode it exits TEST. |
+| **START/STOP** | Short press (acts on release): pause or resume; resumes exactly where it stopped. In TEST mode it exits TEST. **Held 2 s: STOP** — everything off (relays, including those forced with `forzaN = on`, strips, stars, houses); the OLED shows `STOP`, NEXT and TEST are ignored. A short press in STOP is **PLAY**: the cycle starts again from the beginning of GIORNO. Meant for ceremonies. |
 | **NEXT** | Jump to the start of the next phase. |
 | **TEST** | Enter TEST mode, then step through 34 tests (with `[WIFI] abilitato` 1, 2 or 3 the first step shows the WiFi state: the IP address and `<nome>.local`, in access-point mode also the network name; `non collegato` with 1, `cerco la rete...` with 3 while it is still trying, `ESP non risponde` in access-point mode when the ESP8266 does not answer): each colour of each strip, star and house colours, everything together, then relays 1–16 one at a time, with their names if defined. The cycle time is frozen while in TEST. |
 | **Potentiometer** | Selects one of the three cycle lengths; the change is applied once the knob settles. |
@@ -390,7 +390,7 @@ The same firmware and the same Rev D board also work with a **"Mega + WiFi R3"**
 
 With `abilitato = 1` the ESP8266 joins the WPA/WPA2 network named in `[WIFI]`; with `abilitato = 2` it creates its own network instead (access point, see below); with `abilitato = 3` it tries the home network first and opens the access point if that does not connect. Either way it serves two pages, both protected by the user and password of `[AUTENTICAZIONE]`:
 
-- **`http://presepe.local/`** (or `http://<IP>/`): the control panel. It shows the phase, the position in the cycle and the strip colours, and has *Pausa / Avvia*, *Fase successiva*, *Entra in test* and *Modifica configurazione*. In test (entered from the page, or with TEST on the board) it shows:
+- **`http://presepe.local/`** (or `http://<IP>/`): the control panel. It shows the phase, the position in the cycle and the strip colours, and has *Pausa / Avvia*, *Fase successiva*, *Entra in test*, *Modifica configurazione* and *Stop: spegni tutto* (the same STOP as START held 2 s; the page then shows only a *Play* button, and test commands are refused until Play). In test (entered from the page, or with TEST on the board) it shows:
   - the three strips: choose TRAMONTO / CIELO / ALBA, pick a colour on the gradient and set the brightness with the slider, or type R, G, B (*Spegni* switches the strip off); the strip follows at once, and the colour is shown as a ready-to-copy `cielo = %, R, G, B` line;
   - the stars or houses, one button per pixel (`numero` of the file), to switch each one on or off, plus *Tutti accesi / Tutti spenti*;
   - the 16 relays with their names, ON/OFF each;

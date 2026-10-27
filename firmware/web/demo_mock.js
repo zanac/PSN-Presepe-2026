@@ -33,14 +33,14 @@
     const mega = performance.now() > bootFino;
     const fa = E.faseDi(cfg, p), a = E.inizio(cfg, fa), b = E.fine(cfg, fa);
     const ciclo = modo === 0;
-    const col = s => ciclo ? E.colore(cfg, s, p) : test[E.STRISCE[s]];
+    const col = s => modo === 4 ? [0, 0, 0] : ciclo ? E.colore(cfg, s, p) : test[E.STRISCE[s]];
     const releCiclo = E.rele(cfg, p).reduce((m, on, i) => on ? m | (1 << i) : m, 0);
     return {
       versione: "demo", ip: "192.168.1.50", ssid: "Casa", host: "presepe", rssi: -58,
       mega, eta: mega ? 200 : 999999, modo, run: run ? 1 : 0, fase: fa,
       pctFase: Math.round(b > a ? (p - a) * 100 / (b - a) : 0), pct: Math.round(p * 10) / 10, durata: durata(),
       sd: errori ? 4 : 3, err: errori, riga: prima, nst: cfg.numStelle, nca: cfg.numCasette,
-      rele: ciclo ? releCiclo : test.rele, cielo: col(0), tramonto: col(1), alba: col(2), passo: 0,
+      rele: modo === 4 ? 0 : ciclo ? releCiclo : test.rele, cielo: col(0), tramonto: col(1), alba: col(2), passo: 0,
       nomi: cfg.nomi.slice(),
     };
   }
@@ -60,7 +60,11 @@
     const f = c.trim().split(/\s+/), k = f[0], n = f.slice(1).map(Number);
     const ok = { ok: true, msg: "" }, err = m => ({ ok: false, msg: m });
     const range = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+    const stop = err("presepe in STOP: premi Play");
+    if (modo === 4 && ["T", "S", "R", "P", "PA", "PC", "RUN", "NEXT"].includes(k)) return stop;
     switch (k) {
+      case "STOP": modo = 4; run = false; return ok;           // tutto spento
+      case "PLAY": if (modo === 4) { modo = 0; run = true; p = 0; } return ok;   // dall'inizio del GIORNO
       case "T": entraTest(); return ok;
       case "X": if (modo === 2) { modo = 0; run = true; } return ok;
       case "S":

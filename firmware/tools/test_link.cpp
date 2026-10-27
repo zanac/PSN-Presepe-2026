@@ -121,6 +121,9 @@ void toggleStartStop() {
   if (testInCorso) { testInCorso = testWeb = testMostraIP = false; tuttoSpento(); spegniRele(); running = true; return; }
   running = !running;
 }
+bool fermo = false; int stops = 0, plays = 0;
+void fermaPresepe() { if (fermo) return; fermo = true; testInCorso = testWeb = false; running = false; tuttoSpento(); spegniRele(); stops++; }
+void avviaPresepe() { if (!fermo) return; fermo = false; running = true; plays++; }
 void entraTestWeb() {   // same as the sketch
   if (!testInCorso) { testInCorso = true; testIndice = 0; running = false; }
   testWeb = true; testMostraIP = false; tuttoSpento(); spegniRele(); mostraOledTest();
@@ -257,6 +260,17 @@ int main() {
   CHECK(cmd("@S 0 1 1 1")[0] == "@ERR modo colore" && cmd("@T")[0] == "@ERR modo colore" && !testInCorso);
   modalitaColore = false;
   CHECK(cmd("@ZZZ")[0] == "@ERR comando");
+
+  // 5b. STOP / PLAY: numbered; in STOP the web test and the cycle commands are refused
+  CHECK(ok(cmd("@R 2 1")) && releStato == 2);                               // web test with a relay on
+  CHECK(ok(cmd("@STOP 50")) && fermo && !testInCorso && releStato == 0 && stops == 1);
+  CHECK(ok(cmd("@STOP 50")) && stops == 1);                                 // retransmission
+  CHECK(cmd("@R 1 1")[0] == "@ERR stop" && releStato == 0 && cmd("@T")[0] == "@ERR stop");
+  CHECK(cmd("@NEXT 51")[0] == "@ERR stop" && cmd("@RUN")[0] == "@ERR stop");
+  T += 1000; Serial3.out.clear(); lnkTick();
+  CHECK(field(lines(Serial3.out, true)[0], 1) == "4");                     // modo 4 = STOP
+  CHECK(ok(cmd("@PLAY 52")) && !fermo && running && plays == 1);
+  CHECK(ok(cmd("@PLAY 52")) && plays == 1 && ok(cmd("@PLAY")) && plays == 1);   // PLAY outside STOP: nothing
 
   // 6. GET: CRLF removed, long lines split in 120-char pieces, no trailing newline
   std::string lunga(250, 'x');

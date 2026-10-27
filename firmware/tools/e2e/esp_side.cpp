@@ -16,6 +16,7 @@ OTAMock ArduinoOTA;
 void megaAvvia(const char *ssid, const char *pwd);
 void megaAvviaIni(const char *testo);
 int megaErrori();
+bool megaFermo();
 bool megaAp();
 std::string &megaFile(const char *n);
 bool megaHaFile(const char *n);
@@ -75,6 +76,14 @@ int main() {
     for (int i = 0; i < 10; i++) { r = server.chiama("/api/cmd", HTTP_POST, "NEXT"); if (r.body.find("\"ok\":true") != std::string::npos) okn++; }
     CHECK(okn == 10 && megaAvanti == a0 + 10);
   }
+
+  // 4d. STOP / PLAY from the page
+  r = server.chiama("/api/cmd", HTTP_POST, "STOP");
+  CHECK(r.body.find("\"ok\":true") != std::string::npos && megaFermo());
+  r = server.chiama("/api/cmd", HTTP_POST, "NEXT");
+  CHECK(r.body.find("presepe in STOP") != std::string::npos);
+  r = server.chiama("/api/cmd", HTTP_POST, "PLAY");
+  CHECK(r.body.find("\"ok\":true") != std::string::npos && !megaFermo());
 
   // 5. read the file (CRLF removed)
   r = server.chiama("/api/ini", HTTP_GET, "");
