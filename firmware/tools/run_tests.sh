@@ -1,5 +1,7 @@
 #!/bin/sh
-# Host-side tests (no Arduino needed; any C++11 compiler):
+# Host-side tests (no Arduino needed): a C++14 compiler and Python 3; Node.js is optional
+# (syntax check of the page scripts). Also checks that the generated files are up to date
+# (embedded PRESEPE.INI, ESP pages and demo, web simulator).
 #  1. PRESEPE.INI reader and colour tappe: the "// ==== CONFIG BEGIN/END ====" block of
 #     PSN-Presepe.ino is extracted into a temporary PresepeConfig.h and compiled with
 #     tools/test_config.cpp.
@@ -31,6 +33,8 @@ ${CXX:-g++} -std=c++11 -w -I"$T" "$HERE/test_colore.cpp" -o "$T/test_colore"
 ${CXX:-g++} -std=c++11 -Wall -Wno-unused-function -I"$T" "$HERE/test_link.cpp" -o "$T/test_link"
 "$T/test_link"
 python3 "$HERE/embed_ini.py" --check
+python3 "$HERE/build_web.py" --check
+python3 "$HERE/../../simulation_web/build_simulator.py" --check
 sed -n '/^\/\/ ==== INI PREDEFINITO BEGIN ====$/,/^\/\/ ==== INI PREDEFINITO END ====$/p' "$INO" > "$T/iniprede.inc"
 sed -n '/^\/\/ ==== INI SCRIVI BEGIN ====$/,/^\/\/ ==== INI SCRIVI END ====$/p' "$INO" > "$T/iniscrivi.inc"
 [ -s "$T/iniprede.inc" ] && [ -s "$T/iniscrivi.inc" ] || { echo "INI PREDEFINITO / INI SCRIVI blocks not found in PSN-Presepe.ino"; exit 1; }

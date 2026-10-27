@@ -697,7 +697,8 @@ static bool sezAccessPoint(PresepeConfig &c, const char *k, char *v) {
   if (ugualeCI(k, "max_client")) { if (!leggiLong(v, n, 1, 8)) return false; c.apMaxClient = (uint8_t)n; return true; }
   if (ugualeCI(k, "portale")) return leggiBool(v, c.apPortale);
   if (ugualeCI(k, "attesa")) { if (!leggiLong(v, n, 10, 600)) return false; c.apAttesa = (uint16_t)n; return true; }
-  if (ugualeCI(k, "ip")) {                    // a.b.c.d, rete /24: l'ultimo numero da 1 a 254
+  if (ugualeCI(k, "ip")) {                    // a.b.c.d, rete /24: l'ultimo numero da 1 a 55
+    // (il DHCP dell'ESP8266 da' ai telefoni da ultimo+99 a ultimo+199: oltre 55 sforerebbe il 255)
     uint8_t x[4]; const char *s = v;
     for (uint8_t i = 0; i < 4; i++) {
       if (!isdigit((unsigned char)*s)) return false;
@@ -705,7 +706,7 @@ static bool sezAccessPoint(PresepeConfig &c, const char *k, char *v) {
       if (fine - s > 3 || q < 0 || q > 255 || (i < 3 ? *fine != '.' : *fine != 0)) return false;
       x[i] = (uint8_t)q; s = fine + 1;
     }
-    if (x[3] == 0 || x[3] == 255 || x[0] == 0 || x[0] >= 224 || x[0] == 127) return false;
+    if (x[3] == 0 || x[3] > 55 || x[0] == 0 || x[0] >= 224 || x[0] == 127) return false;
     memcpy(c.apIp, x, 4); return true;
   }
   return false;
@@ -2073,7 +2074,7 @@ void applicaTestCorrente() {
       for (uint16_t i = 0; i < NUM_STELLE; i++)
         stelle.setPixelColor(i, stelle.Color(70, 50, 27));
       stelle.show();
-      Serial.println(F("TEST 13/34 - TUTTE LE 50 STELLE"));
+      Serial.println(F("TEST 13/34 - TUTTE LE STELLE"));
       break;
     case 13:
       casette.clear();
@@ -3052,9 +3053,9 @@ const char INI_PREDEFINITO[] PROGMEM =
   ";   [SEZIONE]            inizio di una sezione\n"
   ";   chiave = valore      un parametro per riga\n"
   ";   ; oppure #           da qui a fine riga e' un commento\n"
-  ";   Maiuscole e minuscole sono indifferenti. Massimo 127 caratteri per riga.\n"
+  ";   Maiuscole e minuscole sono indifferenti. Massimo 126 caratteri per riga.\n"
   ";   Numeri con decimali: usa il PUNTO (33.33), perche' la virgola separa i campi.\n"
-  ";   Si/no: 1/0, si/no, on/off, true/false.\n"
+  ";   Si/no: 1/0, si/no, on/off, true/false, acceso/spento.\n"
   ";   Colori: R, G, B con valori da 0 (spento) a 255 (massimo).\n"
   ";   Fasi: GIORNO, TRAMONTO, CREPUSCOLO, NOTTE, ALBA.\n"
   ";   \"% della fase\": 0 = inizio della fase, 50 = meta', 100 = fine della fase.\n"
@@ -3128,7 +3129,10 @@ const char INI_PREDEFINITO[] PROGMEM =
   "; RELE' - una riga = un evento:\n"
   ";   rele = RELE', ON|OFF, %\n"
   ";   RELE' = 1..16, Grp_GG_RR o un nome definito in [RELE]. Il rele' resta nello\n"
-  ";   stato raggiunto fino al suo evento successivo. Massimo 64 eventi in tutto.\n"
+  ";   stato raggiunto fino al suo evento successivo nello stesso ciclo: all'inizio\n"
+  ";   di ogni ciclo (GIORNO 0 %) i rele' ripartono spenti. Per tenerne uno acceso\n"
+  ";   anche a cavallo della fine del ciclo aggiungi \"rele = N, ON, 0\" in [GIORNO].\n"
+  ";   Massimo 64 eventi in tutto.\n"
   ";\n"
   "; PER TROVARE I VALORI R, G, B: \"modalita' colore\". Premi TEST durante la\n"
   "; schermata iniziale \"by Vanni\" (3 s). AVANTI sceglie la striscia (bianca), START\n"
@@ -3254,7 +3258,7 @@ const char INI_PREDEFINITO[] PROGMEM =
   "abilitato = 0\n"
   "ssid =                ; nome della rete WiFi di casa (massimo 32 caratteri)\n"
   "password =            ; password della rete: 8..63 caratteri, vuota = rete aperta\n"
-  "nome = presepe        ; nome in rete: http://presepe.local (lettere, numeri e -), vale per 1 e 2\n"
+  "nome = presepe        ; nome in rete: http://presepe.local (lettere, numeri e -), vale per 1, 2 e 3\n"
   "\n"
   "[ACCESS_POINT]\n"
   "; Rete creata dalla centralina quando [WIFI] abilitato = 2 (oppure 3 e la rete di\n"
@@ -3268,7 +3272,7 @@ const char INI_PREDEFINITO[] PROGMEM =
   "canale = 6            ; canale WiFi 1..13: cambialo se ci sono molte reti vicine sullo stesso\n"
   "nascosta = 0          ; 1 = la rete non compare nell'elenco: va aggiunta a mano sul telefono\n"
   "max_client = 4        ; quanti telefoni/computer insieme (1..8)\n"
-  "ip = 192.168.4.1      ; indirizzo della centralina; rete /24 (i telefoni ricevono .2, .3, ...)\n"
+  "ip = 192.168.4.1      ; indirizzo della centralina, ultimo numero 1..55; i telefoni ricevono da .100 a .200\n"
   "portale = 0           ; 1 = qualsiasi indirizzo scritto nel browser porta alla pagina del presepe,\n"
   "                      ;     e molti telefoni la aprono da soli appena collegati (\"Accedi alla rete\")\n"
   "attesa = 60           ; solo con abilitato = 3: secondi di tentativi sulla rete di casa (10..600)\n"

@@ -217,7 +217,7 @@ function show() {
     d.innerHTML = `<b>${s.n}</b><span class="c" style="background:rgb(${c})"></span><code>${c.join(", ")}</code>`;
     $("swatches").appendChild(d);
   });
-  $("sd").textContent = `microSD: ${SD[st.sd] || "?"}` + (st.err ? ` · ${st.err} righe ignorate (prima ${st.riga === 65535 ? "controllo fasi" : "riga " + st.riga})` : "");
+  $("sd").textContent = `microSD: ${SD[st.sd] || "?"}` + (st.err ? ` · ${st.err} righe ignorate (prima ${st.riga === 65535 ? "valori incoerenti" : "riga " + st.riga})` : "");
   if (st.modo !== modo) {
     if (st.modo === 2 && modo !== 2) { pixels = [[], []]; sstate.forEach(s => { s.rgb = [0, 0, 0]; }); drawPix(); syncStrip(); }
     modo = st.modo;

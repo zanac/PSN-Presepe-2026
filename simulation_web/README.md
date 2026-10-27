@@ -6,7 +6,7 @@ Open `index.html` in any modern browser (double-click it). No server and no inst
 
 ## What it shows
 
-- **Left:** the INI text. Edit or paste a file; the simulation updates as you type. Parse errors are listed under the text with the same messages the firmware prints on the serial monitor. *Ripristina il file predefinito* reloads the repo's `PRESEPE.INI`; *Copia il file* copies the text, ready for the microSD.
+- **Left:** the INI text. Edit or paste a file; the simulation updates as you type. Parse errors are listed under the text, one per bad line, by the same rules the firmware uses (the firmware itself only reports how many there are and the first bad line). *Ripristina il file predefinito* reloads the repo's `PRESEPE.INI`; *Copia il file* copies the text, ready for the microSD.
 - **Right:** three panels, TRAMONTO (left), CIELO (centre), ALBA (right), with their current RGB values; the name of the current phase and the position in the cycle.
 - **Cycle line:** one band per strip (top to bottom: TRAMONTO, CIELO, ALBA), the tappe as white ticks, the star level at the bottom. Click or drag on it to jump to any point of the cycle.
 - **Under the line:** star level, CASETTE on/off, the 16 relays.
@@ -18,7 +18,7 @@ The text you type is kept in the browser's local storage, so it survives a page 
 
 ## How faithful it is
 
-The JavaScript re-implements the firmware's pure-logic part (the CONFIG block of `PSN-Presepe.ino`, release 039): the parser and its error rules, the defaults, phase positions, the tappe engine (`morbida` smoothstep and `lineare`, truncating interpolation, wrap-around across the cycle end), stars, casette window and relay schedule.
+The JavaScript re-implements the firmware's pure-logic part (the CONFIG block of `PSN-Presepe.ino`, release 039): the parser and its error rules (including the final checks: phase order, potentiometer range, star brightness and twinkle limits), the defaults, phase positions, the tappe engine (`morbida` smoothstep and `lineare`, truncating interpolation, wrap-around across the cycle end), stars, casette window and relay schedule.
 
 It is a model, not the firmware: when the firmware logic changes, update `simulator.template.html` too.
 
@@ -32,9 +32,9 @@ A screen is not an LED strip. Real strips are more saturated and low values look
 | `simulator.template.html` | source of the page, with an `__INI__` placeholder for the default file |
 | `build_simulator.py` | rebuilds `index.html` from the template and `firmware/PSN-Presepe/PRESEPE.INI` |
 
-After every change to `firmware/PSN-Presepe/PRESEPE.INI` or to the template, rebuild (after a change to `PRESEPE.INI`, also run `python3 firmware/tools/embed_ini.py`, which updates the copy inside the firmware):
+After every change to `firmware/PSN-Presepe/PRESEPE.INI` or to the template, rebuild. After a change to the template also run `python3 firmware/tools/build_web.py` (the ESP pages and the demo use it); after a change to `PRESEPE.INI` run both that and `python3 firmware/tools/embed_ini.py` (the copy inside the firmware). `firmware/tools/run_tests.sh` checks all of them with `--check`:
 
 ```sh
 python3 simulation_web/build_simulator.py
-# options: --ini PATH  --template PATH  --out PATH
+# options: --ini PATH  --template PATH  --out PATH  --check
 ```

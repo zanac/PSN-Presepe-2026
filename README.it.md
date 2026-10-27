@@ -308,7 +308,7 @@ Librerie: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (con Adafruit BusIO)
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Occupazione: 88,1 kB di flash (34 %, di cui 15,2 kB sono il `PRESEPE.INI` predefinito incorporato), 4,8 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
+Occupazione: 88,4 kB di flash (34 %, di cui 15,4 kB sono il `PRESEPE.INI` predefinito incorporato), 4,8 kB di RAM statica. Restano circa 3,4 kB per heap e stack; il buffer dell'OLED (1 kB) e quelli dei LED (3 byte per pixel) sono allocati in esecuzione, dopo di che restano liberi circa 2 kB.
 
 ### Compilazione
 
@@ -319,6 +319,7 @@ Occupazione: 88,1 kB di flash (34 %, di cui 15,2 kB sono il `PRESEPE.INI` predef
   arduino-cli core install arduino:avr
   arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
   firmware/tools/fw_compile.sh                       # -> firmware/PSN-Presepe/build/PSN-Presepe.ino.hex
+  firmware/tools/esp_compile.sh                      # firmware dell'ESP8266 (serve il pacchetto esp8266, vedi WiFi sotto)
   firmware/tools/run_tests.sh                        # lettura di PRESEPE.INI, modalità colore, collegamento WiFi, test end-to-end ESP <-> Mega
   ```
 
@@ -335,9 +336,9 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 
 **Avvio:**
 1. Carica i valori di default.
-2. Legge `/PRESEPE.INI` dalla microSD, oppure `/PRESEPE.TXT` se il primo manca. Se sulla scheda non c'è nessuno dei due, ci scrive il `PRESEPE.INI` di esempio (valori predefiniti e spiegazioni) e usa quello.
-3. Mostra sull'OLED la schermata iniziale "by Vanni" per 3 s, sempre (anche con `fastboot = 1`). Premendo TEST in questi 3 s si entra nella modalità colore.
-4. Mostra lo stato della SD (con `fastboot = 1` solo se `PRESEPE.INI` contiene errori):
+2. Legge `/PRESEPE.INI` dalla microSD, oppure `/PRESEPE.TXT` se il primo manca. Se un salvataggio dalla pagina web è stato interrotto da una mancanza di corrente mentre il file nuovo veniva copiato, prima completa quella copia. Se sulla scheda non c'è nessuno dei due file, ci scrive il `PRESEPE.INI` di esempio (valori predefiniti e spiegazioni) e usa quello.
+3. Mostra sull'OLED la schermata iniziale "by Vanni 039" per 3 s, sempre (anche con `fastboot = 1`). Premendo TEST in questi 3 s si entra nella modalità colore: l'autotest viene saltato e il ciclo parte quando si esce dalla modalità colore.
+4. Mostra lo stato della SD (con `fastboot = 1` solo se `PRESEPE.INI` contiene errori o è appena stato creato):
 
    | Messaggio OLED | Significato |
    |---|---|
@@ -347,10 +348,10 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
    | `MANCA PRESEPE.INI` | scheda presente, nessun file, e la scheda non si è potuta scrivere (protetta o piena) |
    | `SD ASSENTE` | nessuna scheda |
 
-5. Esegue l'autotest (circa 22 s) con melodia opzionale. Saltato con `fastboot = 1`.
+5. Esegue l'autotest (circa 22 s), con una melodia opzionale che suona durante l'autotest. Saltato con `fastboot = 1`.
 6. Avvia il ciclo dall'inizio del GIORNO, in marcia o in pausa secondo `partenza`.
 
-**Avvio rapido** (`[SISTEMA] fastboot`, predefinito **1** dalla release 038): mantiene solo i 3 s della schermata iniziale e salta la schermata della SD (tranne se il file ha errori), l'autotest e la melodia, così la scena parte subito. Con `fastboot = 0` l'avvio è completo, e `autotest_avvio` e `melodia_avvio` decidono se eseguire autotest e melodia.
+**Avvio rapido** (`[SISTEMA] fastboot`, predefinito **1** dalla release 038): mantiene solo i 3 s della schermata iniziale e salta la schermata della SD (tranne se il file ha errori), l'autotest e la melodia, così la scena parte subito. Con `fastboot = 0` l'avvio è completo, e `autotest_avvio` e `melodia_avvio` decidono se eseguire autotest e melodia (la melodia suona solo durante l'autotest, quindi con `autotest_avvio = 0` `melodia_avvio` non ha effetto).
 
 **Pulsanti:**
 
@@ -358,7 +359,7 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 |---|---|
 | **START/STOP** | Pausa o ripresa; riparte esattamente da dove si era fermato. In modalità TEST, esce dal TEST. |
 | **AVANTI (NEXT)** | Salta all'inizio della fase successiva. |
-| **TEST** | Entra in modalità TEST, poi scorre 34 prove (con `[WIFI] abilitato` 1, 2 o 3 la prima schermata mostra l'indirizzo IP, oppure `non collegato`; in modo access point anche il nome della rete): ogni colore di ogni striscia, colori di stelle e casette, tutto insieme, poi i relè 1–16 uno alla volta, con il loro nome se definito. Durante il TEST il tempo del ciclo è fermo. |
+| **TEST** | Entra in modalità TEST, poi scorre 34 prove (con `[WIFI] abilitato` 1, 2 o 3 la prima schermata mostra lo stato del WiFi: indirizzo IP e `<nome>.local`, in modo access point anche il nome della rete; `non collegato` con 1, `cerco la rete...` con 3 mentre sta ancora provando, `ESP non risponde` in modo access point quando l'ESP8266 non risponde): ogni colore di ogni striscia, colori di stelle e casette, tutto insieme, poi i relè 1–16 uno alla volta, con il loro nome se definito. Durante il TEST il tempo del ciclo è fermo. |
 | **Potenziometro** | Sceglie una delle tre durate del ciclo; la modifica vale quando la manopola si ferma. |
 
 **Monitor seriale** (115200 baud): all'avvio stampa tutta la configurazione in uso, compresi tutti gli eventi dei relè, poi una riga di stato periodica (`debug_ms`).
@@ -390,13 +391,13 @@ Lo stesso firmware e la stessa scheda Rev D funzionano anche con una scheda **"M
 Con `abilitato = 1` l'ESP8266 si collega alla rete WPA/WPA2 indicata in `[WIFI]`; con `abilitato = 2` invece crea una sua rete (access point, vedi sotto); con `abilitato = 3` prova prima la rete di casa e apre l'access point se non si collega. In tutti i casi offre due pagine, protette da utente e password di `[AUTENTICAZIONE]`:
 
 - **`http://presepe.local/`** (oppure `http://<IP>/`): il pannello di controllo. Mostra la fase, il punto del ciclo e i colori delle strisce, e ha *Pausa / Avvia*, *Fase successiva*, *Entra in test* e *Modifica configurazione*. In test (dalla pagina, o con TEST sulla scheda) mostra:
-  - le tre strisce: scegli CIELO / TRAMONTO / ALBA, prendi un colore dal gradiente e regola la luminosità con la levetta; la striscia segue subito, e il colore compare come riga `cielo = %, R, G, B` pronta da copiare;
+  - le tre strisce: scegli TRAMONTO / CIELO / ALBA, prendi un colore dal gradiente e regola la luminosità con la levetta, oppure scrivi R, G, B (*Spegni* spegne la striscia); la striscia segue subito, e il colore compare come riga `cielo = %, R, G, B` pronta da copiare;
   - stelle o casette, un pulsante per ogni pixel (`numero` del file) per accenderli e spegnerli uno alla volta, più *Tutti accesi / Tutti spenti*;
   - i 16 relè con il loro nome, ON/OFF uno per uno;
-  - *Bip del buzzer* ed *Esci dal test* (il ciclo riprende).
-- **`http://presepe.local/config`**: `PRESEPE.INI` così com'è sulla scheda, nello stesso editor del [simulatore web](simulation_web/README.md), con l'anteprima del ciclo e l'elenco degli errori. *Salva sul presepe* scrive il file (il precedente resta come `PRESEPE.BAK`, *Ripristina il file precedente* li scambia); *Riavvia il presepe* fa ripartire il Mega, che rilegge la scheda. Prima di salvare l'editor chiede conferma se il file ha errori o spegne il WiFi. Se manca la corrente mentre il file viene scritto, la copia viene completata alla riaccensione successiva (`PRESEPE.NEW` e il file segnale `PRESEPE.CMT`).
+  - *Bip del buzzer* ed *Esci dal test* (il ciclo prosegue, in marcia o in pausa come era prima del test).
+- **`http://presepe.local/config`**: `PRESEPE.INI` così com'è sulla scheda, nello stesso editor del [simulatore web](simulation_web/README.md), con l'anteprima del ciclo e l'elenco degli errori. *Salva sul presepe* scrive il file (il precedente resta come `PRESEPE.BAK`, *Ripristina il file precedente* li scambia); *Riavvia il presepe* fa ripartire il Mega, che rilegge la scheda. Prima di salvare l'editor chiede conferma se il file ha errori o spegne il WiFi. Il file viene prima inviato tutto in `PRESEPE.NEW`; se il trasferimento si interrompe, resta il file vecchio. Se manca la corrente mentre `PRESEPE.NEW` viene copiato sopra il file vecchio, la copia viene completata alla riaccensione successiva (file segnale `PRESEPE.CMT`). L'editor invia al massimo 24000 caratteri.
 
-Il Mega resta il padrone di tutto: l'ESP8266 fa solo da ponte tra la rete e la `Serial3` del Mega (D14/D15, non usati dalla scheda). Se la rete non c'è o la password è sbagliata la scheda parte e funziona normalmente; la schermata di TEST mostra `non collegato` e l'ESP continua a provare a collegarsi.
+Il Mega resta il padrone di tutto: l'ESP8266 fa solo da ponte tra la rete e la `Serial3` del Mega (D14/D15, non usati dalla scheda). Se la rete non c'è o la password è sbagliata la scheda parte e funziona normalmente; la schermata di TEST mostra `non collegato` (`cerco la rete...` con `abilitato = 3`) e l'ESP continua a provare a collegarsi.
 
 **DIP switch** (sulla scheda WeMos, sotto lo shield una volta montata: impostali prima di innestarla, con il cavo USB scollegato):
 
@@ -410,7 +411,7 @@ Il Mega resta il padrone di tutto: l'ESP8266 fa solo da ponte tra la rete e la `
 Il selettore della seriale accanto ai DIP deve stare su **RXD3 / TXD3**. Tutti gli altri DIP su OFF.
 
 **Prima installazione:**
-1. DIP 3, 4 su ON (gli altri OFF). Carica il firmware del Mega come sopra ([Compilazione](#compilazione) o HEX compilato), scheda *Arduino Mega or Mega 2560*.
+1. DIP 3, 4 su ON (gli altri OFF). Carica il firmware del Mega come sopra ([Compilazione](#compilazione) o [HEX già compilato](#caricare-lhex-già-compilato)), scheda *Arduino Mega or Mega 2560*.
 2. Scollega l'USB. DIP 5, 6, 7 su ON (gli altri OFF). Nell'IDE Arduino aggiungi `https://arduino.esp8266.com/stable/package_esp8266com_index.json` in *Impostazioni → URL aggiuntive per il Gestore schede*, installa il pacchetto **esp8266** (3.1.x), apri `firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino`, scegli *Generic ESP8266 Module*, *Flash Size: 4MB (FS:1MB OTA:~1019KB)*, *Upload Speed: 115200*, poi Carica. Senza IDE: `esptool.py --port PORTA write_flash 0x0 firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino.bin`.
 3. Scollega l'USB. DIP 1, 2, 3, 4 su ON (gli altri OFF), selettore su RXD3 / TXD3. Monta la scheda sullo shield.
 4. Sulla microSD, in `PRESEPE.INI`: `[WIFI] abilitato = 1`, `ssid`, `password` (oppure `abilitato = 2` per l'access point, che non richiede altro, o `abilitato = 3` per entrambi); cambia `[AUTENTICAZIONE] password`.
@@ -427,7 +428,7 @@ Gli aggiornamenti successivi dell'ESP si possono fare via WiFi (IDE Arduino → 
 | `canale` | `6` | canale WiFi 1–13; cambialo se molte reti vicine usano lo stesso |
 | `nascosta` | `0` | 1 = rete nascosta (non compare nell'elenco, va aggiunta a mano sul telefono) |
 | `max_client` | `4` | dispositivi collegati insieme, 1–8 |
-| `ip` | `192.168.4.1` | indirizzo della centralina; rete /24, i telefoni ricevono gli indirizzi successivi |
+| `ip` | `192.168.4.1` | indirizzo della centralina, rete /24, ultimo numero 1–55; i telefoni ricevono indirizzi da ultimo numero + 99 a + 199 (.100–.200 con il predefinito) |
 | `attesa` | `60` | solo con `abilitato = 3`: secondi di tentativi sulla rete di casa prima di aprire l'access point (10–600) |
 | `portale` | `0` | 1 = portale: qualsiasi indirizzo scritto nel browser porta al pannello, e molti telefoni lo aprono da soli appena collegati ("Accedi alla rete") |
 
@@ -437,29 +438,29 @@ Gli aggiornamenti successivi dell'ESP si possono fare via WiFi (IDE Arduino → 
 
 **Sicurezza.** Le pagine usano l'autenticazione HTTP Basic su HTTP semplice: la password viaggia in chiaro sulla rete di casa. In modo access point cambia anche la password della rete: chi la conosce arriva alla pagina di accesso. Usa la scheda solo su una rete fidata e non riutilizzare una password importante. Il monitor seriale avvisa se è ancora in uso la password predefinita.
 
-**Problemi:** l'access point non compare sul telefono → `nascosta = 1`, oppure dispositivo solo 5 GHz; se la connessione cade prova un altro `canale`. `non collegato` → controlla SSID e password (8–63 caratteri, rete a 2,4 GHz: l'ESP8266 non vede il 5 GHz). La pagina non si apre per nome → alcuni Android non risolvono `.local`, usa l'IP. La schermata di TEST resta su `non collegato` e il monitor seriale non stampa mai `WiFi: IP` → DIP 1, 2 o selettore RXD3, oppure il firmware dell'ESP non è stato caricato.
+**Problemi:** l'access point non compare sul telefono → `nascosta = 1`, oppure dispositivo solo 5 GHz; se la connessione cade prova un altro `canale`. `non collegato` → controlla SSID e password (8–63 caratteri, rete a 2,4 GHz: l'ESP8266 non vede il 5 GHz). La pagina non si apre per nome → alcuni Android non risolvono `.local`, usa l'IP. Per controllare il collegamento tra Mega ed ESP8266 indipendentemente dalla rete, metti per un momento `abilitato = 2`: se la schermata di TEST mostra `ESP non risponde` invece di un indirizzo, controlla DIP 1, 2, il selettore RXD3, oppure il firmware dell'ESP (non caricato).
 
 ## 10. Configurazione da microSD (PRESEPE.INI)
 
 Copia [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) nella **radice** di una microSD o microSDHC (2–32 GB, FAT16/FAT32), oppure inserisci semplicemente una scheda vuota: all'accensione il firmware ci scrive lo stesso file (con alcune righe iniziali che lo spiegano e i ritorni a capo CR LF di Windows), pronto da modificare sul PC. Le schede da 64 GB in su escono formattate exFAT, che la libreria SD di Arduino non legge: riformattale prima in FAT32.
 
-La scheda viene letta all'accensione, e di nuovo dopo *Riavvia il presepe* dalla pagina web ([WiFi](#wifi-scheda-mega--wifi-r3)). Se `PRESEPE.INI` manca, il firmware cerca `PRESEPE.TXT` con lo stesso contenuto (comodo per Wokwi, o se Windows ha salvato il file come `.txt`). Il file di esempio contiene esattamente i valori di default, e ogni chiave è spiegata in italiano nei commenti. Il firmware ne tiene una copia in flash (`INI_PREDEFINITO`): dopo aver modificato `PRESEPE.INI` esegui `python3 firmware/tools/embed_ini.py` e `python3 firmware/tools/build_web.py` (la demo usa lo stesso file) (la CI controlla che la copia sia aggiornata).
+La scheda viene letta all'accensione, e di nuovo dopo *Riavvia il presepe* dalla pagina web ([WiFi](#wifi-scheda-mega--wifi-r3)). Se `PRESEPE.INI` manca, il firmware cerca `PRESEPE.TXT` con lo stesso contenuto (comodo per Wokwi, o se Windows ha salvato il file come `.txt`). Il file di esempio contiene esattamente i valori di default, e ogni chiave è spiegata in italiano nei commenti. Il firmware ne tiene una copia in flash (`INI_PREDEFINITO`): dopo aver modificato `PRESEPE.INI` esegui `python3 firmware/tools/embed_ini.py`, `python3 firmware/tools/build_web.py` (la demo usa lo stesso file) e `python3 simulation_web/build_simulator.py`; `run_tests.sh` (e quindi la CI) fallisce finché uno di questi non è aggiornato.
 
 | Sezione | Chiavi |
 |---|---|
 | `[CICLO]` | `durata1..3` (s, 10–86400), `pot_min`, `pot_max`, `pot_invertito`, `partenza = marcia / pausa` |
-| `[FASI]` | % di inizio di `tramonto`, `crepuscolo`, `notte`, `alba` (devono essere strettamente crescenti) |
-| `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 caratteri), `forza1..16 = auto / on / off` |
+| `[FASI]` | % di inizio di `tramonto`, `crepuscolo`, `notte`, `alba` (1–99, devono essere strettamente crescenti) |
+| `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 caratteri, senza virgole; definiscili prima degli eventi che li usano), `forza1..16 = auto / on / off` |
 | `[GIORNO]`, `[TRAMONTO]`, `[CREPUSCOLO]`, `[NOTTE]`, `[ALBA]` | cosa succede in quella fase: `cielo` / `tramonto` / `alba = %, R, G, B [, morbida / lineare]` (colori delle strisce, fino a 20 tappe per striscia) e `rele = RELÈ, ON/OFF, %` (fino a 64 eventi in tutto), vedi sotto |
 | `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tinta in %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = spente), `colore`, `accendi = FASE, %`, `spegni = FASE, %` (può scavalcare la fine del ciclo), `fuoco` (0–100), `dissolvenza_ms` |
 | `[SISTEMA]` | `fastboot` (predefinito 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (entrambi solo con `fastboot = 0`), `oled`, `debug_ms` |
-| `[WIFI]` | `abilitato` (predefinito 0; 1 = rete di casa, 2 o `ap` = access point, 3 o `auto` = rete di casa, access point se non si collega), `ssid` (≤ 32 caratteri), `password` (vuota = rete aperta, altrimenti 8–63 caratteri, WPA/WPA2), `nome` (nome in rete, predefinito `presepe` → `http://presepe.local`) |
+| `[WIFI]` | `abilitato` (predefinito 0; 1 = rete di casa, 2 o `ap` = access point, 3 o `auto` = rete di casa, access point se non si collega), `ssid` (≤ 32 caratteri), `password` (vuota = rete aperta, altrimenti 8–63 caratteri, WPA/WPA2), `nome` (nome in rete, fino a 24 tra lettere, cifre e `-`, non all'inizio; predefinito `presepe` → `http://presepe.local`) |
 | `[ACCESS_POINT]` | rete creata con `abilitato = 2` (o 3 senza rete di casa): `ssid` (predefinito `Presepe`), `password` (predefinita `presepe2026`), `canale` (1–13, predefinito 6), `nascosta` (0/1), `max_client` (1–8, predefinito 4), `ip` (predefinito `192.168.4.1`), `portale` (0/1), `attesa` (s, 10–600, predefinito 60, solo per 3); vedi [WiFi](#wifi-scheda-mega--wifi-r3) |
-| `[AUTENTICAZIONE]` | `utente` e `password` chiesti dalla pagina web (predefiniti `admin` / `presepe2026`; sono anche la password OTA dell'ESP8266) |
+| `[AUTENTICAZIONE]` | `utente` e `password` (1–32 caratteri ciascuno) chiesti dalla pagina web (predefiniti `admin` / `presepe2026`; sono anche la password OTA dell'ESP8266) |
 
-I valori di testo si possono scrivere tra virgolette doppie, così possono contenere `;`, `#` o spazi all'inizio e alla fine: `password = "la;mia#password"`. Le virgolette non fanno parte del valore.
+I valori di testo di `[WIFI]`, `[ACCESS_POINT]` e `[AUTENTICAZIONE]` si possono scrivere tra virgolette doppie, così possono contenere `;`, `#` o spazi all'inizio e alla fine: `password = "la;mia#password"`. Le virgolette non fanno parte del valore. Altrove (per esempio nei nomi dei relè) le virgolette sono caratteri normali. Le righe sono al massimo di 126 caratteri.
 
 ### Le sezioni di fase: colori delle strisce e relè
 
@@ -502,7 +503,7 @@ rele     = 3, ON, 30              ; relè 3 acceso al 30 % del tramonto
 
 Per aggiungere un colore intermedio, per esempio un passaggio rosso fra il picco arancio e il bianco tenue, basta una riga in mezzo: `tramonto = 60, 140, 30, 10`.
 
-**Relè.** Una riga è un evento: `rele = RELÈ, ON|OFF, %`. RELÈ è 1–16, `Grp_GG_RR` (relè = (GG − 1) × 4 + RR) o un nome definito in `[RELE]`. Un relè mantiene lo stato fino al suo evento successivo. La prima riga `rele` valida sostituisce tutta la tabella di eventi predefinita (predefinito: relè 3 acceso al 30 % del TRAMONTO, spento al 50 % della NOTTE). Fino a 64 eventi.
+**Relè.** Una riga è un evento: `rele = RELÈ, ON|OFF, %`. RELÈ è 1–16, `Grp_GG_RR` (relè = (GG − 1) × 4 + RR) o un nome definito in `[RELE]`. Un relè mantiene lo stato fino al suo evento successivo nello stesso ciclo; all'inizio di ogni ciclo (GIORNO 0 %) i relè non forzati con `forzaN` ripartono spenti. Per tenerne uno acceso a cavallo della fine del ciclo aggiungi `rele = N, ON, 0` in `[GIORNO]`. La prima riga `rele` valida sostituisce tutta la tabella di eventi predefinita (predefinito: relè 3 acceso al 30 % del TRAMONTO, spento al 50 % della NOTTE). Fino a 64 eventi.
 
 Esempio: il motorino del mulino sul relè 1 gira dal 10 % del GIORNO fino a quando arriva la notte.
 
@@ -517,11 +518,12 @@ rele = Mulino, ON, 10
 rele = Mulino, OFF, 0
 ```
 
-Il cielo predefinito è: caldo a inizio GIORNO, quasi bianco (80 % della strada) al 30 %, bianco pieno dal 45 % al 55 %, di nuovo quasi bianco al 70 %, caldo a fine GIORNO; nel TRAMONTO sbiadisce e si spegne, resta spento fino al 38 % dell'ALBA, poi si accende rapidamente a un minimo caldo e sale fino al colore caldo del giorno. Le strisce del tramonto e dell'alba si accendono solo nella loro fase.
+Il cielo predefinito è: caldo a fine ALBA e a inizio GIORNO, quasi bianco (80 % della strada) al 30 %, bianco pieno dal 45 % al 55 %, di nuovo quasi bianco al 70 %, caldo a fine GIORNO; nel TRAMONTO sbiadisce e si spegne, resta spento fino al 38 % dell'ALBA, poi si accende rapidamente a un minimo caldo e sale fino al colore caldo del giorno. Le strisce del tramonto e dell'alba si accendono solo nella loro fase.
 
 Gestione degli errori:
 - Una riga sbagliata viene saltata e contata, e quella chiave mantiene il valore di default.
-- Percentuali delle fasi non crescenti, o un intervallo del potenziometro inutilizzabile, tornano ai valori di default.
+- Percentuali delle fasi non crescenti, una corsa del potenziometro sotto 30 (`pot_max − pot_min`), `lum_min` maggiore di `lum_max` o `scintillio_min` maggiore di `scintillio_max` tornano ai valori di default e contano ciascuno come un errore; l'OLED mostra allora `valori incoerenti` al posto del numero di riga.
+- `attive` maggiore di `numero` viene ridotto a `numero` senza errore.
 
 ## 11. Regole di progetto del PCB e verifiche
 
@@ -597,14 +599,16 @@ Requisiti (versioni usate):
 | `rsvg-convert` | | immagini |
 | `zip` | | archivio dei Gerber |
 | arduino-cli | 1.1.1 | con arduino:avr |
-| compilatore C++11 | | test del parser |
+| compilatore C++14 | | test sul PC (`run_tests.sh`) |
+| Node.js | | facoltativo: controllo della sintassi degli script delle pagine in `run_tests.sh` |
 | Freerouting 2.2.4 + Java 25 | | solo per rifare lo sbroglio da zero |
 
 ```sh
 ./build.sh                    # tutto in ./out (PCB riprodotto da build/data/routing.ses + firmware)
 UPDATE_REPO=1 ./build.sh      # come sopra, poi aggiorna kicad/ manufacturing/ previews/ reports/ nel repo
 REROUTE=1 FREEROUTING_JAR=/percorso/freerouting-2.2.4.jar JAVA=/percorso/java ./build.sh   # sbroglio da zero
-SKIP_PCB=1 ./build.sh         # solo firmware
+SKIP_PCB=1 ./build.sh         # solo firmware del Mega (quello dell'ESP: firmware/tools/esp_compile.sh)
+SKIP_FIRMWARE=1 ./build.sh    # solo PCB
 ```
 
 Come funziona la catena del PCB (`build/scripts/pipeline.sh`):

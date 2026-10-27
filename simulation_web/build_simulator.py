@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Build simulation_web/index.html from the template and the default PRESEPE.INI.
 
-Usage: python3 simulation_web/build_simulator.py [--ini PATH] [--out PATH]
+Usage: python3 simulation_web/build_simulator.py [--ini PATH] [--template PATH] [--out PATH] [--check]
 Run it after every change to firmware/PSN-Presepe/PRESEPE.INI so the
 simulator's "Ripristina il file predefinito" button matches the repo.
+--check only compares: exit status 1 if the output is out of date (used by run_tests.sh / CI).
 """
 import argparse, json, pathlib
 
@@ -13,6 +14,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--ini", default=root / "firmware/PSN-Presepe/PRESEPE.INI")
 ap.add_argument("--template", default=here / "simulator.template.html")
 ap.add_argument("--out", default=here / "index.html")
+ap.add_argument("--check", action="store_true")
 a = ap.parse_args()
 
 ini = pathlib.Path(a.ini).read_text(encoding="utf-8")
@@ -26,5 +28,11 @@ page = ('<!doctype html>\n<html lang="it">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
         '<style>html,body{margin:0}[hidden]{display:none!important}</style>\n'
         '</head>\n<body>\n' + body + '\n</body>\n</html>\n')
-pathlib.Path(a.out).write_text(page, encoding="utf-8")
-print(f"wrote {a.out} ({len(page)} bytes) from {a.ini}")
+out = pathlib.Path(a.out)
+if a.check:
+    if not out.exists() or out.read_text(encoding="utf-8") != page:
+        raise SystemExit(f"{out} is out of date: run python3 simulation_web/build_simulator.py")
+    print("simulation_web/index.html up to date")
+else:
+    out.write_text(page, encoding="utf-8")
+    print(f"wrote {a.out} ({len(page)} bytes) from {a.ini}")

@@ -214,6 +214,7 @@ function testo(v, cap, minimo) {
 
 function parse(text) {
   const c = defaults(); const errors = []; let sez = "";
+  const chk = { pot_min: 0, pot_max: 1023, lum_min: 22, lum_max: 75, scintillio_min: 6400, scintillio_max: 12200 };
   const err = (n, line, msg) => errors.push({ n, line: line.trim(), msg });
   text.split(/\n/).forEach((raw, i) => {
     const n = i + 1; let line = raw.replace(/\r$/, "");
@@ -239,7 +240,7 @@ function parse(text) {
     if (sez === "CICLO") {
       const d = /^durata([123])$/.exec(kl);
       if (d) { const x = intIn(v, 10, 86400); if (x !== null) { c.durate[+d[1] - 1] = x; ok = true; } }
-      else if (kl === "pot_min" || kl === "pot_max") ok = intIn(v, 0, 1023) !== null;
+      else if (kl === "pot_min" || kl === "pot_max") { const x = intIn(v, 0, 1023); if (x !== null) { chk[kl] = x; ok = true; } }
       else if (kl === "pot_invertito") ok = bool(v) !== null;
       else if (kl === "partenza") ok = ci(v, "marcia") || ci(v, "pausa");
     } else if (sez === "FASI") {
@@ -256,7 +257,7 @@ function parse(text) {
       else if (kl === "pwm_invertito") ok = bool(v) !== null;
     } else if (sez === "STELLE") {
       const lim = { numero: [0,100], attive: [0,100], lum_min: [0,255], lum_max: [0,255], livello_notte: [0,255], scintillio_min: [500,60000], scintillio_max: [500,60000] }[kl];
-      if (lim) { const x = intIn(v, lim[0], lim[1]); if (x !== null) { ok = true; if (kl === "livello_notte") c.livelloNotte = x; if (kl === "numero") c.numStelle = x; if (kl === "attive") c.stelleAttive = x; } }
+      if (lim) { const x = intIn(v, lim[0], lim[1]); if (x !== null) { ok = true; chk[kl] = x; if (kl === "livello_notte") c.livelloNotte = x; if (kl === "numero") c.numStelle = x; if (kl === "attive") c.stelleAttive = x; } }
       else if (kl === "colore") ok = rgb(v, 100) !== null;
     } else if (sez === "CASETTE") {
       if (kl === "numero") { const x = intIn(v, 0, 100); if (x !== null) { c.numCasette = x; ok = true; } }
@@ -283,7 +284,7 @@ function parse(text) {
       else if (kl === "attesa") ok = intIn(v, 10, 600) !== null;
       else if (kl === "ip") {
         const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(v.trim()), x = m ? m.slice(1).map(Number) : null;
-        ok = !!x && x.every(n => n <= 255) && x[3] >= 1 && x[3] <= 254 && x[0] >= 1 && x[0] < 224 && x[0] !== 127;
+        ok = !!x && x.every(n => n <= 255) && x[3] >= 1 && x[3] <= 55 && x[0] >= 1 && x[0] < 224 && x[0] !== 127;
       }
     } else if (sez === "AUTENTICAZIONE") {
       if (kl === "utente" || kl === "password") ok = testo(v, 33, 1) !== null;
@@ -319,8 +320,13 @@ function parse(text) {
     }
     if (!ok) err(n, s, "chiave sconosciuta o valore non valido");
   });
+  // controlli finali come cfgValida() del firmware (errori senza numero di riga)
   const f = c.fasi;
   if (!(f[0] < f[1] && f[1] < f[2] && f[2] < f[3])) { c.fasi = [40, 50, 55, 85]; errors.push({ n: 0, line: "[FASI]", msg: "le fasi non sono crescenti: uso i valori predefiniti" }); }
+  if (chk.pot_max - chk.pot_min < 30) errors.push({ n: 0, line: "[CICLO]", msg: "pot_max - pot_min minore di 30: uso 0 e 1023" });
+  if (chk.lum_min > chk.lum_max) errors.push({ n: 0, line: "[STELLE]", msg: "lum_min maggiore di lum_max: uso i valori predefiniti" });
+  if (chk.scintillio_min > chk.scintillio_max) errors.push({ n: 0, line: "[STELLE]", msg: "scintillio_min maggiore di scintillio_max: uso i valori predefiniti" });
+  if (c.stelleAttive > c.numStelle) c.stelleAttive = c.numStelle;
   return { c, errors };
 }
 
@@ -518,7 +524,7 @@ async function dLoad() {
 async function dSave() {
   const { c: nc, errors } = parse(ta.value);
   if (!ta.value.trim()) { dStatus("Il file è vuoto: non salvato.", true); return; }
-  if (errors.length && !confirm(`Il file ha ${errors.length} righe con errori (prima: ${errors[0].n ? "riga " + errors[0].n : "controllo fasi"}).\nIl presepe le ignorerà e userà i valori predefiniti per quelle righe.\nSalvare comunque?`)) return;
+  if (errors.length && !confirm(`Il file ha ${errors.length} righe con errori (prima: ${errors[0].n ? "riga " + errors[0].n : "controllo dei valori"}).\nIl presepe le ignorerà e userà i valori predefiniti per quelle righe.\nSalvare comunque?`)) return;
   if (!nc.wifi && !confirm("Con questo file il Wi-Fi è spento ([WIFI] abilitato = 0 o sezione mancante).\nDopo il riavvio questa pagina non sarà più raggiungibile: per riaccenderlo bisognerà modificare la microSD dal computer.\nSalvare comunque?")) return;
   dBusy(true); dStatus("Salvataggio sulla microSD…");
   try { const j = await dPost("/api/ini", ta.value); dStatus(`Salvato in ${j.file}. La copia precedente è in PRESEPE.BAK. Premi «Riavvia il presepe» per usarlo.`); }

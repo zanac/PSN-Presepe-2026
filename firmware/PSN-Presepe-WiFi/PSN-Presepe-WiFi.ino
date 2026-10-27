@@ -222,7 +222,7 @@ String indirizzo() {
 bool autorizzato() {
   if (!configOk || !cfgApwd.length()) {
     server.send(503, "text/plain; charset=utf-8",
-                "Il presepe non ha ancora inviato la configurazione: [WIFI] abilitato = 1 nel PRESEPE.INI, "
+                "Il presepe non ha ancora inviato la configurazione: [WIFI] abilitato = 1, 2 o 3 nel PRESEPE.INI, "
                 "DIP 1 e 2 su ON, selettore su RXD3/TXD3.");
     return false;
   }

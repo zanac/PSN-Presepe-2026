@@ -308,7 +308,7 @@ Libraries: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (with Adafruit BusI
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Size: 88.1 kB flash (34 %, of which 15.2 kB is the embedded default `PRESEPE.INI`), 4.8 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
+Size: 88.4 kB flash (34 %, of which 15.4 kB is the embedded default `PRESEPE.INI`), 4.8 kB static RAM. That leaves about 3.4 kB for heap and stack; the OLED buffer (1 kB) and the LED buffers (3 bytes per pixel) are allocated at run time, after which about 2 kB stay free.
 
 ### Build
 
@@ -319,6 +319,7 @@ Size: 88.1 kB flash (34 %, of which 15.2 kB is the embedded default `PRESEPE.INI
   arduino-cli core install arduino:avr
   arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
   firmware/tools/fw_compile.sh                       # -> firmware/PSN-Presepe/build/PSN-Presepe.ino.hex
+  firmware/tools/esp_compile.sh                      # ESP8266 firmware (needs the esp8266 core, see WiFi below)
   firmware/tools/run_tests.sh                        # INI reader, colour mode, WiFi link, ESP <-> Mega end-to-end
   ```
 
@@ -335,9 +336,9 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
 
 **Boot:**
 1. Load the defaults.
-2. Read `/PRESEPE.INI` from the SD card, or `/PRESEPE.TXT` if the first is missing. If the card has neither, write the example `PRESEPE.INI` (defaults and explanations) to it and use that.
-3. Show the OLED splash "by Vanni" for 3 s, always (also with `fastboot = 1`). Pressing TEST during these 3 s enters the colour mode.
-4. Show the SD status screen (with `fastboot = 1`, only when `PRESEPE.INI` has errors):
+2. Read `/PRESEPE.INI` from the SD card, or `/PRESEPE.TXT` if the first is missing. If a save from the web page was interrupted by a power cut while the new file was being copied, finish that copy first. If the card has neither file, write the example `PRESEPE.INI` (defaults and explanations) to it and use that.
+3. Show the OLED splash "by Vanni 039" for 3 s, always (also with `fastboot = 1`). Pressing TEST during these 3 s enters the colour mode: the self-test is skipped and the cycle starts when you leave the colour mode.
+4. Show the SD status screen (with `fastboot = 1`, only when `PRESEPE.INI` has errors or has just been created):
 
    | OLED message | Meaning |
    |---|---|
@@ -347,10 +348,10 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
    | `MANCA PRESEPE.INI` | card present, no file, and the card could not be written (write-protected or full) |
    | `SD ASSENTE` | no card |
 
-5. Run the self-test (about 22 s), with an optional melody. Skipped with `fastboot = 1`.
+5. Run the self-test (about 22 s), with an optional melody played during it. Skipped with `fastboot = 1`.
 6. Start the cycle from the beginning of GIORNO, running or paused according to `partenza`.
 
-**Fast boot** (`[SISTEMA] fastboot`, default **1**, since release 038) keeps only the 3 s splash and skips the SD status screen (unless the file has errors), the self-test and the melody, so the scene starts immediately. Set `fastboot = 0` for the full start-up; `autotest_avvio` and `melodia_avvio` then decide whether the self-test and the melody run.
+**Fast boot** (`[SISTEMA] fastboot`, default **1**, since release 038) keeps only the 3 s splash and skips the SD status screen (unless the file has errors), the self-test and the melody, so the scene starts immediately. Set `fastboot = 0` for the full start-up; `autotest_avvio` and `melodia_avvio` then decide whether the self-test and the melody run (the melody plays only during the self-test, so `melodia_avvio` has no effect with `autotest_avvio = 0`).
 
 **Buttons:**
 
@@ -358,7 +359,7 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
 |---|---|
 | **START/STOP** | Pause or resume; resumes exactly where it stopped. In TEST mode it exits TEST. |
 | **NEXT** | Jump to the start of the next phase. |
-| **TEST** | Enter TEST mode, then step through 34 tests (with `[WIFI] abilitato` 1, 2 or 3 the first step shows the IP address, or `non collegato`; in access-point mode also the network name): each colour of each strip, star and house colours, everything together, then relays 1–16 one at a time, with their names if defined. The cycle time is frozen while in TEST. |
+| **TEST** | Enter TEST mode, then step through 34 tests (with `[WIFI] abilitato` 1, 2 or 3 the first step shows the WiFi state: the IP address and `<nome>.local`, in access-point mode also the network name; `non collegato` with 1, `cerco la rete...` with 3 while it is still trying, `ESP non risponde` in access-point mode when the ESP8266 does not answer): each colour of each strip, star and house colours, everything together, then relays 1–16 one at a time, with their names if defined. The cycle time is frozen while in TEST. |
 | **Potentiometer** | Selects one of the three cycle lengths; the change is applied once the knob settles. |
 
 **Serial monitor** (115200 baud): prints the whole active configuration at boot, including every relay event, followed by a periodic status line (`debug_ms`).
@@ -390,13 +391,13 @@ The same firmware and the same Rev D board also work with a **"Mega + WiFi R3"**
 With `abilitato = 1` the ESP8266 joins the WPA/WPA2 network named in `[WIFI]`; with `abilitato = 2` it creates its own network instead (access point, see below); with `abilitato = 3` it tries the home network first and opens the access point if that does not connect. Either way it serves two pages, both protected by the user and password of `[AUTENTICAZIONE]`:
 
 - **`http://presepe.local/`** (or `http://<IP>/`): the control panel. It shows the phase, the position in the cycle and the strip colours, and has *Pausa / Avvia*, *Fase successiva*, *Entra in test* and *Modifica configurazione*. In test (entered from the page, or with TEST on the board) it shows:
-  - the three strips: choose CIELO / TRAMONTO / ALBA, pick a colour on the gradient and set the brightness with the slider; the strip follows at once, and the colour is shown as a ready-to-copy `cielo = %, R, G, B` line;
+  - the three strips: choose TRAMONTO / CIELO / ALBA, pick a colour on the gradient and set the brightness with the slider, or type R, G, B (*Spegni* switches the strip off); the strip follows at once, and the colour is shown as a ready-to-copy `cielo = %, R, G, B` line;
   - the stars or houses, one button per pixel (`numero` of the file), to switch each one on or off, plus *Tutti accesi / Tutti spenti*;
   - the 16 relays with their names, ON/OFF each;
-  - *Bip del buzzer* and *Esci dal test* (the cycle resumes).
-- **`http://presepe.local/config`**: `PRESEPE.INI` as it is on the card, in the same editor as the [web simulator](simulation_web/README.md), with live preview of the cycle and the parser's error list. *Salva sul presepe* writes the file (the previous one is kept as `PRESEPE.BAK`, *Ripristina il file precedente* swaps them back); *Riavvia il presepe* restarts the Mega, which re-reads the card. The editor asks for confirmation before saving a file with errors or with WiFi switched off. If the power fails while the file is being written, the copy is completed at the next power-on (`PRESEPE.NEW` and the mark file `PRESEPE.CMT`).
+  - *Bip del buzzer* and *Esci dal test* (the cycle continues, running or paused as it was before the test).
+- **`http://presepe.local/config`**: `PRESEPE.INI` as it is on the card, in the same editor as the [web simulator](simulation_web/README.md), with live preview of the cycle and the parser's error list. *Salva sul presepe* writes the file (the previous one is kept as `PRESEPE.BAK`, *Ripristina il file precedente* swaps them back); *Riavvia il presepe* restarts the Mega, which re-reads the card. The editor asks for confirmation before saving a file with errors or with WiFi switched off. The file is first sent whole to `PRESEPE.NEW`; if the transfer breaks off, the old file stays. If the power fails while `PRESEPE.NEW` is being copied over the old file, the copy is completed at the next power-on (mark file `PRESEPE.CMT`). The editor sends at most 24000 characters.
 
-The Mega stays in charge of everything: the ESP8266 only bridges the network to the Mega's `Serial3` (D14/D15, not used by the board). If the network is missing or the password is wrong, the board starts and runs normally; the TEST screen then shows `non collegato`, and the ESP keeps trying to connect.
+The Mega stays in charge of everything: the ESP8266 only bridges the network to the Mega's `Serial3` (D14/D15, not used by the board). If the network is missing or the password is wrong, the board starts and runs normally; the TEST screen then shows `non collegato` (`cerco la rete...` with `abilitato = 3`), and the ESP keeps trying to connect.
 
 **DIP switches** (on the WeMos board, under the shield once mounted: set them before plugging the board in, with the USB cable unplugged):
 
@@ -427,7 +428,7 @@ Later ESP updates can go over WiFi (Arduino IDE → *Port* → network port `pre
 | `canale` | `6` | WiFi channel 1–13; change it when many networks nearby use the same one |
 | `nascosta` | `0` | 1 = hidden network (not listed, to be added by hand on the phone) |
 | `max_client` | `4` | devices connected at the same time, 1–8 |
-| `ip` | `192.168.4.1` | address of the board; /24 network, phones get the next addresses |
+| `ip` | `192.168.4.1` | address of the board, /24 network, last number 1–55; phones get addresses from last number + 99 to + 199 (.100–.200 with the default) |
 | `attesa` | `60` | only with `abilitato = 3`: seconds to try the home network before opening the access point (10–600) |
 | `portale` | `0` | 1 = captive portal: every name typed in the browser leads to the panel, and many phones open it by themselves when they join ("Sign in to network") |
 
@@ -437,29 +438,29 @@ Later ESP updates can go over WiFi (Arduino IDE → *Port* → network port `pre
 
 **Security.** The pages use HTTP Basic authentication over plain HTTP: the password travels unencrypted on the home network. In access-point mode change the network password too: anyone who knows it can reach the login page. Use the board only on a trusted network, and do not reuse an important password. The serial monitor warns when the default password is still in use.
 
-**Troubleshooting:** access point not listed on the phone → `nascosta = 1`, or a 5 GHz-only device; try another `canale` if the connection drops. `non collegato` → check SSID and password (8–63 characters, 2.4 GHz network; the ESP8266 does not see 5 GHz). Page does not open by name → some Android phones do not resolve `.local`, use the IP. The TEST screen stays on `non collegato` and the serial monitor never prints `WiFi: IP` → DIP 1, 2 or the RXD3 selector, or the ESP firmware was not flashed.
+**Troubleshooting:** access point not listed on the phone → `nascosta = 1`, or a 5 GHz-only device; try another `canale` if the connection drops. `non collegato` → check SSID and password (8–63 characters, 2.4 GHz network; the ESP8266 does not see 5 GHz). Page does not open by name → some Android phones do not resolve `.local`, use the IP. To check the link between Mega and ESP8266 independently of the network, set `abilitato = 2` for a moment: if the TEST screen shows `ESP non risponde` instead of an address, look at DIP 1, 2, the RXD3 selector, or the ESP firmware (not flashed).
 
 ## 10. SD-card configuration (PRESEPE.INI)
 
 Copy [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) to the **root** of a microSD or microSDHC card (2–32 GB, FAT16/FAT32), or simply insert an empty card: at power-on the firmware writes the same file to it (with a short header saying so and Windows CR LF line ends), ready to be edited on a PC. Cards of 64 GB and more come formatted exFAT, which the Arduino SD library cannot read, so reformat them as FAT32 first.
 
-The card is read at power-on, and again after *Riavvia il presepe* on the web page ([WiFi](#wifi-mega--wifi-r3-board)). If `PRESEPE.INI` is missing, the firmware looks for `PRESEPE.TXT` with the same content (handy for Wokwi, or when Windows saved the file as `.txt`). The example file contains exactly the built-in defaults; every key is explained in Italian in its comments. The firmware carries a copy of it in flash (`INI_PREDEFINITO`): after editing `PRESEPE.INI` run `python3 firmware/tools/embed_ini.py` and `python3 firmware/tools/build_web.py` (the demo uses the same file) (CI checks that the copy is up to date).
+The card is read at power-on, and again after *Riavvia il presepe* on the web page ([WiFi](#wifi-mega--wifi-r3-board)). If `PRESEPE.INI` is missing, the firmware looks for `PRESEPE.TXT` with the same content (handy for Wokwi, or when Windows saved the file as `.txt`). The example file contains exactly the built-in defaults; every key is explained in Italian in its comments. The firmware carries a copy of it in flash (`INI_PREDEFINITO`): after editing `PRESEPE.INI` run `python3 firmware/tools/embed_ini.py`, `python3 firmware/tools/build_web.py` (the demo uses the same file) and `python3 simulation_web/build_simulator.py`; `run_tests.sh` (and so CI) fails while any of them is out of date.
 
 | Section | Keys |
 |---|---|
 | `[CICLO]` | `durata1..3` (s, 10–86400), `pot_min`, `pot_max`, `pot_invertito`, `partenza = marcia / pausa` |
-| `[FASI]` | start % of `tramonto`, `crepuscolo`, `notte`, `alba` (must be strictly increasing) |
-| `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 characters), `forza1..16 = auto / on / off` |
+| `[FASI]` | start % of `tramonto`, `crepuscolo`, `notte`, `alba` (1–99, must be strictly increasing) |
+| `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 characters, no commas; define them before the events that use them), `forza1..16 = auto / on / off` |
 | `[GIORNO]`, `[TRAMONTO]`, `[CREPUSCOLO]`, `[NOTTE]`, `[ALBA]` | what happens in that phase: `cielo` / `tramonto` / `alba = %, R, G, B [, morbida / lineare]` (strip colours, up to 20 tappe per strip) and `rele = RELAY, ON/OFF, %` (up to 64 events in all), see below |
 | `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tint %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = off), `colore`, `accendi = PHASE, %`, `spegni = PHASE, %` (may wrap past the end of the cycle), `fuoco` (0–100), `dissolvenza_ms` |
 | `[SISTEMA]` | `fastboot` (default 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (both only with `fastboot = 0`), `oled`, `debug_ms` |
-| `[WIFI]` | `abilitato` (default 0; 1 = home network, 2 or `ap` = access point, 3 or `auto` = home network, access point if it does not connect), `ssid` (≤ 32 characters), `password` (empty = open network, otherwise 8–63 characters, WPA/WPA2), `nome` (network name, default `presepe` → `http://presepe.local`) |
+| `[WIFI]` | `abilitato` (default 0; 1 = home network, 2 or `ap` = access point, 3 or `auto` = home network, access point if it does not connect), `ssid` (≤ 32 characters), `password` (empty = open network, otherwise 8–63 characters, WPA/WPA2), `nome` (network name, up to 24 letters, digits and `-`, not starting with `-`; default `presepe` → `http://presepe.local`) |
 | `[ACCESS_POINT]` | network created with `abilitato = 2` (or 3 without the home network): `ssid` (default `Presepe`), `password` (default `presepe2026`), `canale` (1–13, default 6), `nascosta` (0/1), `max_client` (1–8, default 4), `ip` (default `192.168.4.1`), `portale` (0/1), `attesa` (s, 10–600, default 60, only for 3); see [WiFi](#wifi-mega--wifi-r3-board) |
-| `[AUTENTICAZIONE]` | `utente` and `password` asked by the web page (default `admin` / `presepe2026`; also the OTA password of the ESP8266) |
+| `[AUTENTICAZIONE]` | `utente` and `password` (1–32 characters each) asked by the web page (default `admin` / `presepe2026`; also the OTA password of the ESP8266) |
 
-Text values may be written between double quotes, so that they can contain `;`, `#` or leading and trailing spaces: `password = "la;mia#password"`. The quotes are not part of the value.
+The text values of `[WIFI]`, `[ACCESS_POINT]` and `[AUTENTICAZIONE]` may be written between double quotes, so that they can contain `;`, `#` or leading and trailing spaces: `password = "la;mia#password"`. The quotes are not part of the value. Elsewhere (for example relay names) quotes are ordinary characters. Lines are at most 126 characters.
 
 ### The phase sections: strip colours and relays
 
@@ -502,7 +503,7 @@ rele     = 3, ON, 30              ; relay 3 on at 30 % of the sunset
 
 To add an intermediate colour, for example a red stage between the orange peak and the faint white, add a line in between: `tramonto = 60, 140, 30, 10`.
 
-**Relays.** One line is one event: `rele = RELAY, ON|OFF, %`. RELAY is 1–16, `Grp_GG_RR` (relay = (GG − 1) × 4 + RR) or a name defined in `[RELE]`. A relay keeps its state until its next event. The first valid `rele` line replaces the whole default event table (default: relay 3 on at 30 % of TRAMONTO, off at 50 % of NOTTE). Up to 64 events.
+**Relays.** One line is one event: `rele = RELAY, ON|OFF, %`. RELAY is 1–16, `Grp_GG_RR` (relay = (GG − 1) × 4 + RR) or a name defined in `[RELE]`. A relay keeps its state until its next event in the same cycle; at the start of every cycle (GIORNO 0 %) the relays not forced by `forzaN` start off again. To keep one on across the end of the cycle, add `rele = N, ON, 0` in `[GIORNO]`. The first valid `rele` line replaces the whole default event table (default: relay 3 on at 30 % of TRAMONTO, off at 50 % of NOTTE). Up to 64 events.
 
 Example: a mill motor on relay 1 runs from 10 % of GIORNO until night falls.
 
@@ -521,7 +522,8 @@ The default sky is: warm at dawn's end and at the start of GIORNO, nearly white 
 
 How errors are handled:
 - A bad line is skipped and counted, and that key keeps its default.
-- Non-increasing phase percentages or an unusable potentiometer range revert to the defaults.
+- Non-increasing phase percentages, a potentiometer range under 30 (`pot_max − pot_min`), `lum_min` above `lum_max` or `scintillio_min` above `scintillio_max` revert to the defaults and count as one error each; the OLED then shows `valori incoerenti` instead of a line number.
+- `attive` larger than `numero` is reduced to `numero` without an error.
 
 ## 11. PCB design rules and verification
 
@@ -597,14 +599,16 @@ Requirements (versions used):
 | `rsvg-convert` | | renders |
 | `zip` | | Gerber archive |
 | arduino-cli | 1.1.1 | with arduino:avr |
-| C++11 compiler | | parser tests |
+| C++14 compiler | | host tests (`run_tests.sh`) |
+| Node.js | | optional: syntax check of the page scripts in `run_tests.sh` |
 | Freerouting 2.2.4 + Java 25 | | only to route again from scratch |
 
 ```sh
 ./build.sh                    # everything into ./out (PCB replayed from build/data/routing.ses + firmware)
 UPDATE_REPO=1 ./build.sh      # same, then refresh kicad/ manufacturing/ previews/ reports/ in the repo
 REROUTE=1 FREEROUTING_JAR=/path/freerouting-2.2.4.jar JAVA=/path/java ./build.sh   # route again from scratch
-SKIP_PCB=1 ./build.sh         # firmware only
+SKIP_PCB=1 ./build.sh         # Mega firmware only (the ESP firmware: firmware/tools/esp_compile.sh)
+SKIP_FIRMWARE=1 ./build.sh    # PCB only
 ```
 
 How the PCB pipeline works (`build/scripts/pipeline.sh`):
