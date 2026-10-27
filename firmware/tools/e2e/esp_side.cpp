@@ -14,6 +14,8 @@ OTAMock ArduinoOTA;
 #include ESP_INO
 
 void megaAvvia(const char *ssid, const char *pwd);
+void megaAvviaIni(const char *testo);
+int megaErrori();
 std::string &megaFile(const char *n);
 bool megaHaFile(const char *n);
 uint16_t megaRele();
@@ -127,6 +129,30 @@ int main() {
   megaAvvia("AltraRete", "12345678");
   gira(50);
   CHECK(ESP.restarts == 1);
+
+  // 10b. access point ([WIFI] abilitato = 2) after the ESP restart: own network, IP to the Mega, portal
+  reteAvviata = false; configOk = false; servizi = false; modoAp = false; portale = false; ipInviato = "";
+  megaAvviaIni("[WIFI]\nabilitato = ap\nnome = sala\n[ACCESS_POINT]\nssid = \"Presepe Sala\"\npassword =\n"
+               "canale = 11\nnascosta = 1\nmax_client = 2\nip = 10.0.0.1\nportale = 1\n");
+  CHECK(megaErrori() == 0);
+  gira(3000);
+  CHECK(configOk && modoAp && WiFi.aps == 1 && WiFi.apSsid == "Presepe Sala" && WiFi.apPass == "(open)");
+  CHECK(WiFi.apCanale == 11 && WiFi.apNascosta == 1 && WiFi.apMax == 2 && WiFi.apIp.toString() == "10.0.0.1");
+  CHECK(portale && dns.attivo && dns.dominio == "*" && dns.ip.toString() == "10.0.0.1" && dns.richieste > 0);
+  CHECK(std::strcmp(megaIp(), "10.0.0.1") == 0 && servizi && WiFi.host == "sala");
+  WiFi.stazioni = 2;
+  r = server.chiama("/api/stato", HTTP_GET, "");
+  CHECK(r.body.find("\"ap\":true") != std::string::npos && r.body.find("\"ssid\":\"Presepe Sala\"") != std::string::npos &&
+        r.body.find("\"clienti\":2") != std::string::npos && r.body.find("\"ip\":\"10.0.0.1\"") != std::string::npos);
+  r = server.chiama("/generate_204", HTTP_GET, "");
+  CHECK(r.code == 302 && r.headers["Location"] == "http://10.0.0.1/");          // phones open the panel
+  // same configuration again (Mega restarted): no ESP restart; changed: clean restart
+  int r0 = ESP.restarts;
+  megaAvviaIni("[WIFI]\nabilitato = 2\nnome = sala\n[ACCESS_POINT]\nssid = \"Presepe Sala\"\npassword =\n"
+               "canale = 11\nnascosta = 1\nmax_client = 2\nip = 10.0.0.1\nportale = 1\n");
+  gira(100); CHECK(ESP.restarts == r0);
+  megaAvviaIni("[WIFI]\nabilitato = 2\nnome = sala\n[ACCESS_POINT]\nssid = \"Presepe Sala\"\ncanale = 3\n");
+  gira(100); CHECK(ESP.restarts == r0 + 1);
 
   // 11. incomplete configuration (a line lost while the ESP was starting): not applied
   {

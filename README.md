@@ -308,7 +308,7 @@ Libraries: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (with Adafruit BusI
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Size: 83.9 kB flash (33 %, of which 13.2 kB is the embedded default `PRESEPE.INI`), 4.6 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
+Size: 87.2 kB flash (34 %, of which 14.7 kB is the embedded default `PRESEPE.INI`), 4.8 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
 
 ### Build
 
@@ -358,7 +358,7 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
 |---|---|
 | **START/STOP** | Pause or resume; resumes exactly where it stopped. In TEST mode it exits TEST. |
 | **NEXT** | Jump to the start of the next phase. |
-| **TEST** | Enter TEST mode, then step through 34 tests (with `[WIFI] abilitato = 1` the first step shows the IP address, or `non collegato`): each colour of each strip, star and house colours, everything together, then relays 1–16 one at a time, with their names if defined. The cycle time is frozen while in TEST. |
+| **TEST** | Enter TEST mode, then step through 34 tests (with `[WIFI] abilitato = 1` or `2` the first step shows the IP address, or `non collegato`; in access-point mode also the network name): each colour of each strip, star and house colours, everything together, then relays 1–16 one at a time, with their names if defined. The cycle time is frozen while in TEST. |
 | **Potentiometer** | Selects one of the three cycle lengths; the change is applied once the knob settles. |
 
 **Serial monitor** (115200 baud): prints the whole active configuration at boot, including every relay event, followed by a periodic status line (`debug_ms`).
@@ -387,7 +387,7 @@ The same firmware and the same Rev D board also work with a **"Mega + WiFi R3"**
 
 **Try the pages without hardware:** [demo/](demo/README.md) runs both of them in the browser against a simulated board.
 
-With `abilitato = 1` the ESP8266 joins the WPA/WPA2 network named in `[WIFI]` and serves two pages, both protected by the user and password of `[AUTENTICAZIONE]`:
+With `abilitato = 1` the ESP8266 joins the WPA/WPA2 network named in `[WIFI]`; with `abilitato = 2` it creates its own network instead (access point, see below). Either way it serves two pages, both protected by the user and password of `[AUTENTICAZIONE]`:
 
 - **`http://presepe.local/`** (or `http://<IP>/`): the control panel. It shows the phase, the position in the cycle and the strip colours, and has *Pausa / Avvia*, *Fase successiva*, *Entra in test* and *Modifica configurazione*. In test (entered from the page, or with TEST on the board) it shows:
   - the three strips: choose CIELO / TRAMONTO / ALBA, pick a colour on the gradient and set the brightness with the slider; the strip follows at once, and the colour is shown as a ready-to-copy `cielo = %, R, G, B` line;
@@ -413,14 +413,28 @@ The serial selector switch next to the DIP switches must be on **RXD3 / TXD3**. 
 1. Set DIP 3, 4 ON (others OFF). Flash the Mega as above ([Build](#build) or [Flash the prebuilt HEX](#flash-the-prebuilt-hex)), board *Arduino Mega or Mega 2560*.
 2. Unplug USB. Set DIP 5, 6, 7 ON (others OFF). In the Arduino IDE add `https://arduino.esp8266.com/stable/package_esp8266com_index.json` under *Preferences → Additional boards manager URLs*, install the **esp8266** package (3.1.x), open `firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino`, choose *Generic ESP8266 Module*, *Flash Size: 4MB (FS:1MB OTA:~1019KB)*, *Upload Speed: 115200*, then Upload. Without the IDE: `esptool.py --port PORT write_flash 0x0 firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino.bin`.
 3. Unplug USB. Set DIP 1, 2, 3, 4 ON (others OFF), selector on RXD3 / TXD3. Mount the board on the shield.
-4. On the card, in `PRESEPE.INI`: `[WIFI] abilitato = 1`, `ssid`, `password`; change `[AUTENTICAZIONE] password`.
+4. On the card, in `PRESEPE.INI`: `[WIFI] abilitato = 1`, `ssid`, `password` (or `abilitato = 2` for the access point, which needs nothing else); change `[AUTENTICAZIONE] password`.
 5. Power on, press TEST: the first screen shows the IP address and `presepe.local`. Open it from a phone on the same network. TEST again continues with the normal tests.
 
 Later ESP updates can go over WiFi (Arduino IDE → *Port* → network port `presepe`, password of `[AUTENTICAZIONE]`), so the board does not need to come off the shield. After changing the pages (`firmware/web/pannello.html` or `simulation_web/simulator.template.html`) run `python3 firmware/tools/build_web.py` (it also regenerates [demo/](demo/README.md)) and rebuild the ESP firmware.
 
-**Security.** The pages use HTTP Basic authentication over plain HTTP: the password travels unencrypted on the home network. Use the board only on a trusted network, and do not reuse an important password. The serial monitor warns when the default password is still in use.
+**Access point (`abilitato = 2`).** For places without a WiFi network (a church, a square, an exhibition). The ESP8266 creates the network described in `[ACCESS_POINT]`, ready to use as shipped: connect the phone to **Presepe** (password `presepe2026`) and open `http://192.168.4.1/`. The phone may warn that the network has no Internet: choose to stay connected. The TEST screen shows the network name and the address. Keys:
 
-**Troubleshooting:** `non collegato` → check SSID and password (8–63 characters, 2.4 GHz network; the ESP8266 does not see 5 GHz). Page does not open by name → some Android phones do not resolve `.local`, use the IP. The TEST screen stays on `non collegato` and the serial monitor never prints `WiFi: IP` → DIP 1, 2 or the RXD3 selector, or the ESP firmware was not flashed.
+| Key | Default | Meaning |
+|---|---|---|
+| `ssid` | `Presepe` | network name, 1–32 characters (quotes allowed) |
+| `password` | `presepe2026` | WPA2, 8–63 characters; empty = open network (not recommended) |
+| `canale` | `6` | WiFi channel 1–13; change it when many networks nearby use the same one |
+| `nascosta` | `0` | 1 = hidden network (not listed, to be added by hand on the phone) |
+| `max_client` | `4` | devices connected at the same time, 1–8 |
+| `ip` | `192.168.4.1` | address of the board; /24 network, phones get the next addresses |
+| `portale` | `0` | 1 = captive portal: every name typed in the browser leads to the panel, and many phones open it by themselves when they join ("Sign in to network") |
+
+`[WIFI] nome` still gives `http://<nome>.local` (on phones that support `.local`). Changing these keys and pressing *Riavvia il presepe* restarts the ESP with the new network: the phone must then join it again.
+
+**Security.** The pages use HTTP Basic authentication over plain HTTP: the password travels unencrypted on the home network. In access-point mode change the network password too: anyone who knows it can reach the login page. Use the board only on a trusted network, and do not reuse an important password. The serial monitor warns when the default password is still in use.
+
+**Troubleshooting:** access point not listed on the phone → `nascosta = 1`, or a 5 GHz-only device; try another `canale` if the connection drops. `non collegato` → check SSID and password (8–63 characters, 2.4 GHz network; the ESP8266 does not see 5 GHz). Page does not open by name → some Android phones do not resolve `.local`, use the IP. The TEST screen stays on `non collegato` and the serial monitor never prints `WiFi: IP` → DIP 1, 2 or the RXD3 selector, or the ESP firmware was not flashed.
 
 ## 10. SD-card configuration (PRESEPE.INI)
 
@@ -438,7 +452,8 @@ The card is read at power-on, and again after *Riavvia il presepe* on the web pa
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tint %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = off), `colore`, `accendi = PHASE, %`, `spegni = PHASE, %` (may wrap past the end of the cycle), `fuoco` (0–100), `dissolvenza_ms` |
 | `[SISTEMA]` | `fastboot` (default 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (both only with `fastboot = 0`), `oled`, `debug_ms` |
-| `[WIFI]` | `abilitato` (default 0), `ssid` (≤ 32 characters), `password` (empty = open network, otherwise 8–63 characters, WPA/WPA2), `nome` (network name, default `presepe` → `http://presepe.local`) |
+| `[WIFI]` | `abilitato` (default 0; 1 = home network, 2 or `ap` = access point), `ssid` (≤ 32 characters), `password` (empty = open network, otherwise 8–63 characters, WPA/WPA2), `nome` (network name, default `presepe` → `http://presepe.local`) |
+| `[ACCESS_POINT]` | network created with `abilitato = 2`: `ssid` (default `Presepe`), `password` (default `presepe2026`), `canale` (1–13, default 6), `nascosta` (0/1), `max_client` (1–8, default 4), `ip` (default `192.168.4.1`), `portale` (0/1); see [WiFi](#wifi-mega--wifi-r3-board) |
 | `[AUTENTICAZIONE]` | `utente` and `password` asked by the web page (default `admin` / `presepe2026`; also the OTA password of the ESP8266) |
 
 Text values may be written between double quotes, so that they can contain `;`, `#` or leading and trailing spaces: `password = "la;mia#password"`. The quotes are not part of the value.

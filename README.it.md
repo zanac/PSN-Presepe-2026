@@ -308,7 +308,7 @@ Librerie: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (con Adafruit BusIO)
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Occupazione: 83,9 kB di flash (33 %, di cui 13,2 kB sono il `PRESEPE.INI` predefinito incorporato), 4,6 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
+Occupazione: 87,2 kB di flash (34 %, di cui 14,7 kB sono il `PRESEPE.INI` predefinito incorporato), 4,8 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
 
 ### Compilazione
 
@@ -358,7 +358,7 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 |---|---|
 | **START/STOP** | Pausa o ripresa; riparte esattamente da dove si era fermato. In modalità TEST, esce dal TEST. |
 | **AVANTI (NEXT)** | Salta all'inizio della fase successiva. |
-| **TEST** | Entra in modalità TEST, poi scorre 34 prove (con `[WIFI] abilitato = 1` la prima schermata mostra l'indirizzo IP, oppure `non collegato`): ogni colore di ogni striscia, colori di stelle e casette, tutto insieme, poi i relè 1–16 uno alla volta, con il loro nome se definito. Durante il TEST il tempo del ciclo è fermo. |
+| **TEST** | Entra in modalità TEST, poi scorre 34 prove (con `[WIFI] abilitato = 1` o `2` la prima schermata mostra l'indirizzo IP, oppure `non collegato`; in modo access point anche il nome della rete): ogni colore di ogni striscia, colori di stelle e casette, tutto insieme, poi i relè 1–16 uno alla volta, con il loro nome se definito. Durante il TEST il tempo del ciclo è fermo. |
 | **Potenziometro** | Sceglie una delle tre durate del ciclo; la modifica vale quando la manopola si ferma. |
 
 **Monitor seriale** (115200 baud): all'avvio stampa tutta la configurazione in uso, compresi tutti gli eventi dei relè, poi una riga di stato periodica (`debug_ms`).
@@ -387,7 +387,7 @@ Lo stesso firmware e la stessa scheda Rev D funzionano anche con una scheda **"M
 
 **Prova le pagine senza hardware:** [demo/](demo/README.md) le fa girare nel browser con una scheda simulata.
 
-Con `abilitato = 1` l'ESP8266 si collega alla rete WPA/WPA2 indicata in `[WIFI]` e offre due pagine, entrambe protette da utente e password di `[AUTENTICAZIONE]`:
+Con `abilitato = 1` l'ESP8266 si collega alla rete WPA/WPA2 indicata in `[WIFI]`; con `abilitato = 2` invece crea una sua rete (access point, vedi sotto). In entrambi i casi offre due pagine, protette da utente e password di `[AUTENTICAZIONE]`:
 
 - **`http://presepe.local/`** (oppure `http://<IP>/`): il pannello di controllo. Mostra la fase, il punto del ciclo e i colori delle strisce, e ha *Pausa / Avvia*, *Fase successiva*, *Entra in test* e *Modifica configurazione*. In test (dalla pagina, o con TEST sulla scheda) mostra:
   - le tre strisce: scegli CIELO / TRAMONTO / ALBA, prendi un colore dal gradiente e regola la luminosità con la levetta; la striscia segue subito, e il colore compare come riga `cielo = %, R, G, B` pronta da copiare;
@@ -413,14 +413,28 @@ Il selettore della seriale accanto ai DIP deve stare su **RXD3 / TXD3**. Tutti g
 1. DIP 3, 4 su ON (gli altri OFF). Carica il firmware del Mega come sopra ([Compilazione](#compilazione) o HEX compilato), scheda *Arduino Mega or Mega 2560*.
 2. Scollega l'USB. DIP 5, 6, 7 su ON (gli altri OFF). Nell'IDE Arduino aggiungi `https://arduino.esp8266.com/stable/package_esp8266com_index.json` in *Impostazioni → URL aggiuntive per il Gestore schede*, installa il pacchetto **esp8266** (3.1.x), apri `firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino`, scegli *Generic ESP8266 Module*, *Flash Size: 4MB (FS:1MB OTA:~1019KB)*, *Upload Speed: 115200*, poi Carica. Senza IDE: `esptool.py --port PORTA write_flash 0x0 firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino.bin`.
 3. Scollega l'USB. DIP 1, 2, 3, 4 su ON (gli altri OFF), selettore su RXD3 / TXD3. Monta la scheda sullo shield.
-4. Sulla microSD, in `PRESEPE.INI`: `[WIFI] abilitato = 1`, `ssid`, `password`; cambia `[AUTENTICAZIONE] password`.
+4. Sulla microSD, in `PRESEPE.INI`: `[WIFI] abilitato = 1`, `ssid`, `password` (oppure `abilitato = 2` per l'access point, che non richiede altro); cambia `[AUTENTICAZIONE] password`.
 5. Accendi e premi TEST: la prima schermata mostra l'indirizzo IP e `presepe.local`. Aprilo da un telefono sulla stessa rete. Premendo ancora TEST si prosegue con le prove normali.
 
 Gli aggiornamenti successivi dell'ESP si possono fare via WiFi (IDE Arduino → *Porta* → porta di rete `presepe`, password di `[AUTENTICAZIONE]`), senza togliere la scheda dallo shield. Dopo aver modificato le pagine (`firmware/web/pannello.html` o `simulation_web/simulator.template.html`) esegui `python3 firmware/tools/build_web.py` (rigenera anche [demo/](demo/README.md)) e ricompila il firmware dell'ESP.
 
-**Sicurezza.** Le pagine usano l'autenticazione HTTP Basic su HTTP semplice: la password viaggia in chiaro sulla rete di casa. Usa la scheda solo su una rete fidata e non riutilizzare una password importante. Il monitor seriale avvisa se è ancora in uso la password predefinita.
+**Access point (`abilitato = 2`).** Per i posti senza rete WiFi (chiesa, piazza, mostra). L'ESP8266 crea la rete descritta in `[ACCESS_POINT]`, pronta all'uso così com'è: collega il telefono a **Presepe** (password `presepe2026`) e apri `http://192.168.4.1/`. Il telefono può avvisare che la rete non ha Internet: scegli di restare collegato. La schermata di TEST mostra nome della rete e indirizzo. Chiavi:
 
-**Problemi:** `non collegato` → controlla SSID e password (8–63 caratteri, rete a 2,4 GHz: l'ESP8266 non vede il 5 GHz). La pagina non si apre per nome → alcuni Android non risolvono `.local`, usa l'IP. La schermata di TEST resta su `non collegato` e il monitor seriale non stampa mai `WiFi: IP` → DIP 1, 2 o selettore RXD3, oppure il firmware dell'ESP non è stato caricato.
+| Chiave | Predefinito | Significato |
+|---|---|---|
+| `ssid` | `Presepe` | nome della rete, 1–32 caratteri (virgolette ammesse) |
+| `password` | `presepe2026` | WPA2, 8–63 caratteri; vuota = rete aperta (sconsigliato) |
+| `canale` | `6` | canale WiFi 1–13; cambialo se molte reti vicine usano lo stesso |
+| `nascosta` | `0` | 1 = rete nascosta (non compare nell'elenco, va aggiunta a mano sul telefono) |
+| `max_client` | `4` | dispositivi collegati insieme, 1–8 |
+| `ip` | `192.168.4.1` | indirizzo della centralina; rete /24, i telefoni ricevono gli indirizzi successivi |
+| `portale` | `0` | 1 = portale: qualsiasi indirizzo scritto nel browser porta al pannello, e molti telefoni lo aprono da soli appena collegati ("Accedi alla rete") |
+
+`[WIFI] nome` vale anche qui: `http://<nome>.local` (sui telefoni che supportano `.local`). Se cambi queste chiavi e premi *Riavvia il presepe*, l'ESP riparte con la nuova rete: il telefono va ricollegato.
+
+**Sicurezza.** Le pagine usano l'autenticazione HTTP Basic su HTTP semplice: la password viaggia in chiaro sulla rete di casa. In modo access point cambia anche la password della rete: chi la conosce arriva alla pagina di accesso. Usa la scheda solo su una rete fidata e non riutilizzare una password importante. Il monitor seriale avvisa se è ancora in uso la password predefinita.
+
+**Problemi:** l'access point non compare sul telefono → `nascosta = 1`, oppure dispositivo solo 5 GHz; se la connessione cade prova un altro `canale`. `non collegato` → controlla SSID e password (8–63 caratteri, rete a 2,4 GHz: l'ESP8266 non vede il 5 GHz). La pagina non si apre per nome → alcuni Android non risolvono `.local`, usa l'IP. La schermata di TEST resta su `non collegato` e il monitor seriale non stampa mai `WiFi: IP` → DIP 1, 2 o selettore RXD3, oppure il firmware dell'ESP non è stato caricato.
 
 ## 10. Configurazione da microSD (PRESEPE.INI)
 
@@ -438,7 +452,8 @@ La scheda viene letta all'accensione, e di nuovo dopo *Riavvia il presepe* dalla
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tinta in %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = spente), `colore`, `accendi = FASE, %`, `spegni = FASE, %` (può scavalcare la fine del ciclo), `fuoco` (0–100), `dissolvenza_ms` |
 | `[SISTEMA]` | `fastboot` (predefinito 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (entrambi solo con `fastboot = 0`), `oled`, `debug_ms` |
-| `[WIFI]` | `abilitato` (predefinito 0), `ssid` (≤ 32 caratteri), `password` (vuota = rete aperta, altrimenti 8–63 caratteri, WPA/WPA2), `nome` (nome in rete, predefinito `presepe` → `http://presepe.local`) |
+| `[WIFI]` | `abilitato` (predefinito 0; 1 = rete di casa, 2 o `ap` = access point), `ssid` (≤ 32 caratteri), `password` (vuota = rete aperta, altrimenti 8–63 caratteri, WPA/WPA2), `nome` (nome in rete, predefinito `presepe` → `http://presepe.local`) |
+| `[ACCESS_POINT]` | rete creata con `abilitato = 2`: `ssid` (predefinito `Presepe`), `password` (predefinita `presepe2026`), `canale` (1–13, predefinito 6), `nascosta` (0/1), `max_client` (1–8, predefinito 4), `ip` (predefinito `192.168.4.1`), `portale` (0/1); vedi [WiFi](#wifi-scheda-mega--wifi-r3) |
 | `[AUTENTICAZIONE]` | `utente` e `password` chiesti dalla pagina web (predefiniti `admin` / `presepe2026`; sono anche la password OTA dell'ESP8266) |
 
 I valori di testo si possono scrivere tra virgolette doppie, così possono contenere `;`, `#` o spazi all'inizio e alla fine: `password = "la;mia#password"`. Le virgolette non fanno parte del valore.

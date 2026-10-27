@@ -238,10 +238,15 @@ struct PresepeConfig {
   uint16_t beepHz, beepMs;
   uint32_t debugMs;
   // [WIFI] scheda Mega + WiFi (ESP8266 collegato alla Serial3)
-  uint8_t  wifiAbilitato;                 // 0 = Serial3 non usata: come un Mega senza WiFi
+  uint8_t  wifiAbilitato;                 // 0 = Serial3 non usata: come un Mega senza WiFi, 1 = rete di casa, 2 = access point
   char     wifiSsid[CFG_SSID_LEN];
   char     wifiPassword[CFG_WPWD_LEN];
   char     wifiNome[CFG_HOST_LEN];        // nome in rete: http://<nome>.local
+  // [ACCESS_POINT] rete creata dall'ESP8266 (abilitato = 2)
+  char     apSsid[CFG_SSID_LEN];
+  char     apPassword[CFG_WPWD_LEN];
+  uint8_t  apCanale, apNascosta, apMaxClient, apPortale;
+  uint8_t  apIp[4];
   // [AUTENTICAZIONE] utente e password della pagina web
   char     webUtente[CFG_UTENTE_LEN];
   char     webPassword[CFG_UTENTE_LEN];
@@ -405,6 +410,11 @@ void cfgDefault(PresepeConfig &c) {
   // [WIFI] spento: la scheda si comporta come un Arduino Mega senza WiFi.
   c.wifiAbilitato = 0;
   strcpy(c.wifiNome, "presepe");
+  // [ACCESS_POINT] pronto all'uso: rete "Presepe", password presepe2026, http://192.168.4.1
+  strcpy(c.apSsid, "Presepe");
+  strcpy(c.apPassword, "presepe2026");
+  c.apCanale = 6; c.apNascosta = 0; c.apMaxClient = 4; c.apPortale = 0;
+  c.apIp[0] = 192; c.apIp[1] = 168; c.apIp[2] = 4; c.apIp[3] = 1;
   // [AUTENTICAZIONE] della pagina web (da cambiare nel file).
   strcpy(c.webUtente, "admin");
   strcpy(c.webPassword, "presepe2026");
@@ -650,15 +660,19 @@ static bool leggiTesto(const char *v, char *dst, size_t cap, size_t minimo) {
   memcpy(dst, v, l); dst[l] = 0;
   return true;
 }
+static bool leggiPasswordWpa(const char *v, char *dst) {   // vuota (rete aperta) oppure 8..63 caratteri
+  char tmp[CFG_WPWD_LEN];
+  if (!leggiTesto(v, tmp, CFG_WPWD_LEN, 0)) return false;
+  if (tmp[0] && strlen(tmp) < 8) return false;
+  strcpy(dst, tmp); return true;
+}
 static bool sezWifi(PresepeConfig &c, const char *k, char *v) {
-  if (ugualeCI(k, "abilitato")) return leggiBool(v, c.wifiAbilitato);
-  if (ugualeCI(k, "ssid")) return leggiTesto(v, c.wifiSsid, CFG_SSID_LEN, 0);
-  if (ugualeCI(k, "password")) {
-    char tmp[CFG_WPWD_LEN];
-    if (!leggiTesto(v, tmp, CFG_WPWD_LEN, 0)) return false;
-    if (tmp[0] && strlen(tmp) < 8) return false;      // WPA/WPA2: 8..63 caratteri, oppure vuota
-    strcpy(c.wifiPassword, tmp); return true;
+  if (ugualeCI(k, "abilitato")) {             // 0/1 (anche si/no...), 2 oppure "ap" = access point
+    if (ugualeCI(v, "2") || ugualeCI(v, "ap")) { c.wifiAbilitato = 2; return true; }
+    return leggiBool(v, c.wifiAbilitato);
   }
+  if (ugualeCI(k, "ssid")) return leggiTesto(v, c.wifiSsid, CFG_SSID_LEN, 0);
+  if (ugualeCI(k, "password")) return leggiPasswordWpa(v, c.wifiPassword);
   if (ugualeCI(k, "nome")) {
     char tmp[CFG_HOST_LEN];
     if (!leggiTesto(v, tmp, CFG_HOST_LEN, 1) || tmp[0] == '-') return false;
@@ -667,6 +681,27 @@ static bool sezWifi(PresepeConfig &c, const char *k, char *v) {
       *p = (char)tolower((unsigned char)*p);
     }
     strcpy(c.wifiNome, tmp); return true;
+  }
+  return false;
+}
+static bool sezAccessPoint(PresepeConfig &c, const char *k, char *v) {
+  long n;
+  if (ugualeCI(k, "ssid")) return leggiTesto(v, c.apSsid, CFG_SSID_LEN, 1);
+  if (ugualeCI(k, "password")) return leggiPasswordWpa(v, c.apPassword);
+  if (ugualeCI(k, "canale")) { if (!leggiLong(v, n, 1, 13)) return false; c.apCanale = (uint8_t)n; return true; }
+  if (ugualeCI(k, "nascosta")) return leggiBool(v, c.apNascosta);
+  if (ugualeCI(k, "max_client")) { if (!leggiLong(v, n, 1, 8)) return false; c.apMaxClient = (uint8_t)n; return true; }
+  if (ugualeCI(k, "portale")) return leggiBool(v, c.apPortale);
+  if (ugualeCI(k, "ip")) {                    // a.b.c.d, rete /24: l'ultimo numero da 1 a 254
+    uint8_t x[4]; const char *s = v;
+    for (uint8_t i = 0; i < 4; i++) {
+      if (!isdigit((unsigned char)*s)) return false;
+      char *fine; long q = strtol(s, &fine, 10);
+      if (fine - s > 3 || q < 0 || q > 255 || (i < 3 ? *fine != '.' : *fine != 0)) return false;
+      x[i] = (uint8_t)q; s = fine + 1;
+    }
+    if (x[3] == 0 || x[3] == 255 || x[0] == 0 || x[0] >= 224 || x[0] == 127) return false;
+    memcpy(c.apIp, x, 4); return true;
   }
   return false;
 }
@@ -702,7 +737,7 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
           ugualeCI(n, "GIORNO") || ugualeCI(n, "TRAMONTO") || ugualeCI(n, "CREPUSCOLO") ||
           ugualeCI(n, "NOTTE") || ugualeCI(n, "ALBA") ||
           ugualeCI(n, "STELLE") || ugualeCI(n, "CASETTE") || ugualeCI(n, "SISTEMA") ||
-          ugualeCI(n, "WIFI") || ugualeCI(n, "AUTENTICAZIONE"))) { errore(c, numeroRiga); sezione[0] = 0; }
+          ugualeCI(n, "WIFI") || ugualeCI(n, "ACCESS_POINT") || ugualeCI(n, "AUTENTICAZIONE"))) { errore(c, numeroRiga); sezione[0] = 0; }
     return;
   }
   char *uguale = strchr(s, '=');
@@ -718,6 +753,7 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
   else if (ugualeCI(sezione, "CASETTE")) ok = sezCasette(c, k, v);
   else if (ugualeCI(sezione, "SISTEMA")) ok = sezSistema(c, k, v);
   else if (ugualeCI(sezione, "WIFI")) ok = sezWifi(c, k, v);
+  else if (ugualeCI(sezione, "ACCESS_POINT")) ok = sezAccessPoint(c, k, v);
   else if (ugualeCI(sezione, "AUTENTICAZIONE")) ok = sezAutenticazione(c, k, v);
   else {
     uint8_t fase;
@@ -1494,11 +1530,13 @@ void mostraOledTest() {
     return;
   }
   if (testMostraIP) {                // [WIFI] abilitato: passo con l'indirizzo
-    display.setCursor(0,16); display.print(F("WI-FI"));
-    display.setCursor(0,28); display.print(F("IP: ")); display.print(wifiIp);
-    display.setCursor(0,38);
+    bool ap = cfg.wifiAbilitato == 2;
+    display.setCursor(0,14); display.print(ap ? F("WI-FI ACCESS POINT") : F("WI-FI"));
+    if (ap) { display.setCursor(0,24); display.print(F("rete ")); display.print(cfg.apSsid); }
+    display.setCursor(0, ap ? 34 : 28); display.print(F("IP: ")); display.print(wifiIp);
+    display.setCursor(0, ap ? 43 : 38);
     if (strcmp(wifiIp, "none") != 0) { display.print(cfg.wifiNome); display.print(F(".local")); }
-    else display.print(F("non collegato"));
+    else display.print(ap ? F("ESP non risponde") : F("non collegato"));
     display.setCursor(0,52); display.print(F("TEST=avanti START=esci"));
     display.display();
     return;
@@ -1748,7 +1786,16 @@ void stampaConfig() {
   Serial.print(F("Casette: ")); Serial.print(cfg.numCasette); Serial.print(F(" pixel, accese da "));
   Serial.print(cfgNomeFase(cfg.accendiFase)); Serial.print(' '); Serial.print(cfg.accendiPct); Serial.print(F("% a "));
   Serial.print(cfgNomeFase(cfg.spegniFase)); Serial.print(' '); Serial.print(cfg.spegniPct); Serial.println('%');
-  if (cfg.wifiAbilitato) {
+  if (cfg.wifiAbilitato == 2) {
+    Serial.print(F("WiFi: access point, rete \"")); Serial.print(cfg.apSsid);
+    Serial.print(F("\"")); if (cfg.apNascosta) Serial.print(F(" (nascosta)"));
+    Serial.print(F(", canale ")); Serial.print(cfg.apCanale);
+    Serial.print(F(", pagina http://")); for (uint8_t i = 0; i < 4; i++) { if (i) Serial.print('.'); Serial.print(cfg.apIp[i]); }
+    Serial.print(F("/ o http://")); Serial.print(cfg.wifiNome); Serial.print(F(".local utente "));
+    Serial.println(cfg.webUtente);
+    if (!strcmp(cfg.apPassword, "presepe2026")) Serial.println(F("WiFi: ATTENZIONE password dell'access point ancora quella di default"));
+    if (!strcmp(cfg.webPassword, "presepe2026")) Serial.println(F("WiFi: ATTENZIONE password della pagina ancora quella di default"));
+  } else if (cfg.wifiAbilitato) {
     Serial.print(F("WiFi: abilitato, rete \"")); Serial.print(cfg.wifiSsid);
     Serial.print(F("\", pagina http://")); Serial.print(cfg.wifiNome); Serial.print(F(".local utente "));
     Serial.println(cfg.webUtente);
@@ -2520,7 +2567,7 @@ bool attesaSplash(unsigned long durataMs) {
 
 // ==== LINK WIFI BEGIN ====
 // =============================================================================
-// COLLEGAMENTO CON L'ESP8266 (scheda Mega + WiFi, [WIFI] abilitato = 1)
+// COLLEGAMENTO CON L'ESP8266 (scheda Mega + WiFi, [WIFI] abilitato = 1 o 2)
 // =============================================================================
 // Serial3 (D14 TX3 / D15 RX3), 115200 baud, una riga per messaggio.
 //   ESP -> Mega: "@COMANDO argomenti*HH" (somma di controllo, vedi lnkVerifica);
@@ -2530,7 +2577,8 @@ bool attesaSplash(unsigned long durataMs) {
 //                il Mega rimanda l'esito della prima volta senza ripetere il comando.
 //                W e C hanno il loro numero di pezzo. COMMIT e RESTORE rispondono
 //                subito "@ACK" (lavoro sulla SD in corso), poi "@OK"/"@ERR".
-//   Mega -> ESP: configurazione WiFi (@SSID @WPWD @USER @APWD @HOST @NREL @GO),
+//   Mega -> ESP: configurazione WiFi (@SSID @WPWD @USER @APWD @HOST @MODE @APSSID @APPWD
+//                @APOPT @APIP @NREL @GO),
 //                stato ogni secondo (@ST), contenuto del file (@L @C @END).
 // Con [WIFI] abilitato = 0 la Serial3 non viene nemmeno aperta.
 #define LNK_SERIAL Serial3
@@ -2623,6 +2671,15 @@ void lnkInviaConfig() {
   LNK_SERIAL.print(F("@USER ")); LNK_SERIAL.println(cfg.webUtente);
   LNK_SERIAL.print(F("@APWD ")); LNK_SERIAL.println(cfg.webPassword);
   LNK_SERIAL.print(F("@HOST ")); LNK_SERIAL.println(cfg.wifiNome);
+  LNK_SERIAL.print(F("@MODE ")); LNK_SERIAL.println(cfg.wifiAbilitato);
+  LNK_SERIAL.print(F("@APSSID ")); LNK_SERIAL.println(cfg.apSsid);
+  LNK_SERIAL.print(F("@APPWD ")); LNK_SERIAL.println(cfg.apPassword);
+  LNK_SERIAL.print(F("@APOPT ")); LNK_SERIAL.print(cfg.apCanale); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print(cfg.apNascosta); LNK_SERIAL.print(' '); LNK_SERIAL.print(cfg.apMaxClient); LNK_SERIAL.print(' ');
+  LNK_SERIAL.println(cfg.apPortale);
+  LNK_SERIAL.print(F("@APIP "));
+  for (uint8_t i = 0; i < 4; i++) { if (i) LNK_SERIAL.print('.'); LNK_SERIAL.print(cfg.apIp[i]); }
+  LNK_SERIAL.println();
   for (uint8_t i = 0; i < 16; i++) {
     LNK_SERIAL.print(F("@NREL ")); LNK_SERIAL.print(i + 1); LNK_SERIAL.print(' ');
     LNK_SERIAL.println(cfg.nome[i]);
@@ -3165,23 +3222,42 @@ const char INI_PREDEFINITO[] PROGMEM =
   "; sull'ESP8266 va caricato firmware/PSN-Presepe-WiFi, DIP switch 1-2 su ON e\n"
   "; selettore su RXD3/TXD3 (vedi README). Con un Arduino Mega normale lascia 0.\n"
   "; 0 = WiFi spento: la centralina si comporta esattamente come senza WiFi.\n"
-  "; 1 = all'avvio il Mega passa SSID e password all'ESP8266, che si collega alla\n"
-  ";     rete in sottofondo (il presepe parte comunque, anche se la rete non c'e').\n"
-  ";     Premendo TEST durante il ciclo, il primo passo mostra l'indirizzo IP\n"
-  ";     (\"none\" = non collegato). Pagina: http://<indirizzo IP>/ oppure\n"
+  "; 1 = RETE DI CASA: all'avvio il Mega passa SSID e password (qui sotto) all'ESP8266,\n"
+  ";     che si collega alla rete in sottofondo (il presepe parte comunque, anche se\n"
+  ";     la rete non c'e'). Premendo TEST durante il ciclo, il primo passo mostra\n"
+  ";     l'indirizzo IP (\"none\" = non collegato). Pagina: http://<indirizzo IP>/ oppure\n"
   ";     http://<nome>.local/ (iPhone, Mac, Windows; su alcuni Android serve l'IP).\n"
-  "; La rete deve essere WPA o WPA2 a 2,4 GHz (l'ESP8266 non vede i 5 GHz e il solo WPA3).\n"
+  ";     La rete deve essere WPA o WPA2 a 2,4 GHz (l'ESP8266 non vede i 5 GHz e il solo WPA3).\n"
+  "; 2 = ACCESS POINT: l'ESP8266 crea una sua rete WiFi (sezione [ACCESS_POINT]);\n"
+  ";     colleghi il telefono a quella rete e apri http://192.168.4.1/ . Serve dove\n"
+  ";     non c'e' una rete WiFi (presepe in chiesa, in piazza, a una mostra).\n"
+  ";     Con 2 le chiavi ssid e password di questa sezione non servono.\n"
   "; Se SSID o password contengono ; # oppure spazi all'inizio o alla fine, scrivili\n"
   "; tra virgolette:  password = \"la;mia#password\"   (le virgolette non sono comprese).\n"
   "abilitato = 0\n"
-  "ssid =                ; nome della rete WiFi (massimo 32 caratteri)\n"
+  "ssid =                ; nome della rete WiFi di casa (massimo 32 caratteri)\n"
   "password =            ; password della rete: 8..63 caratteri, vuota = rete aperta\n"
-  "nome = presepe        ; nome in rete: http://presepe.local (lettere, numeri e -)\n"
+  "nome = presepe        ; nome in rete: http://presepe.local (lettere, numeri e -), vale per 1 e 2\n"
+  "\n"
+  "[ACCESS_POINT]\n"
+  "; Rete creata dalla centralina quando [WIFI] abilitato = 2. Pronta all'uso cosi'\n"
+  "; com'e': sul telefono cerca la rete \"Presepe\", password presepe2026, poi apri\n"
+  "; http://192.168.4.1/ (utente e password di [AUTENTICAZIONE]).\n"
+  "; Premendo TEST durante il ciclo, il primo passo mostra nome della rete e indirizzo.\n"
+  "; Il telefono puo' avvisare \"rete senza Internet\": scegli di restare collegato.\n"
+  "ssid = Presepe        ; nome della rete (1..32 caratteri)\n"
+  "password = presepe2026 ; password WPA2: 8..63 caratteri; vuota = rete APERTA (sconsigliato)\n"
+  "canale = 6            ; canale WiFi 1..13: cambialo se ci sono molte reti vicine sullo stesso\n"
+  "nascosta = 0          ; 1 = la rete non compare nell'elenco: va aggiunta a mano sul telefono\n"
+  "max_client = 4        ; quanti telefoni/computer insieme (1..8)\n"
+  "ip = 192.168.4.1      ; indirizzo della centralina; rete /24 (i telefoni ricevono .2, .3, ...)\n"
+  "portale = 0           ; 1 = qualsiasi indirizzo scritto nel browser porta alla pagina del presepe,\n"
+  "                      ;     e molti telefoni la aprono da soli appena collegati (\"Accedi alla rete\")\n"
   "\n"
   "[AUTENTICAZIONE]\n"
   "; Utente e password chiesti dal browser per aprire la pagina del presepe\n"
   "; (anche per l'aggiornamento via WiFi del firmware dell'ESP8266).\n"
-  "; CAMBIALI: chi e' collegato alla tua rete WiFi potrebbe aprire la pagina.\n"
+  "; CAMBIALI: chi e' collegato alla tua rete WiFi (o all'access point) potrebbe aprire la pagina.\n"
   "; Viaggiano in chiaro sulla rete di casa: non usare una password importante.\n"
   "utente = admin\n"
   "password = presepe2026\n";

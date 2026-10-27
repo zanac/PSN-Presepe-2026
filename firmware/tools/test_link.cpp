@@ -192,13 +192,15 @@ int main() {
   lnkInizio();
   {
     std::vector<std::string> v = lines(Serial3.out);
-    CHECK(Serial3.begun && v.size() == 22 && pullup15 == 1);
+    CHECK(Serial3.begun && v.size() == 27 && pullup15 == 1);
     CHECK(v[0] == "@SSID Casa Rossi" && v[1] == "@WPWD ab;c#d=e f" && v[2] == "@USER admin");
     CHECK(v[3] == "@APWD presepe2026" && v[4] == "@HOST presepe");
-    CHECK(v[5] == "@NREL 1 Mulino" && v[6] == "@NREL 2 " && v[20] == "@NREL 16 " && v[21] == "@GO");
+    CHECK(v[5] == "@MODE 1" && v[6] == "@APSSID Presepe" && v[7] == "@APPWD presepe2026");
+    CHECK(v[8] == "@APOPT 6 0 4 0" && v[9] == "@APIP 192.168.4.1");
+    CHECK(v[10] == "@NREL 1 Mulino" && v[11] == "@NREL 2 " && v[25] == "@NREL 16 " && v[26] == "@GO");
   }
   // HELLO (ESP rebooted) -> configuration again; ESP boot noise and bad sums are ignored
-  CHECK(cmd("@HELLO").size() == 22);
+  CHECK(cmd("@HELLO").size() == 27);
   Serial3.out.clear(); sendRaw("\x7f\x13 ets Jan  8 2013,rst cause:2\n"); lnkTick(); CHECK(Serial3.out.empty());
   Serial3.out.clear(); sendRaw("@HELLO*00\n"); lnkTick(); CHECK(Serial3.out.empty());
   CHECK(lnkQuiet()); T += 200; CHECK(!lnkQuiet());                       // WS2811 paused while receiving

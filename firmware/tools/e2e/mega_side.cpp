@@ -116,6 +116,10 @@ void megaAvvia(const char *ssid, const char *pwd) {
   std::strcpy(cfg.wifiSsid, ssid); std::strcpy(cfg.wifiPassword, pwd); std::strcpy(cfg.nome[2], "Mulino");
   lnkInizio();
 }
+void megaAvviaIni(const char *testo) {             // the real parser reads the configuration
+  cfgDefault(cfg); cfgParseBuffer(cfg, testo); lnkInizio();
+}
+int megaErrori() { return cfg.errori; }
 std::string &megaFile(const char *n) { return disk[n]; }
 bool megaHaFile(const char *n) { return disk.count(n) != 0; }
 uint16_t megaRele() { return releStato; }

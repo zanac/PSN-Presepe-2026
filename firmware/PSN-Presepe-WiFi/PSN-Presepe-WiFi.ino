@@ -8,7 +8,9 @@
   1 e 2 sono su ON e il selettore e' su RXD3/TXD3.
 
   - SSID, password WiFi, nome in rete, utente e password della pagina arrivano
-    dal Mega, che li legge dalle sezioni [WIFI] e [AUTENTICAZIONE] di PRESEPE.INI.
+    dal Mega, che li legge dalle sezioni [WIFI], [ACCESS_POINT] e [AUTENTICAZIONE]
+    di PRESEPE.INI. [WIFI] abilitato = 1: si collega alla rete di casa; = 2: crea
+    una sua rete (access point, http://192.168.4.1/), con portale facoltativo.
   - Pagina "/"        : pannello con stato del ciclo, comandi e test da telefono.
   - Pagina "/config"  : file PRESEPE.INI con anteprima del ciclo; salva e riavvia.
   - http://<nome>.local (mDNS) e aggiornamento del firmware ESP via WiFi (ArduinoOTA,
@@ -27,18 +29,25 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
+#include <DNSServer.h>
 #include "pagine_web.h"
 
 #define VERSIONE "039"
 
 ESP8266WebServer server(80);
+DNSServer dns;                  // [ACCESS_POINT] portale = 1: ogni nome porta alla centralina
 
 // ------------------------------------------------------------------ configurazione dal Mega
 String cfgSsid, cfgWpwd, cfgUtente, cfgApwd, cfgHost = "presepe";   // in uso
 String nSsid, nWpwd, nUtente, nApwd, nHost;                          // in arrivo (applicati a @GO)
+// [WIFI] abilitato (1 rete di casa, 2 access point) e sezione [ACCESS_POINT]
+String cfgModo = "1", cfgApSsid, cfgApPwd, cfgApOpt, cfgApIp;       // in uso
+String nModo, nApSsid, nApPwd, nApOpt, nApIp;                        // in arrivo
+bool modoAp = false, portale = false;
 String nomiRele[16];
 bool configOk = false;          // ricevuto almeno un @GO completo
-uint8_t cfgCampi = 0;           // campi ricevuti dall'ultimo @SSID (1 SSID, 2 WPWD, 4 USER, 8 APWD, 16 HOST)
+uint16_t cfgCampi = 0;          // campi ricevuti dall'ultimo @SSID (bit 0..9: SSID WPWD USER APWD HOST MODE APSSID APPWD APOPT APIP)
+#define CAMPI_TUTTI 0x3FF
 uint16_t idComando = 1;         // numero dei comandi non ripetibili (RUN, NEXT, COMMIT, RESTORE)
 bool reteAvviata = false;       // WiFi.begin() eseguito
 bool servizi = false;           // mDNS e OTA avviati (dopo la prima connessione)
@@ -71,12 +80,39 @@ void scriviRiga(const String &l) {          // "@..." + "*HH\n"
   Serial.print(l); Serial.print('*'); Serial.print(h); Serial.print('\n');
 }
 
+// "6 0 4 1" -> canale, nascosta, max client, portale
+void opzioniAp(int &canale, int &nascosta, int &maxClient, int &port) {
+  int v[4] = { 6, 0, 4, 0 }, n = 0, p = 0;
+  while (n < 4 && p < (int)cfgApOpt.length()) {
+    int q = cfgApOpt.indexOf(' ', p); if (q < 0) q = cfgApOpt.length();
+    v[n++] = cfgApOpt.substring(p, q).toInt(); p = q + 1;
+  }
+  canale = (v[0] >= 1 && v[0] <= 13) ? v[0] : 6; nascosta = v[1] ? 1 : 0;
+  maxClient = (v[2] >= 1 && v[2] <= 8) ? v[2] : 4; port = v[3] ? 1 : 0;
+}
+
 void applicaConfig() {
-  bool rete = nSsid != cfgSsid || nWpwd != cfgWpwd || nHost != cfgHost || nApwd != cfgApwd;
+  bool rete = nSsid != cfgSsid || nWpwd != cfgWpwd || nHost != cfgHost || nApwd != cfgApwd ||
+              nModo != cfgModo || nApSsid != cfgApSsid || nApPwd != cfgApPwd || nApOpt != cfgApOpt || nApIp != cfgApIp;
   if (rete && reteAvviata) { delay(50); ESP.restart(); }   // cambio di rete/nome/password: ripartenza pulita
   cfgSsid = nSsid; cfgWpwd = nWpwd; cfgUtente = nUtente; cfgApwd = nApwd; cfgHost = nHost.length() ? nHost : "presepe";
+  cfgModo = nModo; cfgApSsid = nApSsid; cfgApPwd = nApPwd; cfgApOpt = nApOpt; cfgApIp = nApIp;
   configOk = true;
   ipInviato = "";                                          // il Mega puo' essere ripartito: rimanda l'IP
+  if (!reteAvviata && cfgModo == "2") {                    // access point: la rete la crea l'ESP
+    IPAddress ip;
+    if (!ip.fromString(cfgApIp)) ip = IPAddress(192, 168, 4, 1);
+    int canale, nascosta, maxClient, port;
+    opzioniAp(canale, nascosta, maxClient, port);
+    WiFi.persistent(false);
+    WiFi.mode(WIFI_AP);
+    WiFi.hostname(cfgHost);
+    WiFi.softAPConfig(ip, ip, IPAddress(255, 255, 255, 0));
+    WiFi.softAP(cfgApSsid.c_str(), cfgApPwd.length() ? cfgApPwd.c_str() : nullptr, canale, nascosta, maxClient);
+    modoAp = true;
+    if (port) { dns.setErrorReplyCode(DNSReplyCode::NoError); dns.start(53, "*", ip); portale = true; }
+    reteAvviata = true;
+  }
   if (!reteAvviata && cfgSsid.length()) {
     WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
@@ -105,13 +141,21 @@ void rigaDalMega(String l) {
   if (l.startsWith("@USER ")) { nUtente = l.substring(6); cfgCampi |= 4; return; }
   if (l.startsWith("@APWD ")) { nApwd = l.substring(6); cfgCampi |= 8; return; }
   if (l.startsWith("@HOST ")) { nHost = l.substring(6); cfgCampi |= 16; return; }
+  if (l.startsWith("@MODE ")) { nModo = l.substring(6); cfgCampi |= 32; return; }
+  if (l.startsWith("@APSSID ")) { nApSsid = l.substring(8); cfgCampi |= 64; return; }
+  if (l.startsWith("@APPWD ") || l == "@APPWD") { nApPwd = l.substring(7); cfgCampi |= 128; return; }
+  if (l.startsWith("@APOPT ")) { nApOpt = l.substring(7); cfgCampi |= 256; return; }
+  if (l.startsWith("@APIP ")) { nApIp = l.substring(6); cfgCampi |= 512; return; }
   if (l.startsWith("@NREL ")) {
     int sp = l.indexOf(' ', 6);
     int i = (sp < 0 ? l.substring(6) : l.substring(6, sp)).toInt();
     if (i >= 1 && i <= 16) nomiRele[i - 1] = sp < 0 ? "" : l.substring(sp + 1);
     return;
   }
-  if (l == "@GO") { if (cfgCampi == 31 && nUtente.length() && nApwd.length()) applicaConfig(); cfgCampi = 0; return; }
+  if (l == "@GO") {
+    if (cfgCampi == CAMPI_TUTTI && nUtente.length() && nApwd.length() && (nModo != "2" || nApSsid.length())) applicaConfig();
+    cfgCampi = 0; return;
+  }
   if (l == "@ACK") { ackVisto = true; return; }
   if (l.startsWith("@FILE ")) { getNome = l.substring(6); getTesto = ""; ackVisto = true; return; }
   if (l.startsWith("@L ") || l == "@L") { if (inGet) { getTesto += l.substring(3); getTesto += '\n'; } return; }
@@ -156,6 +200,12 @@ String comando(const String &c, unsigned long attesaMs = 600, uint8_t tentativi 
   return "";
 }
 String nuovoId() { if (++idComando == 0) idComando = 1; return String(idComando); }
+
+// Indirizzo della centralina: quello dell'access point, o quello avuto dalla rete di casa.
+String indirizzo() {
+  if (modoAp) return WiFi.softAPIP().toString();
+  return WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String("none");
+}
 
 // ------------------------------------------------------------------ pagine
 bool autorizzato() {
@@ -218,8 +268,10 @@ void apiStato() {
   bool mega = statoValido && millis() - statoMs < 3000;
   String j = "{";
   j += "\"versione\":\"" VERSIONE "\"";
-  j += ",\"ip\":" + jsonTesto(WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String("none"));
-  j += ",\"ssid\":" + jsonTesto(cfgSsid);
+  j += ",\"ip\":" + jsonTesto(indirizzo());
+  j += ",\"ssid\":" + jsonTesto(modoAp ? cfgApSsid : cfgSsid);
+  j += ",\"ap\":" + String(modoAp ? "true" : "false");
+  j += ",\"clienti\":" + String(modoAp ? WiFi.softAPgetStationNum() : 0);
   j += ",\"host\":" + jsonTesto(cfgHost);
   j += ",\"rssi\":" + String(WiFi.RSSI());
   j += ",\"mega\":" + String(mega ? "true" : "false");
@@ -361,7 +413,11 @@ void setup() {
   server.on("/api/ini", HTTP_POST, apiScriviFile);
   server.on("/api/riavvia", HTTP_POST, apiRiavvia);
   server.on("/api/ripristina", HTTP_POST, apiRipristina);
-  server.onNotFound([]() { server.send(404, "text/plain", "non trovato"); });
+  server.onNotFound([]() {
+    // portale: le pagine di prova dei telefoni (e ogni altro indirizzo) portano al pannello
+    if (portale) { server.sendHeader("Location", "http://" + indirizzo() + "/"); server.send(302, "text/plain", ""); return; }
+    server.send(404, "text/plain", "non trovato");
+  });
   server.begin();
 }
 
@@ -371,7 +427,8 @@ void loop() {
   // Finche' il Mega non manda la configurazione, chiedila ogni 2 s.
   if (!configOk && millis() - helloMs >= 2000) { helloMs = millis(); scriviRiga("@HELLO"); }
 
-  bool collegato = WiFi.status() == WL_CONNECTED;
+  bool collegato = modoAp || WiFi.status() == WL_CONNECTED;
+  if (portale) dns.processNextRequest();
   if (collegato && !servizi) {
     MDNS.begin(cfgHost.c_str());
     MDNS.addService("http", "tcp", 80);
@@ -384,7 +441,7 @@ void loop() {
 
   // Indirizzo al Mega: a ogni cambio, e comunque ogni minuto.
   if (configOk) {
-    String ip = collegato ? WiFi.localIP().toString() : String("none");
+    String ip = indirizzo();
     if ((ip != ipInviato && millis() - ipMs > 3000) || millis() - ipMs > 60000) {
       ipMs = millis();
       if (comando("IP " + ip, 600, 2).startsWith("@OK")) ipInviato = ip;
