@@ -73,6 +73,7 @@ struct Adafruit_NeoPixel {
 #define NUM_CASETTE (cfg.numCasette)
 enum Fase { GIORNO, TRAMONTO, CREPUSCOLO, NOTTE, ALBA };
 char wifiIp[16] = "none";
+bool wifiAp = false;
 bool testInCorso = false, testWeb = false, testMostraIP = false, modalitaColore = false, running = true;
 uint8_t testIndice = 0;
 uint16_t releStato = 0;
@@ -120,6 +121,7 @@ void megaAvviaIni(const char *testo) {             // the real parser reads the 
   cfgDefault(cfg); cfgParseBuffer(cfg, testo); lnkInizio();
 }
 int megaErrori() { return cfg.errori; }
+bool megaAp() { return wifiAp; }
 std::string &megaFile(const char *n) { return disk[n]; }
 bool megaHaFile(const char *n) { return disk.count(n) != 0; }
 uint16_t megaRele() { return releStato; }

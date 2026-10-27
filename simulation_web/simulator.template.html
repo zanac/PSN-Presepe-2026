@@ -270,7 +270,7 @@ function parse(text) {
       else if (kl === "beep_ms") ok = intIn(v, 10, 2000) !== null;
       else if (kl === "debug_ms") ok = intIn(v, 0, 3600000) !== null;
     } else if (sez === "WIFI") {
-      if (kl === "abilitato") { const b = /^\s*(2|ap)\s*$/i.test(v) ? 2 : bool(v); ok = b !== null; if (ok) c.wifi = b; }
+      if (kl === "abilitato") { const b = /^\s*(2|ap)\s*$/i.test(v) ? 2 : /^\s*(3|auto)\s*$/i.test(v) ? 3 : bool(v); ok = b !== null; if (ok) c.wifi = b; }
       else if (kl === "ssid") ok = testo(v, 33, 0) !== null;
       else if (kl === "password") { const t = testo(v, 64, 0); ok = t !== null && (t === "" || byteLen(t) >= 8); }
       else if (kl === "nome") { const t = testo(v, 25, 1); ok = t !== null && /^[A-Za-z0-9][A-Za-z0-9-]*$/.test(t); }
@@ -280,6 +280,7 @@ function parse(text) {
       else if (kl === "canale") ok = intIn(v, 1, 13) !== null;
       else if (kl === "nascosta" || kl === "portale") ok = bool(v) !== null;
       else if (kl === "max_client") ok = intIn(v, 1, 8) !== null;
+      else if (kl === "attesa") ok = intIn(v, 10, 600) !== null;
       else if (kl === "ip") {
         const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(v.trim()), x = m ? m.slice(1).map(Number) : null;
         ok = !!x && x.every(n => n <= 255) && x[3] >= 1 && x[3] <= 254 && x[0] >= 1 && x[0] < 224 && x[0] !== 127;

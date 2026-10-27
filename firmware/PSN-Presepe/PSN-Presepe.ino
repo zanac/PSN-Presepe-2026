@@ -238,15 +238,17 @@ struct PresepeConfig {
   uint16_t beepHz, beepMs;
   uint32_t debugMs;
   // [WIFI] scheda Mega + WiFi (ESP8266 collegato alla Serial3)
-  uint8_t  wifiAbilitato;                 // 0 = Serial3 non usata: come un Mega senza WiFi, 1 = rete di casa, 2 = access point
+  uint8_t  wifiAbilitato;                 // 0 = Serial3 non usata: come un Mega senza WiFi, 1 = rete di casa,
+                                          // 2 = access point, 3 = rete di casa, se non si collega access point
   char     wifiSsid[CFG_SSID_LEN];
   char     wifiPassword[CFG_WPWD_LEN];
   char     wifiNome[CFG_HOST_LEN];        // nome in rete: http://<nome>.local
-  // [ACCESS_POINT] rete creata dall'ESP8266 (abilitato = 2)
+  // [ACCESS_POINT] rete creata dall'ESP8266 (abilitato = 2, oppure 3 senza rete di casa)
   char     apSsid[CFG_SSID_LEN];
   char     apPassword[CFG_WPWD_LEN];
   uint8_t  apCanale, apNascosta, apMaxClient, apPortale;
   uint8_t  apIp[4];
+  uint16_t apAttesa;                      // abilitato = 3: secondi di tentativi sulla rete di casa
   // [AUTENTICAZIONE] utente e password della pagina web
   char     webUtente[CFG_UTENTE_LEN];
   char     webPassword[CFG_UTENTE_LEN];
@@ -415,6 +417,7 @@ void cfgDefault(PresepeConfig &c) {
   strcpy(c.apPassword, "presepe2026");
   c.apCanale = 6; c.apNascosta = 0; c.apMaxClient = 4; c.apPortale = 0;
   c.apIp[0] = 192; c.apIp[1] = 168; c.apIp[2] = 4; c.apIp[3] = 1;
+  c.apAttesa = 60;
   // [AUTENTICAZIONE] della pagina web (da cambiare nel file).
   strcpy(c.webUtente, "admin");
   strcpy(c.webPassword, "presepe2026");
@@ -667,8 +670,9 @@ static bool leggiPasswordWpa(const char *v, char *dst) {   // vuota (rete aperta
   strcpy(dst, tmp); return true;
 }
 static bool sezWifi(PresepeConfig &c, const char *k, char *v) {
-  if (ugualeCI(k, "abilitato")) {             // 0/1 (anche si/no...), 2 oppure "ap" = access point
+  if (ugualeCI(k, "abilitato")) {             // 0/1 (anche si/no...), 2 o "ap" = access point, 3 o "auto"
     if (ugualeCI(v, "2") || ugualeCI(v, "ap")) { c.wifiAbilitato = 2; return true; }
+    if (ugualeCI(v, "3") || ugualeCI(v, "auto")) { c.wifiAbilitato = 3; return true; }
     return leggiBool(v, c.wifiAbilitato);
   }
   if (ugualeCI(k, "ssid")) return leggiTesto(v, c.wifiSsid, CFG_SSID_LEN, 0);
@@ -692,6 +696,7 @@ static bool sezAccessPoint(PresepeConfig &c, const char *k, char *v) {
   if (ugualeCI(k, "nascosta")) return leggiBool(v, c.apNascosta);
   if (ugualeCI(k, "max_client")) { if (!leggiLong(v, n, 1, 8)) return false; c.apMaxClient = (uint8_t)n; return true; }
   if (ugualeCI(k, "portale")) return leggiBool(v, c.apPortale);
+  if (ugualeCI(k, "attesa")) { if (!leggiLong(v, n, 10, 600)) return false; c.apAttesa = (uint16_t)n; return true; }
   if (ugualeCI(k, "ip")) {                    // a.b.c.d, rete /24: l'ultimo numero da 1 a 254
     uint8_t x[4]; const char *s = v;
     for (uint8_t i = 0; i < 4; i++) {
@@ -986,6 +991,7 @@ bool testMostraIP = false;   // [WIFI] abilitato: primo passo del test = indiriz
 bool testWeb = false;        // test comandato dalla pagina web (strisce, pixel, rele' uno a uno)
 uint16_t releStato = 0;      // bit i = rele' i+1 acceso (per la pagina web)
 char wifiIp[16] = "none";    // indirizzo comunicato dall'ESP8266 ("none" = non collegato)
+bool wifiAp = false;         // l'ESP8266 ha creato l'access point (abilitato = 2, o 3 senza rete di casa)
 uint8_t testIndice = 0;
 bool testEraInMarcia = false;
 unsigned long testPausaMs = 0;
@@ -1530,13 +1536,13 @@ void mostraOledTest() {
     return;
   }
   if (testMostraIP) {                // [WIFI] abilitato: passo con l'indirizzo
-    bool ap = cfg.wifiAbilitato == 2;
+    bool ap = cfg.wifiAbilitato == 2 || wifiAp;
     display.setCursor(0,14); display.print(ap ? F("WI-FI ACCESS POINT") : F("WI-FI"));
     if (ap) { display.setCursor(0,24); display.print(F("rete ")); display.print(cfg.apSsid); }
     display.setCursor(0, ap ? 34 : 28); display.print(F("IP: ")); display.print(wifiIp);
     display.setCursor(0, ap ? 43 : 38);
     if (strcmp(wifiIp, "none") != 0) { display.print(cfg.wifiNome); display.print(F(".local")); }
-    else display.print(ap ? F("ESP non risponde") : F("non collegato"));
+    else display.print(ap ? F("ESP non risponde") : cfg.wifiAbilitato == 3 ? F("cerco la rete...") : F("non collegato"));
     display.setCursor(0,52); display.print(F("TEST=avanti START=esci"));
     display.display();
     return;
@@ -1786,7 +1792,11 @@ void stampaConfig() {
   Serial.print(F("Casette: ")); Serial.print(cfg.numCasette); Serial.print(F(" pixel, accese da "));
   Serial.print(cfgNomeFase(cfg.accendiFase)); Serial.print(' '); Serial.print(cfg.accendiPct); Serial.print(F("% a "));
   Serial.print(cfgNomeFase(cfg.spegniFase)); Serial.print(' '); Serial.print(cfg.spegniPct); Serial.println('%');
-  if (cfg.wifiAbilitato == 2) {
+  if (cfg.wifiAbilitato == 3) {
+    Serial.print(F("WiFi: automatico, rete di casa \"")); Serial.print(cfg.wifiSsid);
+    Serial.print(F("\"; se non si collega entro ")); Serial.print(cfg.apAttesa); Serial.println(F(" s apre l'access point"));
+  }
+  if (cfg.wifiAbilitato >= 2) {
     Serial.print(F("WiFi: access point, rete \"")); Serial.print(cfg.apSsid);
     Serial.print(F("\"")); if (cfg.apNascosta) Serial.print(F(" (nascosta)"));
     Serial.print(F(", canale ")); Serial.print(cfg.apCanale);
@@ -2567,7 +2577,7 @@ bool attesaSplash(unsigned long durataMs) {
 
 // ==== LINK WIFI BEGIN ====
 // =============================================================================
-// COLLEGAMENTO CON L'ESP8266 (scheda Mega + WiFi, [WIFI] abilitato = 1 o 2)
+// COLLEGAMENTO CON L'ESP8266 (scheda Mega + WiFi, [WIFI] abilitato = 1, 2 o 3)
 // =============================================================================
 // Serial3 (D14 TX3 / D15 RX3), 115200 baud, una riga per messaggio.
 //   ESP -> Mega: "@COMANDO argomenti*HH" (somma di controllo, vedi lnkVerifica);
@@ -2676,7 +2686,7 @@ void lnkInviaConfig() {
   LNK_SERIAL.print(F("@APPWD ")); LNK_SERIAL.println(cfg.apPassword);
   LNK_SERIAL.print(F("@APOPT ")); LNK_SERIAL.print(cfg.apCanale); LNK_SERIAL.print(' ');
   LNK_SERIAL.print(cfg.apNascosta); LNK_SERIAL.print(' '); LNK_SERIAL.print(cfg.apMaxClient); LNK_SERIAL.print(' ');
-  LNK_SERIAL.println(cfg.apPortale);
+  LNK_SERIAL.print(cfg.apPortale); LNK_SERIAL.print(' '); LNK_SERIAL.println(cfg.apAttesa);
   LNK_SERIAL.print(F("@APIP "));
   for (uint8_t i = 0; i < 4; i++) { if (i) LNK_SERIAL.print('.'); LNK_SERIAL.print(cfg.apIp[i]); }
   LNK_SERIAL.println();
@@ -2692,7 +2702,7 @@ void lnkInizio() {
   if (!lnkAttivo) return;
   LNK_SERIAL.begin(115200);
   pinMode(15, INPUT_PULLUP);   // RX3: senza ESP (DIP 1-2 su OFF) il pin non resta flottante
-  strcpy(wifiIp, "none");
+  strcpy(wifiIp, "none"); wifiAp = false;
   lnkLen = 0; lnkRigaLunga = false;
   lnkInviaConfig();
 }
@@ -2847,11 +2857,13 @@ void lnkComando(char *riga) {
 
   if (!strcmp(cmd, "HELLO")) { lnkInviaConfig(); return; }
   if (!strcmp(cmd, "IP")) {
-    char *ip = lnkCampo(s);
+    char *ip = lnkCampo(s);                  // IP indirizzo [AP]
     if (!ip || strlen(ip) >= sizeof(wifiIp)) { lnkErr(F("ip")); return; }
-    if (strcmp(ip, wifiIp) != 0) {
-      strcpy(wifiIp, ip);
-      Serial.print(F("WiFi: IP ")); Serial.println(wifiIp);
+    char *tipo = lnkCampo(s);
+    bool ap = tipo && !strcmp(tipo, "AP");
+    if (strcmp(ip, wifiIp) != 0 || ap != wifiAp) {
+      strcpy(wifiIp, ip); wifiAp = ap;
+      Serial.print(F("WiFi: IP ")); Serial.print(wifiIp); Serial.println(ap ? F(" (access point)") : F(""));
       if (testInCorso && testMostraIP && !testWeb) mostraOledTest();
     }
     lnkOk(); return;
@@ -3232,6 +3244,11 @@ const char INI_PREDEFINITO[] PROGMEM =
   ";     colleghi il telefono a quella rete e apri http://192.168.4.1/ . Serve dove\n"
   ";     non c'e' una rete WiFi (presepe in chiesa, in piazza, a una mostra).\n"
   ";     Con 2 le chiavi ssid e password di questa sezione non servono.\n"
+  "; 3 = AUTOMATICO: prova la rete di casa (come 1); se non si collega entro \"attesa\"\n"
+  ";     secondi (sezione [ACCESS_POINT], predefinito 60) apre l'access point (come 2)\n"
+  ";     e resta cosi' fino al riavvio. Comodo quando porti il presepe in un posto nuovo.\n"
+  ";     Se la rete di casa si e' collegata, resta su quella anche se poi cade.\n"
+  ";     Con ssid vuoto apre subito l'access point.\n"
   "; Se SSID o password contengono ; # oppure spazi all'inizio o alla fine, scrivili\n"
   "; tra virgolette:  password = \"la;mia#password\"   (le virgolette non sono comprese).\n"
   "abilitato = 0\n"
@@ -3240,7 +3257,8 @@ const char INI_PREDEFINITO[] PROGMEM =
   "nome = presepe        ; nome in rete: http://presepe.local (lettere, numeri e -), vale per 1 e 2\n"
   "\n"
   "[ACCESS_POINT]\n"
-  "; Rete creata dalla centralina quando [WIFI] abilitato = 2. Pronta all'uso cosi'\n"
+  "; Rete creata dalla centralina quando [WIFI] abilitato = 2 (oppure 3 e la rete di\n"
+  "; casa non si collega). Pronta all'uso cosi'\n"
   "; com'e': sul telefono cerca la rete \"Presepe\", password presepe2026, poi apri\n"
   "; http://192.168.4.1/ (utente e password di [AUTENTICAZIONE]).\n"
   "; Premendo TEST durante il ciclo, il primo passo mostra nome della rete e indirizzo.\n"
@@ -3253,6 +3271,7 @@ const char INI_PREDEFINITO[] PROGMEM =
   "ip = 192.168.4.1      ; indirizzo della centralina; rete /24 (i telefoni ricevono .2, .3, ...)\n"
   "portale = 0           ; 1 = qualsiasi indirizzo scritto nel browser porta alla pagina del presepe,\n"
   "                      ;     e molti telefoni la aprono da soli appena collegati (\"Accedi alla rete\")\n"
+  "attesa = 60           ; solo con abilitato = 3: secondi di tentativi sulla rete di casa (10..600)\n"
   "\n"
   "[AUTENTICAZIONE]\n"
   "; Utente e password chiesti dal browser per aprire la pagina del presepe\n"

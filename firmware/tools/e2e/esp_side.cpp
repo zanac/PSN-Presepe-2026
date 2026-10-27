@@ -16,6 +16,7 @@ OTAMock ArduinoOTA;
 void megaAvvia(const char *ssid, const char *pwd);
 void megaAvviaIni(const char *testo);
 int megaErrori();
+bool megaAp();
 std::string &megaFile(const char *n);
 bool megaHaFile(const char *n);
 uint16_t megaRele();
@@ -153,6 +154,30 @@ int main() {
   gira(100); CHECK(ESP.restarts == r0);
   megaAvviaIni("[WIFI]\nabilitato = 2\nnome = sala\n[ACCESS_POINT]\nssid = \"Presepe Sala\"\ncanale = 3\n");
   gira(100); CHECK(ESP.restarts == r0 + 1);
+
+  // 10c. abilitato = 3: home network first; access point only if it does not connect within "attesa"
+  auto riavviaEsp = []() { reteAvviata = false; configOk = false; servizi = false; modoAp = false; portale = false;
+                           staRiuscita = false; ipInviato = ""; cfgModo = ""; };
+  riavviaEsp(); WiFi.st = WL_IDLE_STATUS; WiFi.aps = 0; int b0 = WiFi.begins;
+  megaAvviaIni("[WIFI]\nabilitato = auto\nssid = Casa\npassword = 12345678\n[ACCESS_POINT]\nattesa = 10\n");
+  gira(3000);
+  CHECK(configOk && WiFi.begins == b0 + 1 && !modoAp && WiFi.aps == 0 && std::strcmp(megaIp(), "none") == 0);
+  gira(8000);
+  CHECK(modoAp && WiFi.aps == 1 && WiFi.apSsid == "Presepe" && WiFi.apPass == "presepe2026" && WiFi.modo == WIFI_AP);
+  gira(4000);
+  CHECK(std::strcmp(megaIp(), "192.168.4.1") == 0 && megaAp() && servizi);
+  // the home network answers in time: it stays there, no access point even after "attesa"
+  riavviaEsp(); WiFi.aps = 0; WiFi.st = WL_IDLE_STATUS;
+  megaAvviaIni("[WIFI]\nabilitato = 3\nssid = Casa\npassword = 12345678\n[ACCESS_POINT]\nattesa = 10\n");
+  gira(3000); WiFi.st = WL_CONNECTED; WiFi.ip = "192.168.1.60";
+  gira(5000); WiFi.st = WL_IDLE_STATUS;                                     // connection lost later
+  gira(15000);
+  CHECK(!modoAp && WiFi.aps == 0 && std::strcmp(megaIp(), "none") == 0 && !megaAp());
+  // abilitato = 3 without a home SSID: access point at once
+  riavviaEsp(); WiFi.aps = 0;
+  megaAvviaIni("[WIFI]\nabilitato = 3\n");
+  gira(3000);
+  CHECK(modoAp && WiFi.aps == 1);
 
   // 11. incomplete configuration (a line lost while the ESP was starting): not applied
   {

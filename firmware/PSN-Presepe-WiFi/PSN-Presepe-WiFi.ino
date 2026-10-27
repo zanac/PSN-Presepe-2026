@@ -44,6 +44,8 @@ String nSsid, nWpwd, nUtente, nApwd, nHost;                          // in arriv
 String cfgModo = "1", cfgApSsid, cfgApPwd, cfgApOpt, cfgApIp;       // in uso
 String nModo, nApSsid, nApPwd, nApOpt, nApIp;                        // in arrivo
 bool modoAp = false, portale = false;
+unsigned long staInizioMs = 0;  // abilitato = 3: inizio dei tentativi sulla rete di casa
+bool staRiuscita = false;       // abilitato = 3: collegato almeno una volta (niente piu' access point)
 String nomiRele[16];
 bool configOk = false;          // ricevuto almeno un @GO completo
 uint16_t cfgCampi = 0;          // campi ricevuti dall'ultimo @SSID (bit 0..9: SSID WPWD USER APWD HOST MODE APSSID APPWD APOPT APIP)
@@ -80,15 +82,35 @@ void scriviRiga(const String &l) {          // "@..." + "*HH\n"
   Serial.print(l); Serial.print('*'); Serial.print(h); Serial.print('\n');
 }
 
-// "6 0 4 1" -> canale, nascosta, max client, portale
-void opzioniAp(int &canale, int &nascosta, int &maxClient, int &port) {
-  int v[4] = { 6, 0, 4, 0 }, n = 0, p = 0;
-  while (n < 4 && p < (int)cfgApOpt.length()) {
+// "6 0 4 1 60" -> canale, nascosta, max client, portale, attesa (s, solo abilitato = 3)
+void opzioniAp(int &canale, int &nascosta, int &maxClient, int &port, int &attesa) {
+  int v[5] = { 6, 0, 4, 0, 60 }, n = 0, p = 0;
+  while (n < 5 && p < (int)cfgApOpt.length()) {
     int q = cfgApOpt.indexOf(' ', p); if (q < 0) q = cfgApOpt.length();
     v[n++] = cfgApOpt.substring(p, q).toInt(); p = q + 1;
   }
   canale = (v[0] >= 1 && v[0] <= 13) ? v[0] : 6; nascosta = v[1] ? 1 : 0;
   maxClient = (v[2] >= 1 && v[2] <= 8) ? v[2] : 4; port = v[3] ? 1 : 0;
+  attesa = (v[4] >= 10 && v[4] <= 600) ? v[4] : 60;
+}
+
+// Crea la rete [ACCESS_POINT] (abilitato = 2, oppure 3 quando la rete di casa non risponde).
+void avviaAccessPoint() {
+  IPAddress ip;
+  if (!ip.fromString(cfgApIp)) ip = IPAddress(192, 168, 4, 1);
+  int canale, nascosta, maxClient, port, attesa;
+  opzioniAp(canale, nascosta, maxClient, port, attesa);
+  WiFi.persistent(false);
+  WiFi.setAutoReconnect(false);
+  WiFi.disconnect();
+  WiFi.mode(WIFI_AP);
+  WiFi.hostname(cfgHost);
+  WiFi.softAPConfig(ip, ip, IPAddress(255, 255, 255, 0));
+  WiFi.softAP(cfgApSsid.c_str(), cfgApPwd.length() ? cfgApPwd.c_str() : nullptr, canale, nascosta, maxClient);
+  modoAp = true;
+  if (port) { dns.setErrorReplyCode(DNSReplyCode::NoError); dns.start(53, "*", ip); portale = true; }
+  servizi = false;              // mDNS e OTA ripartono sulla nuova rete
+  reteAvviata = true;
 }
 
 void applicaConfig() {
@@ -99,21 +121,10 @@ void applicaConfig() {
   cfgModo = nModo; cfgApSsid = nApSsid; cfgApPwd = nApPwd; cfgApOpt = nApOpt; cfgApIp = nApIp;
   configOk = true;
   ipInviato = "";                                          // il Mega puo' essere ripartito: rimanda l'IP
-  if (!reteAvviata && cfgModo == "2") {                    // access point: la rete la crea l'ESP
-    IPAddress ip;
-    if (!ip.fromString(cfgApIp)) ip = IPAddress(192, 168, 4, 1);
-    int canale, nascosta, maxClient, port;
-    opzioniAp(canale, nascosta, maxClient, port);
-    WiFi.persistent(false);
-    WiFi.mode(WIFI_AP);
-    WiFi.hostname(cfgHost);
-    WiFi.softAPConfig(ip, ip, IPAddress(255, 255, 255, 0));
-    WiFi.softAP(cfgApSsid.c_str(), cfgApPwd.length() ? cfgApPwd.c_str() : nullptr, canale, nascosta, maxClient);
-    modoAp = true;
-    if (port) { dns.setErrorReplyCode(DNSReplyCode::NoError); dns.start(53, "*", ip); portale = true; }
-    reteAvviata = true;
-  }
-  if (!reteAvviata && cfgSsid.length()) {
+  // 2 = access point; 3 senza SSID della rete di casa = subito access point
+  if (!reteAvviata && (cfgModo == "2" || (cfgModo == "3" && !cfgSsid.length()))) avviaAccessPoint();
+  if (!reteAvviata && cfgSsid.length()) {                  // 1 e 3: rete di casa
+    staInizioMs = millis();
     WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
     WiFi.hostname(cfgHost);
@@ -153,7 +164,7 @@ void rigaDalMega(String l) {
     return;
   }
   if (l == "@GO") {
-    if (cfgCampi == CAMPI_TUTTI && nUtente.length() && nApwd.length() && (nModo != "2" || nApSsid.length())) applicaConfig();
+    if (cfgCampi == CAMPI_TUTTI && nUtente.length() && nApwd.length() && ((nModo != "2" && nModo != "3") || nApSsid.length())) applicaConfig();
     cfgCampi = 0; return;
   }
   if (l == "@ACK") { ackVisto = true; return; }
@@ -428,6 +439,13 @@ void loop() {
   if (!configOk && millis() - helloMs >= 2000) { helloMs = millis(); scriviRiga("@HELLO"); }
 
   bool collegato = modoAp || WiFi.status() == WL_CONNECTED;
+  // abilitato = 3: se la rete di casa non si collega entro "attesa" secondi, access point
+  // (fino al prossimo riavvio). Una volta collegata, resta sulla rete di casa.
+  if (cfgModo == "3" && !modoAp && reteAvviata) {
+    if (collegato) staRiuscita = true;
+    int c, h, m, po, attesa; opzioniAp(c, h, m, po, attesa);
+    if (!staRiuscita && millis() - staInizioMs > (unsigned long)attesa * 1000UL) { avviaAccessPoint(); collegato = true; }
+  }
   if (portale) dns.processNextRequest();
   if (collegato && !servizi) {
     MDNS.begin(cfgHost.c_str());
@@ -442,6 +460,7 @@ void loop() {
   // Indirizzo al Mega: a ogni cambio, e comunque ogni minuto.
   if (configOk) {
     String ip = indirizzo();
+    if (modoAp) ip += " AP";                              // il Mega mostra "access point" sul display
     if ((ip != ipInviato && millis() - ipMs > 3000) || millis() - ipMs > 60000) {
       ipMs = millis();
       if (comando("IP " + ip, 600, 2).startsWith("@OK")) ipInviato = ip;

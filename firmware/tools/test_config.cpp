@@ -255,9 +255,13 @@ int main(int argc, char **argv) {
     CHECK(ap.apCanale == 13 && ap.apNascosta == 1 && ap.apMaxClient == 8 && ap.apPortale == 1);
     CHECK(ap.apIp[0] == 10 && ap.apIp[1] == 1 && ap.apIp[2] == 2 && ap.apIp[3] == 254);
     cfgParseBuffer(ap, "[WIFI]\nabilitato = AP\n"); CHECK(ap.wifiAbilitato == 2);
+    CHECK(ap.apAttesa == 60);
+    cfgParseBuffer(ap, "[WIFI]\nabilitato = 3\n[ACCESS_POINT]\nattesa = 10\n"); CHECK(ap.wifiAbilitato == 3 && ap.apAttesa == 10);
+    cfgParseBuffer(ap, "[WIFI]\nabilitato = auto\n[ACCESS_POINT]\nattesa = 600\n"); CHECK(ap.wifiAbilitato == 3 && ap.apAttesa == 600 && ap.errori == 0);
+    cfgParseBuffer(ap, "[ACCESS_POINT]\nattesa = 9\nattesa = 601\n"); CHECK(ap.errori == 2 && ap.apAttesa == 600);
     cfgParseBuffer(ap, "[WIFI]\nabilitato = 1\n"); CHECK(ap.wifiAbilitato == 1);
     PresepeConfig bad; cfgDefault(bad);
-    cfgParseBuffer(bad, "[WIFI]\nabilitato = 3\n[ACCESS_POINT]\nssid =\npassword = corta\ncanale = 0\ncanale = 14\n"
+    cfgParseBuffer(bad, "[WIFI]\nabilitato = 4\n[ACCESS_POINT]\nssid =\npassword = corta\ncanale = 0\ncanale = 14\n"
                         "max_client = 9\nnascosta = forse\nip = 192.168.4\nip = 192.168.4.0\nip = 192.168.4.255\n"
                         "ip = 300.1.1.1\nip = 127.0.0.1\nip = 192.168.4.1x\nip = +1.2.3.4\nip = 1.2.3.0004\nfoo = 1\n");
     CHECK(bad.errori == 16 && bad.wifiAbilitato == 0 && std::strcmp(bad.apSsid, "Presepe") == 0 && bad.apCanale == 6 && bad.apIp[3] == 1);

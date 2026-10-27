@@ -98,6 +98,7 @@ struct Adafruit_NeoPixel {
 // ------------------------------------------------------------------ rest of the sketch
 enum Fase { GIORNO, TRAMONTO, CREPUSCOLO, NOTTE, ALBA };
 char wifiIp[16] = "none";
+bool wifiAp = false;
 bool testInCorso = false, testWeb = false, testMostraIP = false, modalitaColore = false, running = true;
 uint8_t testIndice = 0;
 uint16_t releStato = 0;
@@ -196,7 +197,7 @@ int main() {
     CHECK(v[0] == "@SSID Casa Rossi" && v[1] == "@WPWD ab;c#d=e f" && v[2] == "@USER admin");
     CHECK(v[3] == "@APWD presepe2026" && v[4] == "@HOST presepe");
     CHECK(v[5] == "@MODE 1" && v[6] == "@APSSID Presepe" && v[7] == "@APPWD presepe2026");
-    CHECK(v[8] == "@APOPT 6 0 4 0" && v[9] == "@APIP 192.168.4.1");
+    CHECK(v[8] == "@APOPT 6 0 4 0 60" && v[9] == "@APIP 192.168.4.1");
     CHECK(v[10] == "@NREL 1 Mulino" && v[11] == "@NREL 2 " && v[25] == "@NREL 16 " && v[26] == "@GO");
   }
   // HELLO (ESP rebooted) -> configuration again; ESP boot noise and bad sums are ignored
@@ -208,7 +209,9 @@ int main() {
   // 3. IP address from the ESP
   CHECK(ok(cmd("@IP 192.168.1.23")) && std::strcmp(wifiIp, "192.168.1.23") == 0);
   CHECK(cmd("@IP 1234567890123456").size() == 1 && std::strcmp(wifiIp, "192.168.1.23") == 0);   // too long
-  CHECK(ok(cmd("@IP none")) && std::strcmp(wifiIp, "none") == 0);
+  CHECK(ok(cmd("@IP 192.168.4.1 AP")) && std::strcmp(wifiIp, "192.168.4.1") == 0 && wifiAp);   // access point
+  CHECK(ok(cmd("@IP 192.168.1.23")) && !wifiAp);
+  CHECK(ok(cmd("@IP none")) && std::strcmp(wifiIp, "none") == 0 && !wifiAp);
 
   // 4. status line once per second: 23 fields
   T += 1000; Serial3.out.clear(); lnkTick();
