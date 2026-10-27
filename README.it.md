@@ -307,7 +307,7 @@ Librerie: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (con Adafruit BusIO)
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Occupazione: 68,8 kB di flash (27 %), 4,6 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
+Occupazione: 70,1 kB di flash (27 %), 4,6 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
 
 ### Compilazione
 
@@ -390,7 +390,7 @@ Con `abilitato = 1` l'ESP8266 si collega alla rete WPA/WPA2 indicata in `[WIFI]`
   - stelle o casette, un pulsante per ogni pixel (`numero` del file) per accenderli e spegnerli uno alla volta, più *Tutti accesi / Tutti spenti*;
   - i 16 relè con il loro nome, ON/OFF uno per uno;
   - *Bip del buzzer* ed *Esci dal test* (il ciclo riprende).
-- **`http://presepe.local/config`**: `PRESEPE.INI` così com'è sulla scheda, nello stesso editor del [simulatore web](simulation_web/README.md), con l'anteprima del ciclo e l'elenco degli errori. *Salva sul presepe* scrive il file (il precedente resta come `PRESEPE.BAK`, *Ripristina il file precedente* li scambia); *Riavvia il presepe* fa ripartire il Mega, che rilegge la scheda.
+- **`http://presepe.local/config`**: `PRESEPE.INI` così com'è sulla scheda, nello stesso editor del [simulatore web](simulation_web/README.md), con l'anteprima del ciclo e l'elenco degli errori. *Salva sul presepe* scrive il file (il precedente resta come `PRESEPE.BAK`, *Ripristina il file precedente* li scambia); *Riavvia il presepe* fa ripartire il Mega, che rilegge la scheda. Prima di salvare l'editor chiede conferma se il file ha errori o spegne il WiFi. Se manca la corrente mentre il file viene scritto, la copia viene completata alla riaccensione successiva (`PRESEPE.NEW` e il file segnale `PRESEPE.CMT`).
 
 Il Mega resta il padrone di tutto: l'ESP8266 fa solo da ponte tra la rete e la `Serial3` del Mega (D14/D15, non usati dalla scheda). Se la rete non c'è o la password è sbagliata la scheda parte e funziona normalmente; la schermata di TEST mostra `non collegato` e l'ESP continua a provare a collegarsi.
 
@@ -416,7 +416,7 @@ Gli aggiornamenti successivi dell'ESP si possono fare via WiFi (IDE Arduino → 
 
 **Sicurezza.** Le pagine usano l'autenticazione HTTP Basic su HTTP semplice: la password viaggia in chiaro sulla rete di casa. Usa la scheda solo su una rete fidata e non riutilizzare una password importante. Il monitor seriale avvisa se è ancora in uso la password predefinita.
 
-**Problemi:** `non collegato` → controlla SSID e password (8–63 caratteri, rete a 2,4 GHz: l'ESP8266 non vede il 5 GHz). La pagina non si apre per nome → alcuni Android non risolvono `.local`, usa l'IP. Il Mega non mostra mai un IP e il monitor seriale non ha righe `WiFi:` → DIP 1, 2 o selettore RXD3, oppure il firmware dell'ESP non è stato caricato.
+**Problemi:** `non collegato` → controlla SSID e password (8–63 caratteri, rete a 2,4 GHz: l'ESP8266 non vede il 5 GHz). La pagina non si apre per nome → alcuni Android non risolvono `.local`, usa l'IP. La schermata di TEST resta su `non collegato` e il monitor seriale non stampa mai `WiFi: IP` → DIP 1, 2 o selettore RXD3, oppure il firmware dell'ESP non è stato caricato.
 
 ## 10. Configurazione da microSD (PRESEPE.INI)
 

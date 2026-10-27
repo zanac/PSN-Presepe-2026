@@ -49,6 +49,7 @@ Printer Serial;
 const int FILE_READ = 0, FILE_WRITE = 1;
 std::map<std::string, std::string> disk;
 bool cardOk = true, writeFails = false;
+int writesLeft = -1;      // >= 0: the next writes succeed this many times, then fail (power loss / bad card)
 struct File {
   std::string name; size_t pos = 0; int mode = -1;
   explicit operator bool() const { return mode >= 0; }
@@ -58,7 +59,12 @@ struct File {
     while (k < n && pos < d.size()) ((uint8_t *)buf)[k++] = (uint8_t)d[pos++];
     return (int)k;
   }
-  size_t write(const uint8_t *b, size_t n) { if (writeFails) return 0; disk[name].append((const char *)b, n); return n; }
+  size_t write(const uint8_t *b, size_t n) {
+    if (writeFails || writesLeft == 0) return 0;
+    if (writesLeft > 0) writesLeft--;
+    disk[name].append((const char *)b, n); return n;
+  }
+  size_t print(const char *s) { return write((const uint8_t *)s, std::strlen(s)); }
   void close() { mode = -1; }
 };
 struct SDMock {
@@ -75,6 +81,8 @@ struct SDMock {
   }
 } SD;
 const uint8_t PIN_SD_CS = 53;
+const int INPUT_PULLUP = 2; int pullup15 = 0;
+void pinMode(int pin, int mode) { if (pin == 15 && mode == INPUT_PULLUP) pullup15++; }
 
 // ------------------------------------------------------------------ WS2811 mock
 struct Adafruit_NeoPixel {
@@ -137,12 +145,15 @@ static std::string withSum(const std::string &l) {
   char h[4]; std::snprintf(h, sizeof h, "%02X", lnkSomma(l.c_str(), l.size()));
   return l + "*" + h;
 }
-// Sends one command, runs the Mega once, returns its reply lines (status excluded).
+// Sends one command, runs the Mega once, returns its reply lines (status and @ACK excluded).
+static int acks = 0;
 static std::vector<std::string> cmd(const std::string &l) {
   Serial3.out.clear();
   sendRaw(withSum(l) + "\n");
   lnkTick();
-  return lines(Serial3.out);
+  std::vector<std::string> v, r = lines(Serial3.out);
+  for (auto &x : r) { if (x == "@ACK") acks++; else v.push_back(x); }
+  return v;
 }
 static bool ok(const std::vector<std::string> &r) { return r.size() == 1 && r[0].compare(0, 3, "@OK") == 0; }
 static std::string field(const std::string &st, int n) {   // n-th space-separated field of a line
@@ -181,7 +192,7 @@ int main() {
   lnkInizio();
   {
     std::vector<std::string> v = lines(Serial3.out);
-    CHECK(Serial3.begun && v.size() == 22);
+    CHECK(Serial3.begun && v.size() == 22 && pullup15 == 1);
     CHECK(v[0] == "@SSID Casa Rossi" && v[1] == "@WPWD ab;c#d=e f" && v[2] == "@USER admin");
     CHECK(v[3] == "@APWD presepe2026" && v[4] == "@HOST presepe");
     CHECK(v[5] == "@NREL 1 Mulino" && v[6] == "@NREL 2 " && v[20] == "@NREL 16 " && v[21] == "@GO");
@@ -231,6 +242,12 @@ int main() {
   CHECK(ok(cmd("@X")));
   CHECK(ok(cmd("@RUN")) && !running && ok(cmd("@RUN")) && running);
   int a0 = avanti; CHECK(ok(cmd("@NEXT")) && avanti == a0 + 1);
+  // numbered: a retransmission (same number) gets the same reply and is not executed again
+  a0 = avanti;
+  CHECK(ok(cmd("@NEXT 41")) && ok(cmd("@NEXT 41")) && ok(cmd("@NEXT 41")) && avanti == a0 + 1);
+  CHECK(ok(cmd("@NEXT 42")) && avanti == a0 + 2);
+  CHECK(ok(cmd("@RUN 43")) && !running && ok(cmd("@RUN 43")) && !running && ok(cmd("@RUN 44")) && running);
+  CHECK(ok(cmd("@T")) && cmd("@NEXT 45")[0] == "@ERR test" && cmd("@NEXT 45")[0] == "@ERR test" && ok(cmd("@X")));
   modalitaColore = true;
   CHECK(cmd("@S 0 1 1 1")[0] == "@ERR modo colore" && cmd("@T")[0] == "@ERR modo colore" && !testInCorso);
   modalitaColore = false;
@@ -254,29 +271,63 @@ int main() {
   CHECK(ok(cmd("@W 3 ")) && ok(cmd("@W 4    rientro")));
   std::string nuovo = "[WIFI]\nssid = Casa Rossi\n\n   rientro\n";
   CHECK(disk["PRESEPE.NEW"] == nuovo);
-  CHECK(cmd("@COMMIT " + std::to_string(nuovo.size() + 1))[0] == "@ERR lunghezza");   // wrong length: nothing changes
+  CHECK(cmd("@COMMIT " + std::to_string(nuovo.size()))[0] == "@ERR arg");            // the number is required
+  CHECK(lnkScrittura);
+  CHECK(cmd("@COMMIT " + std::to_string(nuovo.size() + 1) + " 100")[0] == "@ERR lunghezza");   // wrong length: nothing changes
+  CHECK(cmd("@COMMIT " + std::to_string(nuovo.size() + 1) + " 100")[0] == "@ERR lunghezza");   // same reply when retransmitted
   CHECK(disk["PRESEPE.INI"] == vecchio && !disk.count("PRESEPE.NEW") && !disk.count("PRESEPE.BAK"));
   CHECK(cmd("@W 5 x")[0] == "@ERR put");                                   // writing needs PUT first
   CHECK(ok(cmd("@PUT")) && ok(cmd("@W 0 [WIFI]")) && ok(cmd("@W 1 ssid = Casa Rossi")) && ok(cmd("@W 2 ")) && ok(cmd("@W 3    rientro")));
   {
-    std::vector<std::string> r = cmd("@COMMIT " + std::to_string(nuovo.size()));
-    CHECK(r.size() == 1 && r[0] == "@OK PRESEPE.INI");
+    int a0 = acks;
+    std::vector<std::string> r = cmd("@COMMIT " + std::to_string(nuovo.size()) + " 101");
+    CHECK(r.size() == 1 && r[0] == "@OK PRESEPE.INI" && acks == a0 + 1);
+    r = cmd("@COMMIT " + std::to_string(nuovo.size()) + " 101");          // reply lost: same answer, not "put"
+    CHECK(r.size() == 1 && r[0] == "@OK PRESEPE.INI" && acks == a0 + 1);
+    CHECK(cmd("@COMMIT " + std::to_string(nuovo.size()) + " 102")[0] == "@ERR put");
   }
   CHECK(disk["PRESEPE.INI"] == nuovo && disk["PRESEPE.BAK"] == vecchio && !disk.count("PRESEPE.NEW"));
   CHECK(getFile() == nuovo);
 
   // 8. RESTORE swaps the file with its backup (a second RESTORE undoes it)
-  CHECK(ok(cmd("@RESTORE")) && disk["PRESEPE.INI"] == vecchio && disk["PRESEPE.BAK"] == nuovo && !disk.count("PRESEPE.NEW"));
-  CHECK(ok(cmd("@RESTORE")) && disk["PRESEPE.INI"] == nuovo && disk["PRESEPE.BAK"] == vecchio);
+  CHECK(cmd("@RESTORE")[0] == "@ERR arg");
+  CHECK(ok(cmd("@RESTORE 200")) && disk["PRESEPE.INI"] == vecchio && disk["PRESEPE.BAK"] == nuovo && !disk.count("PRESEPE.NEW"));
+  CHECK(ok(cmd("@RESTORE 200")) && disk["PRESEPE.INI"] == vecchio && disk["PRESEPE.BAK"] == nuovo);   // retransmission: no second swap
+  CHECK(ok(cmd("@RESTORE 201")) && disk["PRESEPE.INI"] == nuovo && disk["PRESEPE.BAK"] == vecchio);
+  CHECK(!disk.count("PRESEPE.NEW") && !disk.count("PRESEPE.CMT"));
   disk.erase("PRESEPE.BAK");
-  CHECK(cmd("@RESTORE")[0] == "@ERR nessun backup" && disk["PRESEPE.INI"] == nuovo);
+  CHECK(cmd("@RESTORE 202")[0] == "@ERR nessun backup" && disk["PRESEPE.INI"] == nuovo);
+
+  // 8b. empty upload is refused: the old file stays
+  CHECK(ok(cmd("@PUT")) && cmd("@COMMIT 0 203")[0] == "@ERR vuoto" && disk["PRESEPE.INI"] == nuovo && !disk.count("PRESEPE.NEW"));
+
+  // 8c. copy .NEW -> file fails half way (bad card): the previous file is put back from .BAK
+  {
+    CHECK(ok(cmd("@PUT")) && ok(cmd("@W 0 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")));
+    writesLeft = 3;           // .BAK copy (1 block of 64), the mark, the first 64 of the 90 bytes; then the card fails
+    std::vector<std::string> r = cmd("@COMMIT 90 204");
+    writesLeft = -1;
+    CHECK(r.size() == 1 && r[0] == "@ERR copia");
+    // putting .BAK back fails too (card still failing): the mark stays, the next boot finishes the copy
+    CHECK(disk.count("PRESEPE.CMT") && disk.count("PRESEPE.NEW"));
+    CHECK(lnkRecupera() && disk["PRESEPE.INI"].size() == 90 && !disk.count("PRESEPE.CMT") && !disk.count("PRESEPE.NEW"));
+    CHECK(!lnkRecupera());                                                  // nothing left to do
+  }
+  // 8d. power lost during the copy: at boot the copy is done again from .NEW
+  disk["PRESEPE.INI"] = "[CICLO]\ndura";                                  // truncated
+  disk["PRESEPE.NEW"] = "[CICLO]\ndurata1 = 60\n";
+  disk["PRESEPE.CMT"] = "PRESEPE.INI";
+  CHECK(lnkRecupera() && disk["PRESEPE.INI"] == "[CICLO]\ndurata1 = 60\n" && !disk.count("PRESEPE.CMT") && !disk.count("PRESEPE.NEW"));
+  disk["PRESEPE.CMT"] = "PRESEPE.INI";                                     // mark without .NEW: removed, file untouched
+  CHECK(!lnkRecupera() && !disk.count("PRESEPE.CMT") && disk["PRESEPE.INI"] == "[CICLO]\ndurata1 = 60\n");
+  disk["PRESEPE.INI"] = nuovo; disk["PRESEPE.BAK"] = vecchio;
 
   // 9. only PRESEPE.TXT on the card (Wokwi): that file is read and written
   disk.clear(); disk["PRESEPE.TXT"] = "a\n";
   {
     std::string name; CHECK(getFile(&name) == "a\n" && name == "PRESEPE.TXT");
     CHECK(ok(cmd("@PUT")) && ok(cmd("@W 0 b")));
-    std::vector<std::string> r = cmd("@COMMIT 2");
+    std::vector<std::string> r = cmd("@COMMIT 2 300");
     CHECK(r.size() == 1 && r[0] == "@OK PRESEPE.TXT" && disk["PRESEPE.TXT"] == "b\n" && disk["PRESEPE.BAK"] == "a\n");
     CHECK(!disk.count("PRESEPE.INI"));
   }
@@ -284,12 +335,12 @@ int main() {
   disk.clear();
   {
     std::string name, end; CHECK(getFile(&name, &end) == "" && name == "PRESEPE.INI" && end == "0 0");
-    CHECK(ok(cmd("@PUT")) && ok(cmd("@W 0 x")) && ok(cmd("@COMMIT 2")) && disk["PRESEPE.INI"] == "x\n" && !disk.count("PRESEPE.BAK"));
+    CHECK(ok(cmd("@PUT")) && ok(cmd("@W 0 x")) && ok(cmd("@COMMIT 2 301")) && disk["PRESEPE.INI"] == "x\n" && !disk.count("PRESEPE.BAK"));
   }
 
   // 10. errors: no card, write failure, interrupted upload (30 s), too long line
   cardOk = false;
-  CHECK(cmd("@GET")[0] == "@ERR sd" && cmd("@PUT")[0] == "@ERR sd" && cmd("@RESTORE")[0] == "@ERR sd");
+  CHECK(cmd("@GET")[0] == "@ERR sd" && cmd("@PUT")[0] == "@ERR sd" && cmd("@RESTORE 302")[0] == "@ERR sd");
   cardOk = true;
   CHECK(ok(cmd("@PUT")));
   writeFails = true; CHECK(cmd("@W 0 x")[0] == "@ERR sd" && !lnkScrittura && !disk.count("PRESEPE.NEW")); writeFails = false;

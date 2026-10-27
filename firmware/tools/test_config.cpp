@@ -244,6 +244,10 @@ int main(int argc, char **argv) {
     cfgParseBuffer(g, "[WIFI]\nssid = \npassword = \nssid = 12345678901234567890123456789012\n"
                       "password = 12345678\n");
     CHECK(g.errori == 0 && std::strlen(g.wifiSsid) == 32 && std::strcmp(g.wifiPassword, "12345678") == 0);
+    // a " inside an ordinary value does not swallow the comment
+    PresepeConfig h; cfgDefault(h);
+    cfgParseBuffer(h, "[RELE]\nnome1 = TV 12\" ; televisore\n[WIFI]\nssid = \"a ; b\" ; rete\n");
+    CHECK(h.errori == 0 && std::strcmp(h.nome[0], "TV 12\"") == 0 && std::strcmp(h.wifiSsid, "a ; b") == 0);
   }
 
   // 11. link line check: "@CMD args*HH", HH = byte sum mod 256

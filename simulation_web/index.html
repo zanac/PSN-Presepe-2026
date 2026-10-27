@@ -226,12 +226,13 @@ function parse(text) {
   text.split(/\n/).forEach((raw, i) => {
     const n = i + 1; let line = raw.replace(/\r$/, "");
     if (line.length > 127) return err(n, line.slice(0, 60) + "…", "riga più lunga di 127 caratteri");
-    let tra = false;                                 // dentro "..." ; e # non aprono un commento
-    for (let j = 0; j < line.length; j++) {
-      const ch = line[j];
-      if (ch === '"') tra = !tra;
-      else if (!tra && (ch === ";" || ch === "#")) { line = line.slice(0, j); break; }
+    // commenti da ; o #; se il valore comincia con " si cercano solo dopo la virgoletta di chiusura
+    let from = 0; const uq = line.indexOf("=");
+    if (uq >= 0 && !/[;#]/.test(line.slice(0, uq))) {
+      let q = uq + 1; while (line[q] === " " || line[q] === "\t") q++;
+      if (line[q] === '"') { const close = line.indexOf('"', q + 1); from = close >= 0 ? close + 1 : line.length; }
     }
+    for (let j = from; j < line.length; j++) if (line[j] === ";" || line[j] === "#") { line = line.slice(0, j); break; }
     const s = line.trim(); if (!s) return;
     if (s[0] === "[") {
       const m = /^\[([^\]]*)\]$/.exec(s); if (!m) { sez = ""; return err(n, s, "sezione scritta male"); }
@@ -277,7 +278,7 @@ function parse(text) {
       else if (kl === "beep_ms") ok = intIn(v, 10, 2000) !== null;
       else if (kl === "debug_ms") ok = intIn(v, 0, 3600000) !== null;
     } else if (sez === "WIFI") {
-      if (kl === "abilitato") ok = bool(v) !== null;
+      if (kl === "abilitato") { const b = bool(v); ok = b !== null; if (ok) c.wifi = !!b; }
       else if (kl === "ssid") ok = testo(v, 33, 0) !== null;
       else if (kl === "password") { const t = testo(v, 64, 0); ok = t !== null && (t === "" || byteLen(t) >= 8); }
       else if (kl === "nome") { const t = testo(v, 25, 1); ok = t !== null && /^[A-Za-z0-9][A-Za-z0-9-]*$/.test(t); }
@@ -493,7 +494,9 @@ const DEVICE = window.PRESEPE_DEVICE === true;
 function dStatus(msg, bad) { const d = $("dStatus"); d.hidden = false; d.className = "status " + (bad ? "bad" : "ok"); d.textContent = msg; }
 function dBusy(b) { ["dSave", "dReboot", "dLoad", "dRestore"].forEach(id => { $(id).disabled = b; }); }
 async function dPost(url, body) {
-  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=UTF-8" }, body: body || "" });
+  body = body || "";
+  const r = await fetch(url, { method: "POST", body,
+    headers: { "Content-Type": "text/plain;charset=UTF-8", "X-Presepe": "1", "X-Len": String(byteLen(body)) } });
   let j = null; try { j = await r.json(); } catch (e) {}
   if (!r.ok || !j || !j.ok) throw new Error(j && j.msg ? j.msg : "il presepe non risponde (" + r.status + ")");
   return j;
@@ -510,8 +513,10 @@ async function dLoad() {
   dBusy(false);
 }
 async function dSave() {
-  const { errors } = parse(ta.value);
+  const { c: nc, errors } = parse(ta.value);
+  if (!ta.value.trim()) { dStatus("Il file è vuoto: non salvato.", true); return; }
   if (errors.length && !confirm(`Il file ha ${errors.length} righe con errori (prima: ${errors[0].n ? "riga " + errors[0].n : "controllo fasi"}).\nIl presepe le ignorerà e userà i valori predefiniti per quelle righe.\nSalvare comunque?`)) return;
+  if (!nc.wifi && !confirm("Con questo file il Wi-Fi è spento ([WIFI] abilitato = 0 o sezione mancante).\nDopo il riavvio questa pagina non sarà più raggiungibile: per riaccenderlo bisognerà modificare la microSD dal computer.\nSalvare comunque?")) return;
   dBusy(true); dStatus("Salvataggio sulla microSD…");
   try { const j = await dPost("/api/ini", ta.value); dStatus(`Salvato in ${j.file}. La copia precedente è in PRESEPE.BAK. Premi «Riavvia il presepe» per usarlo.`); }
   catch (e) { dStatus("Salvataggio non riuscito: " + e.message + ". Il file sulla microSD non è cambiato.", true); }

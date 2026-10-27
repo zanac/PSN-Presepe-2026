@@ -307,7 +307,7 @@ Libraries: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (with Adafruit BusI
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Size: 68.8 kB flash (27 %), 4.6 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
+Size: 70.1 kB flash (27 %), 4.6 kB static RAM. The LED and OLED buffers are allocated at run time, which leaves about 3 kB free.
 
 ### Build
 
@@ -390,7 +390,7 @@ With `abilitato = 1` the ESP8266 joins the WPA/WPA2 network named in `[WIFI]` an
   - the stars or houses, one button per pixel (`numero` of the file), to switch each one on or off, plus *Tutti accesi / Tutti spenti*;
   - the 16 relays with their names, ON/OFF each;
   - *Bip del buzzer* and *Esci dal test* (the cycle resumes).
-- **`http://presepe.local/config`**: `PRESEPE.INI` as it is on the card, in the same editor as the [web simulator](simulation_web/README.md), with live preview of the cycle and the parser's error list. *Salva sul presepe* writes the file (the previous one is kept as `PRESEPE.BAK`, *Ripristina il file precedente* swaps them back); *Riavvia il presepe* restarts the Mega, which re-reads the card.
+- **`http://presepe.local/config`**: `PRESEPE.INI` as it is on the card, in the same editor as the [web simulator](simulation_web/README.md), with live preview of the cycle and the parser's error list. *Salva sul presepe* writes the file (the previous one is kept as `PRESEPE.BAK`, *Ripristina il file precedente* swaps them back); *Riavvia il presepe* restarts the Mega, which re-reads the card. The editor asks for confirmation before saving a file with errors or with WiFi switched off. If the power fails while the file is being written, the copy is completed at the next power-on (`PRESEPE.NEW` and the mark file `PRESEPE.CMT`).
 
 The Mega stays in charge of everything: the ESP8266 only bridges the network to the Mega's `Serial3` (D14/D15, not used by the board). If the network is missing or the password is wrong, the board starts and runs normally; the TEST screen then shows `non collegato`, and the ESP keeps trying to connect.
 
@@ -416,7 +416,7 @@ Later ESP updates can go over WiFi (Arduino IDE → *Port* → network port `pre
 
 **Security.** The pages use HTTP Basic authentication over plain HTTP: the password travels unencrypted on the home network. Use the board only on a trusted network, and do not reuse an important password. The serial monitor warns when the default password is still in use.
 
-**Troubleshooting:** `non collegato` → check SSID and password (8–63 characters, 2.4 GHz network; the ESP8266 does not see 5 GHz). Page does not open by name → some Android phones do not resolve `.local`, use the IP. The Mega never shows an IP and the serial monitor shows no `WiFi:` lines → DIP 1, 2 or the RXD3 selector, or the ESP firmware was not flashed.
+**Troubleshooting:** `non collegato` → check SSID and password (8–63 characters, 2.4 GHz network; the ESP8266 does not see 5 GHz). Page does not open by name → some Android phones do not resolve `.local`, use the IP. The TEST screen stays on `non collegato` and the serial monitor never prints `WiFi: IP` → DIP 1, 2 or the RXD3 selector, or the ESP firmware was not flashed.
 
 ## 10. SD-card configuration (PRESEPE.INI)
 

@@ -678,11 +678,18 @@ static bool sezAutenticazione(PresepeConfig &c, const char *k, char *v) {
 
 void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRiga) {
   c.righeLette = numeroRiga;
-  bool tra = false;                              // dentro "..." ; e # non aprono un commento
-  for (char *p = riga; *p; p++) {
-    if (*p == '"') tra = !tra;
-    else if (!tra && (*p == ';' || *p == '#')) { *p = 0; break; }   // commenti
+  // Commenti: da ; o # in poi. Se il valore comincia con " il commento si cerca solo
+  // dopo la virgoletta di chiusura (la password puo' contenere ; e #). Una " in mezzo
+  // a un valore normale (es. nome1 = TV 12") non cambia nulla.
+  char *inizio = riga;
+  char *ug = strchr(riga, '=');
+  if (ug && !memchr(riga, ';', ug - riga) && !memchr(riga, '#', ug - riga)) {
+    char *q = ug + 1;
+    while (*q == ' ' || *q == '\t') q++;
+    if (*q == '"') { char *chiusa = strchr(q + 1, '"'); inizio = chiusa ? chiusa + 1 : q + strlen(q); }
   }
+  for (char *p = inizio; *p; p++)
+    if (*p == ';' || *p == '#') { *p = 0; break; }
   char *s = trim(riga);
   if (!*s) return;
   if (*s == '[') {
@@ -919,6 +926,7 @@ void eseguiSequenzaBoot();
 bool lnkQuiet();
 void lnkInizio();
 void lnkTick();
+bool lnkRecupera();
 void entraTest();
 void entraTestWeb();
 void riavviaSoftware();
@@ -2502,7 +2510,11 @@ bool attesaSplash(unsigned long durataMs) {
 // Serial3 (D14 TX3 / D15 RX3), 115200 baud, una riga per messaggio.
 //   ESP -> Mega: "@COMANDO argomenti*HH" (somma di controllo, vedi lnkVerifica);
 //                il Mega risponde "@OK ..." oppure "@ERR motivo". Senza risposta
-//                l'ESP ritrasmette: i comandi sono ripetibili senza effetti doppi.
+//                l'ESP ritrasmette. I comandi con effetto non ripetibile (RUN, NEXT,
+//                COMMIT, RESTORE) portano un numero: se arriva di nuovo lo stesso numero
+//                il Mega rimanda l'esito della prima volta senza ripetere il comando.
+//                W e C hanno il loro numero di pezzo. COMMIT e RESTORE rispondono
+//                subito "@ACK" (lavoro sulla SD in corso), poi "@OK"/"@ERR".
 //   Mega -> ESP: configurazione WiFi (@SSID @WPWD @USER @APWD @HOST @NREL @GO),
 //                stato ogni secondo (@ST), contenuto del file (@L @C @END).
 // Con [WIFI] abilitato = 0 la Serial3 non viene nemmeno aperta.
@@ -2511,6 +2523,7 @@ bool attesaSplash(unsigned long durataMs) {
 #define LNK_PEZZO_MAX 120          // righe del file spezzate in pezzi da 120 caratteri
 #define LNK_FILE_NUOVO "PRESEPE.NEW"
 #define LNK_FILE_BACKUP "PRESEPE.BAK"
+#define LNK_FILE_SEGNO "PRESEPE.CMT"   // copia .NEW -> file in corso (contiene il nome del file)
 
 bool lnkAttivo = false;
 char lnkRiga[LNK_RIGA_MAX + 1];
@@ -2527,14 +2540,67 @@ uint32_t lnkByte = 0;
 unsigned long lnkScritturaMs = 0;
 // pixel del test da web: bit per pixel, STELLE (0) e CASETTE (1)
 uint8_t webPixel[2][(CFG_MAX_STELLE + 7) / 8];
+// ultimo comando numerato eseguito e il suo esito (vedi lnkEsito)
+uint16_t lnkIdFatto = 0;
+uint8_t lnkIdEsito = 0;
 CfgRGB webPixelColore = { 70, 50, 27 };
 
 bool lnkQuiet() {
   return lnkAttivo && (long)(millis() - lnkSilenzioFino) < 0;
 }
 
+// Prossimo campo separato da spazio (modifica la stringa); nullptr se finita.
+char *lnkCampo(char *&s) {
+  while (*s == ' ') s++;
+  if (!*s) return 0;
+  char *inizio = s;
+  while (*s && *s != ' ') s++;
+  if (*s) *s++ = 0;
+  return inizio;
+}
+bool lnkNumero(char *&s, long &out, long minimo, long massimo) {
+  char *c = lnkCampo(s);
+  if (!c) return false;
+  char *fine; long v = strtol(c, &fine, 10);
+  if (*fine || v < minimo || v > massimo) return false;
+  out = v; return true;
+}
+
 void lnkOk() { LNK_SERIAL.println(F("@OK")); }
 void lnkErr(const __FlashStringHelper *motivo) { LNK_SERIAL.print(F("@ERR ")); LNK_SERIAL.println(motivo); }
+
+// Esiti dei comandi numerati (rimandati uguali a una ritrasmissione).
+enum { ES_OK, ES_OK_INI, ES_OK_TXT, ES_LUNGHEZZA, ES_BACKUP, ES_COPIA, ES_SD, ES_NO_BACKUP, ES_VUOTO, ES_TEST, ES_PUT };
+void lnkRispondi(uint8_t e) {
+  switch (e) {
+    case ES_OK: lnkOk(); break;
+    case ES_OK_INI: LNK_SERIAL.println(F("@OK " CFG_FILE_NAME)); break;
+    case ES_OK_TXT: LNK_SERIAL.println(F("@OK " CFG_FILE_NAME_ALT)); break;
+    case ES_LUNGHEZZA: lnkErr(F("lunghezza")); break;
+    case ES_BACKUP: lnkErr(F("backup")); break;
+    case ES_COPIA: lnkErr(F("copia")); break;
+    case ES_SD: lnkErr(F("sd")); break;
+    case ES_NO_BACKUP: lnkErr(F("nessun backup")); break;
+    case ES_VUOTO: lnkErr(F("vuoto")); break;
+    case ES_TEST: lnkErr(F("test")); break;
+    default: lnkErr(F("put")); break;
+  }
+}
+// Legge il numero del comando (facoltativo per RUN/NEXT). Se e' quello dell'ultimo comando
+// eseguito rimanda il suo esito e ritorna true: il comando non va ripetuto.
+bool lnkGiaFatto(char *&s, uint16_t &id) {
+  long v; id = 0;
+  char *prima = s;
+  if (!lnkNumero(s, v, 1, 65535)) { s = prima; return false; }
+  id = (uint16_t)v;
+  if (id != lnkIdFatto) return false;
+  lnkRispondi(lnkIdEsito);
+  return true;
+}
+void lnkFatto(uint16_t id, uint8_t esito) {
+  if (id) { lnkIdFatto = id; lnkIdEsito = esito; }
+  lnkRispondi(esito);
+}
 
 void lnkInviaConfig() {
   LNK_SERIAL.print(F("@SSID ")); LNK_SERIAL.println(cfg.wifiSsid);
@@ -2553,6 +2619,7 @@ void lnkInizio() {
   lnkAttivo = cfg.wifiAbilitato != 0;
   if (!lnkAttivo) return;
   LNK_SERIAL.begin(115200);
+  pinMode(15, INPUT_PULLUP);   // RX3: senza ESP (DIP 1-2 su OFF) il pin non resta flottante
   strcpy(wifiIp, "none");
   lnkLen = 0; lnkRigaLunga = false;
   lnkInviaConfig();
@@ -2611,6 +2678,44 @@ long lnkCopia(const char *da, const char *a) {
   return tot;
 }
 
+// Copia .NEW sul file di configurazione. Prima scrive il segno PRESEPE.CMT: se la corrente
+// manca durante la copia, al riavvio lnkRecupera() la rifa' (.NEW e' gia' completo e
+// controllato). Se la copia fallisce rimette il file da .BAK. Ritorna true se riuscita.
+bool lnkApplicaNuovo(const char *nome, long attesi) {
+  if (SD.exists(LNK_FILE_SEGNO)) SD.remove(LNK_FILE_SEGNO);
+  File m = SD.open(LNK_FILE_SEGNO, FILE_WRITE);
+  if (!m) return false;
+  m.print(nome); m.close();
+  bool ok = lnkCopia(LNK_FILE_NUOVO, nome) == attesi;
+  if (!ok && SD.exists(LNK_FILE_BACKUP) && lnkCopia(LNK_FILE_BACKUP, nome) < 0) return false;   // il segno resta
+  SD.remove(LNK_FILE_NUOVO);
+  SD.remove(LNK_FILE_SEGNO);
+  return ok;
+}
+
+// All'avvio: completa una copia .NEW -> file interrotta da un'interruzione di corrente.
+// Ritorna true se ha riscritto il file di configurazione (va riletto).
+bool lnkRecupera() {
+  bool fatto = false;
+  if (!SD.begin(PIN_SD_CS)) return false;
+  if (SD.exists(LNK_FILE_SEGNO)) {
+    char nome[13] = CFG_FILE_NAME;
+    File m = SD.open(LNK_FILE_SEGNO, FILE_READ);
+    if (m) {
+      char b[13]; int n = m.read((uint8_t *)b, 12); m.close();
+      if (n > 0) { b[n] = 0; if (!strcmp(b, CFG_FILE_NAME_ALT)) strcpy(nome, CFG_FILE_NAME_ALT); }
+    }
+    if (!SD.exists(LNK_FILE_NUOVO)) SD.remove(LNK_FILE_SEGNO);
+    else if (lnkCopia(LNK_FILE_NUOVO, nome) >= 0) {
+      SD.remove(LNK_FILE_NUOVO); SD.remove(LNK_FILE_SEGNO);
+      Serial.print(F("SD: completato il salvataggio interrotto di ")); Serial.println(nome);
+      fatto = true;
+    }
+  }
+  SD.end();
+  return fatto;
+}
+
 void lnkChiudiScrittura(bool cancella) {
   if (lnkScrittura) { lnkFile.close(); lnkScrittura = false; }
   if (cancella && SD.exists(LNK_FILE_NUOVO)) SD.remove(LNK_FILE_NUOVO);
@@ -2643,22 +2748,6 @@ void lnkInviaFile() {
   LNK_SERIAL.print(F("@END ")); LNK_SERIAL.print(righe); LNK_SERIAL.print(' '); LNK_SERIAL.println(tot);
 }
 
-// Prossimo campo separato da spazio (modifica la stringa); nullptr se finita.
-char *lnkCampo(char *&s) {
-  while (*s == ' ') s++;
-  if (!*s) return 0;
-  char *inizio = s;
-  while (*s && *s != ' ') s++;
-  if (*s) *s++ = 0;
-  return inizio;
-}
-bool lnkNumero(char *&s, long &out, long minimo, long massimo) {
-  char *c = lnkCampo(s);
-  if (!c) return false;
-  char *fine; long v = strtol(c, &fine, 10);
-  if (*fine || v < minimo || v > massimo) return false;
-  out = v; return true;
-}
 
 void webPixelMostra(uint8_t catena) {
   Adafruit_NeoPixel &np = catena ? casette : stelle;
@@ -2733,10 +2822,12 @@ void lnkComando(char *riga) {
   }
   if (!strcmp(cmd, "B")) { buzzerBeep(); lnkOk(); return; }
   // ---------------------------------------------------------------- ciclo
-  if (!strcmp(cmd, "RUN") || !strcmp(cmd, "NEXT")) {
-    if (testInCorso || modalitaColore) { lnkErr(F("test")); return; }
+  if (!strcmp(cmd, "RUN") || !strcmp(cmd, "NEXT")) {     // RUN [id] | NEXT [id]
+    uint16_t id;
+    if (lnkGiaFatto(s, id)) return;
+    if (testInCorso || modalitaColore) { lnkFatto(id, ES_TEST); return; }
     if (cmd[0] == 'R') toggleStartStop(); else faseAvanti();
-    lnkOk(); return;
+    lnkFatto(id, ES_OK); return;
   }
   // ---------------------------------------------------------------- file sulla SD
   if (!strcmp(cmd, "GET")) { lnkInviaFile(); return; }
@@ -2763,32 +2854,43 @@ void lnkComando(char *riga) {
     lnkOk(); return;
   }
   if (!strcmp(cmd, "ABORT")) { lnkChiudiScrittura(true); lnkOk(); return; }
-  if (!strcmp(cmd, "COMMIT")) {                     // COMMIT byte: controlla, poi .INI -> .BAK, .NEW -> .INI
-    if (!lnkScrittura) { lnkErr(F("put")); return; }
+  if (!strcmp(cmd, "COMMIT")) {      // COMMIT byte id: controlla, poi file -> .BAK, .NEW -> file
     if (!lnkNumero(s, a, 0, 2000000L)) { lnkErr(F("arg")); return; }
-    lnkFile.close(); lnkScrittura = false;
-    if ((uint32_t)a != lnkByte) { lnkChiudiScrittura(true); lnkErr(F("lunghezza")); return; }
-    const char *nome = lnkNomeFile();
-    if (SD.exists(nome) && lnkCopia(nome, LNK_FILE_BACKUP) < 0) { lnkChiudiScrittura(true); lnkErr(F("backup")); return; }
-    if (lnkCopia(LNK_FILE_NUOVO, nome) != (long)lnkByte) { lnkChiudiScrittura(false); lnkErr(F("copia")); return; }
-    lnkChiudiScrittura(true);
-    Serial.print(F("WiFi: salvato ")); Serial.println(nome);
-    LNK_SERIAL.print(F("@OK ")); LNK_SERIAL.println(nome);
+    uint16_t id;
+    if (!lnkGiaFatto(s, id)) {
+      if (!id) { lnkErr(F("arg")); return; }
+      if (!lnkScrittura) { lnkFatto(id, ES_PUT); return; }
+      LNK_SERIAL.println(F("@ACK"));
+      lnkFile.close(); lnkScrittura = false;
+      if (a == 0) { lnkChiudiScrittura(true); lnkFatto(id, ES_VUOTO); return; }   // mai un file vuoto
+      if ((uint32_t)a != lnkByte) { lnkChiudiScrittura(true); lnkFatto(id, ES_LUNGHEZZA); return; }
+      const char *nome = lnkNomeFile();
+      if (SD.exists(nome) && lnkCopia(nome, LNK_FILE_BACKUP) < 0) { lnkChiudiScrittura(true); lnkFatto(id, ES_BACKUP); return; }
+      bool ok = lnkApplicaNuovo(nome, (long)lnkByte);
+      SD.end();
+      if (!ok) { lnkFatto(id, ES_COPIA); return; }
+      Serial.print(F("WiFi: salvato ")); Serial.println(nome);
+      lnkFatto(id, strcmp(nome, CFG_FILE_NAME_ALT) ? ES_OK_INI : ES_OK_TXT);
+    }
     return;
   }
-  if (!strcmp(cmd, "RESTORE")) {                    // scambia il file con la copia precedente
+  if (!strcmp(cmd, "RESTORE")) {     // RESTORE id: scambia il file con la copia precedente
+    uint16_t id;
+    if (lnkGiaFatto(s, id)) return;
+    if (!id) { lnkErr(F("arg")); return; }
+    LNK_SERIAL.println(F("@ACK"));
     if (lnkScrittura) lnkChiudiScrittura(true);
-    if (!SD.begin(PIN_SD_CS)) { lnkErr(F("sd")); return; }
+    if (!SD.begin(PIN_SD_CS)) { lnkFatto(id, ES_SD); return; }
     const char *nome = lnkNomeFile();
-    if (!SD.exists(LNK_FILE_BACKUP)) { SD.end(); lnkErr(F("nessun backup")); return; }
-    bool ok = true;
-    if (SD.exists(nome)) ok = lnkCopia(nome, LNK_FILE_NUOVO) >= 0;
-    ok = ok && lnkCopia(LNK_FILE_BACKUP, nome) >= 0;
-    if (ok && SD.exists(LNK_FILE_NUOVO)) ok = lnkCopia(LNK_FILE_NUOVO, LNK_FILE_BACKUP) >= 0;
-    if (SD.exists(LNK_FILE_NUOVO)) SD.remove(LNK_FILE_NUOVO);
+    if (!SD.exists(LNK_FILE_BACKUP)) { SD.end(); lnkFatto(id, ES_NO_BACKUP); return; }
+    // .BAK -> .NEW, file -> .BAK, poi .NEW -> file come un salvataggio normale (con il segno)
+    long n = lnkCopia(LNK_FILE_BACKUP, LNK_FILE_NUOVO);
+    bool ok = n > 0;
+    if (ok && SD.exists(nome) && lnkCopia(nome, LNK_FILE_BACKUP) < 0) { lnkCopia(LNK_FILE_NUOVO, LNK_FILE_BACKUP); ok = false; }
+    ok = ok && lnkApplicaNuovo(nome, n);
+    if (SD.exists(LNK_FILE_NUOVO) && !SD.exists(LNK_FILE_SEGNO)) SD.remove(LNK_FILE_NUOVO);
     SD.end();
-    if (!ok) { lnkErr(F("sd")); return; }
-    LNK_SERIAL.print(F("@OK ")); LNK_SERIAL.println(nome);
+    lnkFatto(id, !ok ? ES_SD : strcmp(nome, CFG_FILE_NAME_ALT) ? ES_OK_INI : ES_OK_TXT);
     return;
   }
   if (!strcmp(cmd, "REBOOT")) { lnkOk(); lnkRiavvio = true; return; }
@@ -2854,6 +2956,8 @@ void setup() {
   pinMode(PIN_SD_CS, OUTPUT);
   digitalWrite(PIN_SD_CS, HIGH);
   cfgCaricaDaSD(PIN_SD_CS, PIN_SD_CD);
+  // Salvataggio dalla pagina web interrotto da un'interruzione di corrente: completalo e rileggi.
+  if (cfg.sdStato != SD_ASSENTE && lnkRecupera()) { cfgDefault(cfg); cfgCaricaDaSD(PIN_SD_CS, PIN_SD_CD); }
   lnkInizio();                 // [WIFI] abilitato: invia SSID e password all'ESP8266 (non blocca)
   stelle.updateLength(cfg.numStelle);
   casette.updateLength(cfg.numCasette);

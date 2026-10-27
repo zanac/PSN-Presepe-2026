@@ -21,6 +21,8 @@ const char *megaIp();
 bool megaRiavvio();
 bool megaTestWeb();
 extern bool megaPresente;
+extern int megaAvanti;
+extern std::map<std::string, std::string> disk;
 
 static int fails = 0, checks = 0;
 #define CHECK(c) do { checks++; if (!(c)) { fails++; std::printf("FAIL line %d: %s\n", __LINE__, #c); } } while (0)
@@ -59,6 +61,18 @@ int main() {
   r = server.chiama("/api/cmd", HTTP_POST, "R 17 1");
   CHECK(r.code == 200 && r.body.find("\"ok\":false") != std::string::npos && r.body.find("arg") != std::string::npos);
 
+  // 4b. requests without the pages' X-Presepe header (another site in the same browser) are refused
+  CHECK(server.chiama("/api/cmd", HTTP_POST, "R 3 0", "admin", "presepe2026", {}).code == 403 && megaRele() == 4);
+  CHECK(server.chiama("/api/ini", HTTP_POST, "x\n", "admin", "presepe2026", {}).code == 403);
+  CHECK(server.chiama("/api/riavvia", HTTP_POST, "", "admin", "presepe2026", {}).code == 403 && !megaRiavvio());
+  r = server.chiama("/api/cmd", HTTP_POST, "X");                                // leave the test
+  // 4c. NEXT with losses: executed exactly once per click that got an answer
+  {
+    int a0 = megaAvanti, okn = 0;
+    for (int i = 0; i < 10; i++) { r = server.chiama("/api/cmd", HTTP_POST, "NEXT"); if (r.body.find("\"ok\":true") != std::string::npos) okn++; }
+    CHECK(okn == 10 && megaAvanti == a0 + 10);
+  }
+
   // 5. read the file (CRLF removed)
   r = server.chiama("/api/ini", HTTP_GET, "");
   CHECK(r.code == 200 && r.body == "[CICLO]\ndurata1 = 60\n" && r.headers["X-File"] == "PRESEPE.INI");
@@ -83,10 +97,20 @@ int main() {
   r = server.chiama("/api/ini", HTTP_GET, "");
   CHECK(r.code == 200 && r.body == atteso.substr(0, atteso.size() - 1) + "19\n");
 
+  // 6b. empty or truncated body (ESP out of memory): refused, nothing sent to the Mega
+  {
+    std::string prima = megaFile("PRESEPE.INI");
+    r = server.chiama("/api/ini", HTTP_POST, "");
+    CHECK(r.code == 400 && r.body.find("vuoto") != std::string::npos && megaFile("PRESEPE.INI") == prima);
+    r = server.chiama("/api/ini", HTTP_POST, "[CICLO]\n", "admin", "presepe2026", {{"X-Presepe", "1"}, {"X-Len", "12000"}});
+    CHECK(r.code == 400 && megaFile("PRESEPE.INI") == prima && !megaHaFile("PRESEPE.NEW"));
+  }
+
   // 7. restore swaps with the backup
   std::string ora = megaFile("PRESEPE.INI"), prima = megaFile("PRESEPE.BAK");
   r = server.chiama("/api/ripristina", HTTP_POST, "");
   CHECK(r.code == 200 && megaFile("PRESEPE.INI") == prima && megaFile("PRESEPE.BAK") == ora);
+  CHECK(!megaHaFile("PRESEPE.NEW") && !megaHaFile("PRESEPE.CMT"));
 
   // 8. reboot request reaches the Mega
   r = server.chiama("/api/riavvia", HTTP_POST, "");
@@ -103,6 +127,13 @@ int main() {
   megaAvvia("AltraRete", "12345678");
   gira(50);
   CHECK(ESP.restarts == 1);
+
+  // 11. incomplete configuration (a line lost while the ESP was starting): not applied
+  {
+    String ssid0 = cfgSsid; int r0 = ESP.restarts;
+    rigaDalMega("@SSID Terza"); rigaDalMega("@WPWD 12345678"); rigaDalMega("@APWD x"); rigaDalMega("@HOST h"); rigaDalMega("@GO");
+    CHECK(cfgSsid == ssid0 && ESP.restarts == r0);                             // @USER missing
+  }
 
   CHECK(persi > 50);                              // the loss model really dropped bytes
   std::printf("end-to-end test: %d checks, %d failures (%ld bytes lost and recovered)\n", checks, fails, persi);

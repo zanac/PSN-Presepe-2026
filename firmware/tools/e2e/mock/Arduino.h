@@ -61,5 +61,5 @@ struct EspSerial {
   void print(char c) { put(c); }
 };
 extern EspSerial Serial;
-struct EspMock { int restarts = 0; void restart() { restarts++; } };
+struct EspMock { int restarts = 0; void restart() { restarts++; } uint32_t random() { return 0x5a5a; } };
 extern EspMock ESP;

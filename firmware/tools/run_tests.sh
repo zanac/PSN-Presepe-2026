@@ -33,4 +33,13 @@ ${CXX:-g++} -std=c++14 -Wall -Wno-unused-function -I"$T" -I"$E" -c "$E/mega_side
 ${CXX:-g++} -std=c++14 -Wall -Wno-unused-function -I"$E/mock" -DESP_INO="\"$HERE/../PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino\"" -c "$E/esp_side.cpp" -o "$T/esp_side.o"
 ${CXX:-g++} "$T/mega_side.o" "$T/esp_side.o" -o "$T/e2e"
 "$T/e2e"
+# 5. syntax of the page scripts (simulator / editor and control panel), when Node.js is installed
+if command -v node >/dev/null 2>&1; then
+  R=$HERE/../..
+  for f in "$R/simulation_web/simulator.template.html" "$R/firmware/web/pannello.html"; do
+    awk '/<script>/{f=1;next} /<\/script>/{f=0} f' "$f" | sed 's/__INI__/""/' > "$T/page.js"
+    node --check "$T/page.js" || { echo "JavaScript syntax error in $f"; exit 1; }
+  done
+  echo "page scripts: syntax OK"
+fi
 rm -rf "$T"

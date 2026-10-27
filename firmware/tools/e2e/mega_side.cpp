@@ -52,6 +52,7 @@ struct File {
   int read() { std::string &d = disk[name]; return pos < d.size() ? (unsigned char)d[pos++] : -1; }
   int read(void *buf, size_t n) { std::string &d = disk[name]; size_t k = 0; while (k < n && pos < d.size()) ((uint8_t *)buf)[k++] = (uint8_t)d[pos++]; return (int)k; }
   size_t write(const uint8_t *b, size_t n) { disk[name].append((const char *)b, n); return n; }
+  size_t print(const char *s) { return write((const uint8_t *)s, std::strlen(s)); }
   void close() { mode = -1; }
 };
 struct SDMock {
@@ -61,6 +62,8 @@ struct SDMock {
   File open(const char *n, int mode) { File f; if (mode == FILE_READ && !disk.count(n)) return f; if (mode == FILE_WRITE) disk[n]; f.name = n; f.mode = mode; return f; }
 } SD;
 const uint8_t PIN_SD_CS = 53;
+const int INPUT_PULLUP = 2;
+static void pinMode(int, int) {}
 struct Adafruit_NeoPixel {
   uint32_t px[100] = {};
   void clear() { std::memset(px, 0, sizeof px); } void setPixelColor(uint16_t i, uint32_t c) { if (i < 100) px[i] = c; } void show() {}
@@ -85,7 +88,8 @@ void scriviRele(uint8_t i, bool on) { if (on) releStato |= (uint16_t)(1U << i); 
 void spegniRele() { for (uint8_t i = 0; i < 16; i++) scriviRele(i, false); }
 void tuttoSpento() { setCielo(0, 0, 0); setTramonto(0, 0, 0); setAlba(0, 0, 0); }
 void buzzerBeep(bool = true) {}
-void faseAvanti() {}
+int megaAvanti = 0;
+void faseAvanti() { megaAvanti++; }
 void mostraOledTest() {}
 void toggleStartStop() { if (testInCorso) { testInCorso = testWeb = false; spegniRele(); return; } running = !running; }
 void entraTestWeb() { if (!testInCorso) testInCorso = true; testWeb = true; tuttoSpento(); spegniRele(); }

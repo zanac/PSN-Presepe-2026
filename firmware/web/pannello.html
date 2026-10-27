@@ -178,10 +178,11 @@ let busy = false; const queue = new Map();   // chiave -> comando: il piu' recen
 function send(key, c) { queue.set(key, c); pump(); }
 async function pump() {
   if (busy || !queue.size) return;
+  if (!st || !st.mega) { queue.clear(); say("Il presepe non risponde: comando non inviato.", true); return; }
   const [key, c] = queue.entries().next().value; queue.delete(key);
   busy = true;
   try {
-    const r = await fetch("/api/cmd", { method: "POST", headers: { "Content-Type": "text/plain" }, body: c });
+    const r = await fetch("/api/cmd", { method: "POST", headers: { "Content-Type": "text/plain", "X-Presepe": "1" }, body: c });
     const j = await r.json();
     if (!j.ok) say("Comando non eseguito: " + (j.msg || c), true);
   } catch (e) { say("Il presepe non risponde.", true); }
@@ -203,7 +204,8 @@ function show() {
   $("dot").className = "dot" + (st.mega ? " on" : "");
   $("net").textContent = `${st.host}.local · ${st.ip} · segnale ${st.rssi} dBm`;
   $("offline").hidden = st.mega;
-  if (!st.mega) { $("offlineMsg").textContent = "Il presepe non risponde: è in avvio, oppure l'ESP8266 non è collegato alla Serial3 (DIP 1-2 e selettore su RXD3/TXD3)."; return; }
+  if (!st.mega) { ["cardCiclo", "cardTest", "cardColore"].forEach(id => { $(id).hidden = true; }); modo = -1;
+    $("offlineMsg").textContent = "Il presepe non risponde: è in avvio, oppure l'ESP8266 non è collegato alla Serial3 (DIP 1-2 e selettore su RXD3/TXD3)."; return; }
   $("phase").textContent = FASI[st.fase] || "—";
   $("meta").textContent = `${st.pctFase} % della fase · ${st.pct.toFixed(1)} % del ciclo · ${st.run ? "in corso" : "in pausa"} · ciclo ${fmt(st.durata)}`;
   $("prog").style.width = st.pct + "%";

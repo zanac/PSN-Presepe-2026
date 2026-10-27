@@ -37,7 +37,9 @@ ESP8266WebServer server(80);
 String cfgSsid, cfgWpwd, cfgUtente, cfgApwd, cfgHost = "presepe";   // in uso
 String nSsid, nWpwd, nUtente, nApwd, nHost;                          // in arrivo (applicati a @GO)
 String nomiRele[16];
-bool configOk = false;          // ricevuto almeno un @GO
+bool configOk = false;          // ricevuto almeno un @GO completo
+uint8_t cfgCampi = 0;           // campi ricevuti dall'ultimo @SSID (1 SSID, 2 WPWD, 4 USER, 8 APWD, 16 HOST)
+uint16_t idComando = 1;         // numero dei comandi non ripetibili (RUN, NEXT, COMMIT, RESTORE)
 bool reteAvviata = false;       // WiFi.begin() eseguito
 bool servizi = false;           // mDNS e OTA avviati (dopo la prima connessione)
 unsigned long helloMs = 0;
@@ -55,6 +57,7 @@ bool inGet = false;
 String getTesto, getNome;
 String ipInviato = "";          // ultimo IP confermato dal Mega
 unsigned long ipMs = 0;
+bool ackVisto = false;          // "@ACK" (o "@FILE" per GET): il Mega ha ricevuto il comando e lavora
 
 uint8_t somma(const String &s) {
   uint8_t x = 0;
@@ -95,19 +98,22 @@ void rigaDalMega(String l) {
     statoValido = n == 22; statoMs = millis();
     return;
   }
-  if (l.startsWith("@SSID ")) { nSsid = l.substring(6); return; }
-  if (l.startsWith("@WPWD ")) { nWpwd = l.substring(6); return; }
-  if (l.startsWith("@USER ")) { nUtente = l.substring(6); return; }
-  if (l.startsWith("@APWD ")) { nApwd = l.substring(6); return; }
-  if (l.startsWith("@HOST ")) { nHost = l.substring(6); return; }
+  // La configurazione arriva sempre in quest'ordine: @SSID apre un nuovo invio, @GO lo applica
+  // solo se sono arrivati tutti i campi (altrimenti l'ESP continua a mandare @HELLO).
+  if (l.startsWith("@SSID ") || l == "@SSID") { nSsid = l.substring(6); cfgCampi = 1; return; }
+  if (l.startsWith("@WPWD ") || l == "@WPWD") { nWpwd = l.substring(6); cfgCampi |= 2; return; }
+  if (l.startsWith("@USER ")) { nUtente = l.substring(6); cfgCampi |= 4; return; }
+  if (l.startsWith("@APWD ")) { nApwd = l.substring(6); cfgCampi |= 8; return; }
+  if (l.startsWith("@HOST ")) { nHost = l.substring(6); cfgCampi |= 16; return; }
   if (l.startsWith("@NREL ")) {
     int sp = l.indexOf(' ', 6);
     int i = (sp < 0 ? l.substring(6) : l.substring(6, sp)).toInt();
     if (i >= 1 && i <= 16) nomiRele[i - 1] = sp < 0 ? "" : l.substring(sp + 1);
     return;
   }
-  if (l == "@GO") { applicaConfig(); return; }
-  if (l.startsWith("@FILE ")) { getNome = l.substring(6); return; }
+  if (l == "@GO") { if (cfgCampi == 31 && nUtente.length() && nApwd.length()) applicaConfig(); cfgCampi = 0; return; }
+  if (l == "@ACK") { ackVisto = true; return; }
+  if (l.startsWith("@FILE ")) { getNome = l.substring(6); getTesto = ""; ackVisto = true; return; }
   if (l.startsWith("@L ") || l == "@L") { if (inGet) { getTesto += l.substring(3); getTesto += '\n'; } return; }
   if (l.startsWith("@C ")) { if (inGet) getTesto += l.substring(3); return; }
   if (l.startsWith("@END")) { if (inGet) { risposta = l; rispostaPronta = true; } return; }
@@ -125,24 +131,35 @@ void leggiSeriale() {
 
 // Invia un comando e aspetta la risposta. Ritrasmette se la riga non arriva al Mega
 // (puo' perdere caratteri mentre aggiorna le WS2811). Ritorna "" se nessuna risposta.
-String comando(const String &c, unsigned long attesaMs = 600, uint8_t tentativi = 4) {
+// lavoroMs: dopo "@ACK" (comando ricevuto, lavoro sulla SD in corso) aspetta fino a
+// lavoroMs la risposta finale senza ritrasmettere.
+String comando(const String &c, unsigned long attesaMs = 600, uint8_t tentativi = 4, unsigned long lavoroMs = 0) {
   for (uint8_t t = 0; t < tentativi; t++) {
     leggiSeriale();
-    rispostaPronta = false; risposta = "";
+    rispostaPronta = false; risposta = ""; ackVisto = false;
+    // Un '\n' da solo prima della riga: il Mega lo tiene nel registro della UART anche se sta
+    // aggiornando le WS2811 a interrupt spenti, e appena lo legge smette di aggiornarle
+    // per 150 ms (lnkQuiet), cosi' la riga vera arriva intera.
+    Serial.print('\n');
+    delay(8);
     scriviRiga("@" + c);
     unsigned long t0 = millis();
-    while (millis() - t0 < attesaMs) {
+    bool lavoro = false;
+    while (millis() - t0 < (lavoro ? lavoroMs : attesaMs)) {
       leggiSeriale();
       if (rispostaPronta) return risposta;
+      if (ackVisto && lavoroMs && !lavoro) { lavoro = true; t0 = millis(); }
       delay(1);
     }
+    if (lavoro) return "";        // il Mega ha ricevuto ma non ha finito: non ripetere
   }
   return "";
 }
+String nuovoId() { if (++idComando == 0) idComando = 1; return String(idComando); }
 
 // ------------------------------------------------------------------ pagine
 bool autorizzato() {
-  if (!configOk) {
+  if (!configOk || !cfgApwd.length()) {
     server.send(503, "text/plain; charset=utf-8",
                 "Il presepe non ha ancora inviato la configurazione: [WIFI] abilitato = 1 nel PRESEPE.INI, "
                 "DIP 1 e 2 su ON, selettore su RXD3/TXD3.");
@@ -187,6 +204,10 @@ String motivo(const String &r) {
     if (m == "test") return "comando non disponibile durante il test";
     if (m == "lunghezza") return "trasferimento incompleto, riprova";
     if (m == "nessun backup") return "non c'e' una copia precedente (PRESEPE.BAK)";
+    if (m == "vuoto") return "file vuoto, non salvato";
+    if (m == "copia") return "scrittura sulla microSD non riuscita (rimesso il file precedente)";
+    if (m == "backup") return "copia di sicurezza PRESEPE.BAK non riuscita, file non salvato";
+    if (m == "put") return "salvataggio interrotto, riprova";
     return m;
   }
   return r;
@@ -233,10 +254,20 @@ bool comandoAmmesso(const String &c) {
   return false;
 }
 
+// Le richieste che cambiano qualcosa devono avere l'intestazione X-Presepe (la mettono le
+// pagine del presepe): un'altra pagina aperta nello stesso browser non puo' aggiungerla senza
+// un permesso CORS che l'ESP non da', quindi non puo' usare le credenziali salvate.
+bool daPagina() {
+  if (server.header("X-Presepe") == "1") return true;
+  server.send(403, "text/plain; charset=utf-8", "richiesta non valida");
+  return false;
+}
+
 void apiComando() {
-  if (!autorizzato()) return;
+  if (!autorizzato() || !daPagina()) return;
   String c = server.arg("plain"); c.trim();
   if (!comandoAmmesso(c)) { rispostaJson(false, "msg", "comando non valido", 400); return; }
+  if (c == "RUN" || c == "NEXT") c += " " + nuovoId();     // non ripetibili: numerati
   String r = comando(c);
   bool ok = r.startsWith("@OK");
   rispostaJson(ok, "msg", ok ? String("") : motivo(r));
@@ -246,7 +277,7 @@ void apiLeggiFile() {
   if (!autorizzato()) return;
   inGet = true; getTesto = ""; getNome = "";
   getTesto.reserve(12000);
-  String r = comando("GET", 15000, 2);
+  String r = comando("GET", 1500, 4, 15000);
   inGet = false;
   if (!r.startsWith("@END")) {
     server.send(503, "text/plain; charset=utf-8", motivo(r));
@@ -261,10 +292,13 @@ void apiLeggiFile() {
 
 // Salva il testo sulla microSD: PUT, righe a pezzi da 100 caratteri, COMMIT.
 void apiScriviFile() {
-  if (!autorizzato()) return;
-  String t = server.arg("plain");
+  if (!autorizzato() || !daPagina()) return;
+  const String &t = server.arg("plain");      // nessuna copia: il file puo' essere lungo
+  // X-Len = byte inviati dalla pagina: se la memoria e' finita il testo arriva vuoto o tagliato
+  if (!t.length() || String(t.length()) != server.header("X-Len")) {
+    rispostaJson(false, "msg", t.length() ? "file arrivato incompleto, riprova" : "file vuoto, non salvato", 400); return;
+  }
   if (t.length() > 24000) { rispostaJson(false, "msg", "file troppo lungo (massimo 24000 caratteri)", 413); return; }
-  t.replace("\r", "");
   String r = comando("PUT", 3000, 3);
   if (!r.startsWith("@OK")) { rispostaJson(false, "msg", motivo(r), 503); return; }
   uint16_t seq = 0; uint32_t byte = 0;
@@ -278,6 +312,7 @@ void apiScriviFile() {
       size_t q = fineRiga - p > 100 ? p + 100 : fineRiga;
       bool ultimo = q == fineRiga;
       String pezzo = t.substring(p, q);
+      pezzo.replace("\r", "");
       String cmd = String(ultimo ? "W " : "C ") + String(seq) + " " + pezzo;
       r = comando(cmd, 1500, 4);
       if (!r.startsWith("@OK")) { comando("ABORT", 3000, 2); rispostaJson(false, "msg", motivo(r), 503); return; }
@@ -287,15 +322,14 @@ void apiScriviFile() {
     i = fineRiga + 1;
     if (fine < 0) break;
   }
-  r = comando("COMMIT " + String(byte), 15000, 2);
-  if (r.startsWith("@ERR put")) r = "@OK";       // il primo COMMIT era arrivato: gia' salvato
+  r = comando("COMMIT " + String(byte) + " " + nuovoId(), 1500, 4, 20000);
   if (!r.startsWith("@OK")) { rispostaJson(false, "msg", motivo(r), 503); return; }
   String nome = r.length() > 4 ? r.substring(4) : String("PRESEPE.INI");
   rispostaJson(true, "file", nome);
 }
 
 void apiRiavvia() {
-  if (!autorizzato()) return;
+  if (!autorizzato() || !daPagina()) return;
   String r = comando("REBOOT", 800, 4);
   bool ok = r.startsWith("@OK");
   if (ok) statoValido = false;
@@ -303,8 +337,8 @@ void apiRiavvia() {
 }
 
 void apiRipristina() {
-  if (!autorizzato()) return;
-  String r = comando("RESTORE", 15000, 2);
+  if (!autorizzato() || !daPagina()) return;
+  String r = comando("RESTORE " + nuovoId(), 1500, 4, 20000);
   if (!r.startsWith("@OK")) { rispostaJson(false, "msg", motivo(r), 503); return; }
   rispostaJson(true, "file", r.length() > 4 ? r.substring(4) : String("PRESEPE.INI"));
 }
@@ -316,6 +350,8 @@ void setup() {
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();            // nessuna rete ricordata: si collega solo con i dati del Mega
+  idComando = (uint16_t)(ESP.random() | 1);   // diverso a ogni avvio dell'ESP
+  server.collectHeaders("X-Presepe", "X-Len");    // intestazioni lette da daPagina() e apiScriviFile()
 
   server.on("/", HTTP_GET, []() { if (autorizzato()) inviaPagina(PAGINA_PANNELLO, PAGINA_PANNELLO_LEN); });
   server.on("/config", HTTP_GET, []() { if (autorizzato()) inviaPagina(PAGINA_CONFIG, PAGINA_CONFIG_LEN); });
