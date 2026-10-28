@@ -1,4 +1,4 @@
-# PSN-Presepe — Rev D
+# PSN-Presepe
 
 *English · [Italiano](README.it.md)*
 
@@ -12,7 +12,7 @@ It runs a day/night cycle: **GIORNO → TRAMONTO → CREPUSCOLO → NOTTE → AL
 
 Every scenography parameter can be changed from a `PRESEPE.INI` file on a microSD card, read at power-on.
 
-This repository holds the complete Rev D project:
+This repository holds the complete project, for both board revisions:
 
 - the PCB (KiCad), with the scripts that generate and verify it;
 - manufacturing files ready for a turnkey assembler;
@@ -20,6 +20,15 @@ This repository holds the complete Rev D project:
 - wiring documentation for building the controller on a breadboard without the PCB.
 
 > **Status.** The Rev D PCB was ordered from PCBWay (turnkey assembly, see [manufacturing/pcbway-order-2026-10-04](hardware/rev-d/manufacturing/pcbway-order-2026-10-04/README.md)) and the assembled boards have been tested: everything works. **Rev E** (small fixes plus a status LED and test points, same size and connectors, same firmware) is being designed in [`hardware/rev-e`](hardware/rev-e); it has not been ordered yet. See [Rev E](#rev-e-next-revision).
+
+**Two board releases.** Both use the same firmware, the same `PRESEPE.INI` and the same terminals, so the rest of this README applies to either:
+
+| Release | Folder | State | Use it for |
+|---|---|---|---|
+| **Rev D** | [`hardware/rev-d`](hardware/rev-d) | ordered, assembled and tested: works | the boards already built; reference for reorders as they are |
+| **Rev E** | [`hardware/rev-e`](hardware/rev-e) | designed and verified, not ordered yet | the next order: buzzer footprint for the CEM-1203(42), polarised C1, 8 mil spacing, status LED, test points |
+
+To flash the firmware (plain Mega or Mega + WiFi) see [Step by step with the Arduino IDE](#step-by-step-with-the-arduino-ide).
 
 ![Rev D top side](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-gerber-render-top.png)
 
@@ -349,10 +358,64 @@ The sketch declares its prototypes explicitly, so it does not depend on the IDE'
 
 ### Flash the prebuilt HEX
 
-- **Windows:** copy `PSN-Presepe.ino.hex` and `flash-windows.bat` into one folder and run the BAT. It downloads arduino-cli on first use and auto-detects the Mega.
+- **Windows:** copy `PSN-Presepe.ino.hex` and `flash-windows.bat` into one folder and run the BAT. It downloads arduino-cli on first use and auto-detects an original Mega; with a CH340 clone (WeMos and others) it asks for the COM port.
 - **Linux / macOS:** `firmware/tools/flash.sh [port]`.
 
 Flash with the 12 V supply off: during the upload the outputs toggle, and without 12 V no relay can switch. The Mega can stay plugged into the board, as long as the USB plug fits ([section 14](#14-known-limitations-and-open-points)).
+
+### Step by step with the Arduino IDE
+
+The same firmware runs on both board revisions (Rev D and Rev E) and on either controller:
+
+- **Arduino Mega 2560** (original or clone): only the Mega firmware, parts A and B.
+- **"Mega + WiFi R3"** (WeMos / RobotDyn, ATmega2560 + ESP8266 on one board, CH340 USB chip): both firmwares, parts A and C.
+
+Download the repository (*Code → Download ZIP* on GitHub) and unpack it into a **new, empty folder**. An old sketch folder with leftover files (for example a former `PresepeConfig.cpp`) breaks the build with *multiple definition* errors.
+
+**A. Once: Arduino IDE, libraries, ESP8266 package**
+
+1. Install the Arduino IDE 2.x from arduino.cc.
+2. *Tools → Manage Libraries*: install **Adafruit NeoPixel**, **Adafruit GFX Library**, **Adafruit SSD1306** (answer *Install all* to add Adafruit BusIO) and check that **SD** (by Arduino) is installed.
+3. Only for the WiFi board: *File → Preferences → Additional boards manager URLs*, add `https://arduino.esp8266.com/stable/package_esp8266com_index.json`; then *Tools → Board → Boards Manager*, install **esp8266** (by ESP8266 Community) version **3.1.2**.
+4. Clones with a CH340 USB chip (the WeMos and many Megas) need the CH340 driver on Windows: the board must appear in *Device Manager → Ports* as "USB-SERIAL CH340 (COMx)".
+
+**B. Arduino Mega 2560**
+
+1. Connect the Mega by USB. If it is already on the shield, switch the 12 V supply off.
+2. Open `firmware/PSN-Presepe/PSN-Presepe.ino`. Only one tab must appear.
+3. *Tools → Board → Arduino AVR Boards → Arduino Mega or Mega 2560*, *Processor: ATmega2560*, *Port*: the Mega's COM port.
+4. **Upload**. The IDE reports about 89 kB (35 %) of program storage.
+5. Check: *Serial Monitor* at **115200 baud** prints the configuration at start-up.
+
+**C. "Mega + WiFi R3" board (two firmwares)**
+
+The DIP switches sit under the shield once the board is mounted: do C1–C3 with the board off the shield, powered by USB only, and **always unplug the USB before moving a DIP switch**.
+
+*C1 – Mega firmware*
+1. DIP **3 and 4 ON**, all others OFF. Plug in the USB.
+2. As in part B: open `PSN-Presepe.ino`, board *Arduino Mega or Mega 2560*, the CH340 COM port, **Upload**.
+
+*C2 – ESP8266 firmware*
+1. Unplug the USB. DIP **5, 6 and 7 ON**, all others OFF (DIP 7 puts the ESP8266 in flash mode). Plug in the USB.
+2. Open `firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino`. Two tabs appear: the sketch and `pagine_web.h` (the web pages, generated; it must stay in the same folder).
+3. *Tools*: **Board: Generic ESP8266 Module**, **Flash Size: 4MB (FS:1MB OTA:~1019KB)**, **Upload Speed: 115200**, *Port*: the same COM port. Leave the other options as they are.
+4. **Upload**. The first build takes a few minutes; then "Connecting…", "Writing at … (100 %)" and "Hard resetting via RTS pin…". If it says *Failed to connect to ESP8266*, unplug and replug the USB with DIP 5, 6, 7 still ON and upload again.
+5. Check: unplug the USB, set DIP 7 OFF (5 and 6 stay ON), plug in, *Serial Monitor* at 115200: a line `@HELLO*B4` every 2 s means the ESP firmware runs and is calling the Mega.
+
+*C3 – final setting and mounting*
+1. Unplug the USB. DIP **1, 2, 3 and 4 ON**, 5–8 OFF. Serial selector next to the DIP switches on **RXD3 / TXD3**.
+2. Check DIP switches and selector once more, then mount the board on the shield; make sure nothing under it touches the ESP module or the DIP switches.
+
+*C4 – first test, no home network needed*
+1. Put an **empty** FAT32 microSD in the shield and power on with 12 V: the display shows **PRESEPE.INI CREATO**. Power off.
+2. On a PC open `PRESEPE.INI`, set `[WIFI] abilitato = 2` (access point), save, put the card back, power on.
+3. During the cycle press **TEST**: the first screen shows `WI-FI ACCESS POINT`, `rete Presepe`, `IP: 192.168.4.1`.
+4. On the phone join the WiFi **Presepe** (password `presepe2026`; if the phone warns there is no Internet, stay connected) and open **http://192.168.4.1/**, user **admin**, password **presepe2026**.
+5. Then choose the final mode in `[WIFI]` (1 = home network with `ssid` and `password`, 3 = home network with access point as fallback) and change the passwords of `[AUTENTICAZIONE]` and `[ACCESS_POINT]`.
+
+**Later updates (no need to remove the board):**
+- **Mega:** with the normal setting (DIP 1–4 ON) the USB still reaches the Mega: upload as in part B.
+- **ESP8266:** over WiFi. The PC must be on the same network as the presepe (in access-point mode: connected to the presepe's network). In *Tools → Port* choose the network port **presepe** instead of the COM port and upload; the IDE asks for the password of `[AUTENTICAZIONE]`. Without the network port: `python espota.py -i <IP> -p 8266 -a <password> -f PSN-Presepe-WiFi.ino.bin` (`espota.py` is in the `tools` folder of the installed esp8266 package). Only if an ESP firmware no longer starts does the board have to come off for the USB route (DIP 5, 6, 7).
 
 ### Operation
 
@@ -443,12 +506,7 @@ The Mega stays in charge of everything: the ESP8266 only bridges the network to 
 
 The serial selector switch next to the DIP switches must be on **RXD3 / TXD3**. All other DIP switches OFF.
 
-**First installation:**
-1. Set DIP 3, 4 ON (others OFF). Flash the Mega as above ([Build](#build) or [Flash the prebuilt HEX](#flash-the-prebuilt-hex)), board *Arduino Mega or Mega 2560*.
-2. Unplug USB. Set DIP 5, 6, 7 ON (others OFF). In the Arduino IDE add `https://arduino.esp8266.com/stable/package_esp8266com_index.json` under *Preferences → Additional boards manager URLs*, install the **esp8266** package (3.1.x), open `firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino`, choose *Generic ESP8266 Module*, *Flash Size: 4MB (FS:1MB OTA:~1019KB)*, *Upload Speed: 115200*, then Upload. Without the IDE: `esptool.py --port PORT write_flash 0x0 firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino.bin`.
-3. Unplug USB. Set DIP 1, 2, 3, 4 ON (others OFF), selector on RXD3 / TXD3. Mount the board on the shield.
-4. On the card, in `PRESEPE.INI`: `[WIFI] abilitato = 1`, `ssid`, `password` (or `abilitato = 2` for the access point, which needs nothing else, or `abilitato = 3` for both); change `[AUTENTICAZIONE] password`.
-5. Power on, press TEST: the first screen shows the IP address and `presepe.local`. Open it from a phone on the same network. TEST again continues with the normal tests.
+**First installation and updates:** step by step in [Step by step with the Arduino IDE](#step-by-step-with-the-arduino-ide) (part C). In short: Mega firmware with DIP 3, 4 ON; ESP firmware with DIP 5, 6, 7 ON; then DIP 1–4 ON and the selector on RXD3 / TXD3. Without the IDE the ESP can be flashed with `esptool.py --port PORT write_flash 0x0 firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino.bin`.
 
 Later ESP updates can go over WiFi (Arduino IDE → *Port* → network port `presepe`, password of `[AUTENTICAZIONE]`), so the board does not need to come off the shield. After changing the pages (`firmware/web/pannello.html` or `simulation_web/simulator.template.html`) run `python3 firmware/tools/build_web.py` (it also regenerates [demo/](demo/README.md)) and rebuild the ESP firmware.
 

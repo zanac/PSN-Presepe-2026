@@ -1,4 +1,4 @@
-# PSN-Presepe — Rev D
+# PSN-Presepe
 
 *[English](README.md) · Italiano*
 
@@ -12,7 +12,7 @@ Gestisce un ciclo giorno/notte: **GIORNO → TRAMONTO → CREPUSCOLO → NOTTE �
 
 Tutti i parametri della scenografia si possono cambiare con il file `PRESEPE.INI` su una microSD, letto all'accensione.
 
-Questo repository contiene il progetto Rev D completo:
+Questo repository contiene il progetto completo, per entrambe le revisioni della scheda:
 
 - il PCB (KiCad), con gli script che lo generano e lo verificano;
 - i file di produzione pronti per un assemblatore chiavi in mano;
@@ -20,6 +20,15 @@ Questo repository contiene il progetto Rev D completo:
 - la documentazione dei collegamenti per realizzare la centralina su breadboard, senza PCB.
 
 > **Stato.** Il PCB Rev D è stato ordinato a PCBWay con montaggio chiavi in mano (vedi [manufacturing/pcbway-order-2026-10-04](hardware/rev-d/manufacturing/pcbway-order-2026-10-04/README.md)) e le schede montate sono state provate: funziona tutto. La **Rev E** (piccole correzioni più un LED di stato e i punti di misura, stesse dimensioni e morsetti, stesso firmware) è in progettazione in [`hardware/rev-e`](hardware/rev-e); non è ancora stata ordinata. Vedi [Rev E](#rev-e-prossima-revisione).
+
+**Due release della scheda.** Usano lo stesso firmware, lo stesso `PRESEPE.INI` e gli stessi morsetti, quindi il resto di questo README vale per entrambe:
+
+| Release | Cartella | Stato | Da usare per |
+|---|---|---|---|
+| **Rev D** | [`hardware/rev-d`](hardware/rev-d) | ordinata, montata e provata: funziona | le schede già fatte; riferimento per riordinarla così com'è |
+| **Rev E** | [`hardware/rev-e`](hardware/rev-e) | progettata e verificata, non ancora ordinata | il prossimo ordine: impronta del buzzer CEM-1203(42), C1 polarizzato, spaziature 8 mil, LED di stato, punti di misura |
+
+Per caricare il firmware (Mega normale o Mega + WiFi) vedi [Passo passo con l'IDE Arduino](#passo-passo-con-lide-arduino).
 
 ![Rev D lato superiore](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-gerber-render-top.png)
 
@@ -349,10 +358,64 @@ Lo sketch dichiara i suoi prototipi esplicitamente, quindi non dipende dalla gen
 
 ### Caricare l'HEX già compilato
 
-- **Windows:** metti `PSN-Presepe.ino.hex` e `flash-windows.bat` nella stessa cartella ed esegui il BAT. Al primo avvio scarica arduino-cli e trova da solo la Mega.
+- **Windows:** metti `PSN-Presepe.ino.hex` e `flash-windows.bat` nella stessa cartella ed esegui il BAT. Al primo avvio scarica arduino-cli e trova da solo una Mega originale; con una compatibile CH340 (WeMos e altre) chiede la porta COM.
 - **Linux / macOS:** `firmware/tools/flash.sh [porta]`.
 
 Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le uscite cambiano stato, e senza 12 V nessun relè può scattare. La Mega può restare innestata sulla scheda, a patto che la spina USB entri ([sezione 14](#14-limiti-noti-e-punti-aperti)).
+
+### Passo passo con l'IDE Arduino
+
+Lo stesso firmware va su entrambe le revisioni della scheda (Rev D e Rev E) e su entrambe le centraline:
+
+- **Arduino Mega 2560** (originale o compatibile): solo il firmware del Mega, parti A e B.
+- **"Mega + WiFi R3"** (WeMos / RobotDyn, ATmega2560 + ESP8266 sulla stessa basetta, chip USB CH340): entrambi i firmware, parti A e C.
+
+Scarica il repository (*Code → Download ZIP* su GitHub) ed estrailo in una **cartella nuova e vuota**. Una vecchia cartella dello sketch con file rimasti (per esempio un vecchio `PresepeConfig.cpp`) fa fallire la compilazione con errori *multiple definition*.
+
+**A. Una volta sola: IDE Arduino, librerie, pacchetto ESP8266**
+
+1. Installa l'IDE Arduino 2.x da arduino.cc.
+2. *Strumenti → Gestisci librerie*: installa **Adafruit NeoPixel**, **Adafruit GFX Library**, **Adafruit SSD1306** (rispondi *Installa tutto* per aggiungere Adafruit BusIO) e controlla che **SD** (di Arduino) sia installata.
+3. Solo per la scheda WiFi: *File → Impostazioni → URL aggiuntive per il Gestore schede*, aggiungi `https://arduino.esp8266.com/stable/package_esp8266com_index.json`; poi *Strumenti → Scheda → Gestore schede*, installa **esp8266** (di ESP8266 Community) versione **3.1.2**.
+4. Le schede compatibili con chip USB CH340 (la WeMos e molte Mega) su Windows vogliono il driver CH340: la scheda deve comparire in *Gestione dispositivi → Porte* come "USB-SERIAL CH340 (COMx)".
+
+**B. Arduino Mega 2560**
+
+1. Collega la Mega via USB. Se è già sullo shield, spegni l'alimentatore a 12 V.
+2. Apri `firmware/PSN-Presepe/PSN-Presepe.ino`. Deve comparire una sola scheda.
+3. *Strumenti → Scheda → Arduino AVR Boards → Arduino Mega or Mega 2560*, *Processore: ATmega2560*, *Porta*: la COM della Mega.
+4. **Carica**. L'IDE indica circa 89 kB (35 %) di memoria programma.
+5. Controllo: il *Monitor seriale* a **115200 baud** stampa la configurazione all'avvio.
+
+**C. Scheda "Mega + WiFi R3" (due firmware)**
+
+Con la scheda montata i DIP switch restano sotto lo shield: fai C1–C3 con la scheda fuori dallo shield, alimentata solo dall'USB, e **scollega sempre l'USB prima di spostare un DIP**.
+
+*C1 – firmware del Mega*
+1. DIP **3 e 4 su ON**, tutti gli altri su OFF. Collega l'USB.
+2. Come nella parte B: apri `PSN-Presepe.ino`, scheda *Arduino Mega or Mega 2560*, la COM del CH340, **Carica**.
+
+*C2 – firmware dell'ESP8266*
+1. Scollega l'USB. DIP **5, 6 e 7 su ON**, tutti gli altri su OFF (il DIP 7 mette l'ESP8266 in modo programmazione). Collega l'USB.
+2. Apri `firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino`. Compaiono due schede: lo sketch e `pagine_web.h` (le pagine web, generate; deve restare nella stessa cartella).
+3. *Strumenti*: **Scheda: Generic ESP8266 Module**, **Flash Size: 4MB (FS:1MB OTA:~1019KB)**, **Upload Speed: 115200**, *Porta*: la stessa COM. Le altre voci lasciale come sono.
+4. **Carica**. La prima compilazione dura qualche minuto; poi "Connecting…", "Writing at … (100 %)" e "Hard resetting via RTS pin…". Se compare *Failed to connect to ESP8266*, scollega e ricollega l'USB con i DIP 5, 6, 7 ancora su ON e carica di nuovo.
+5. Controllo: scollega l'USB, metti il DIP 7 su OFF (5 e 6 restano su ON), ricollega, *Monitor seriale* a 115200: una riga `@HELLO*B4` ogni 2 s vuol dire che il firmware dell'ESP gira e sta chiamando il Mega.
+
+*C3 – impostazione definitiva e montaggio*
+1. Scollega l'USB. DIP **1, 2, 3 e 4 su ON**, 5–8 su OFF. Selettore della seriale accanto ai DIP su **RXD3 / TXD3**.
+2. Ricontrolla DIP e selettore, poi monta la scheda sullo shield; verifica che sotto niente tocchi il modulo ESP o i DIP.
+
+*C4 – prima prova, senza rete di casa*
+1. Metti nello shield una microSD **vuota** formattata FAT32 e accendi con il 12 V: il display mostra **PRESEPE.INI CREATO**. Spegni.
+2. Sul PC apri `PRESEPE.INI`, metti `[WIFI] abilitato = 2` (access point), salva, rimetti la microSD e accendi.
+3. Durante il ciclo premi **TEST**: la prima schermata mostra `WI-FI ACCESS POINT`, `rete Presepe`, `IP: 192.168.4.1`.
+4. Dal telefono collegati alla rete WiFi **Presepe** (password `presepe2026`; se il telefono avvisa che non c'è Internet, resta collegato) e apri **http://192.168.4.1/**, utente **admin**, password **presepe2026**.
+5. Poi scegli il modo definitivo in `[WIFI]` (1 = rete di casa con `ssid` e `password`, 3 = rete di casa con l'access point di riserva) e cambia le password di `[AUTENTICAZIONE]` e `[ACCESS_POINT]`.
+
+**Aggiornamenti successivi (senza togliere la scheda):**
+- **Mega:** con l'impostazione normale (DIP 1–4 su ON) l'USB arriva al Mega: carica come nella parte B.
+- **ESP8266:** via WiFi. Il PC deve essere sulla stessa rete del presepe (in modo access point: collegato alla rete del presepe). In *Strumenti → Porta* scegli la porta di rete **presepe** invece della COM e carica; l'IDE chiede la password di `[AUTENTICAZIONE]`. Senza la porta di rete: `python espota.py -i <IP> -p 8266 -a <password> -f PSN-Presepe-WiFi.ino.bin` (`espota.py` è nella cartella `tools` del pacchetto esp8266 installato). Solo se un firmware dell'ESP non riparte più la scheda va tolta per passare dall'USB (DIP 5, 6, 7).
 
 ### Funzionamento
 
@@ -443,12 +506,7 @@ Il Mega resta il padrone di tutto: l'ESP8266 fa solo da ponte tra la rete e la `
 
 Il selettore della seriale accanto ai DIP deve stare su **RXD3 / TXD3**. Tutti gli altri DIP su OFF.
 
-**Prima installazione:**
-1. DIP 3, 4 su ON (gli altri OFF). Carica il firmware del Mega come sopra ([Compilazione](#compilazione) o [HEX già compilato](#caricare-lhex-già-compilato)), scheda *Arduino Mega or Mega 2560*.
-2. Scollega l'USB. DIP 5, 6, 7 su ON (gli altri OFF). Nell'IDE Arduino aggiungi `https://arduino.esp8266.com/stable/package_esp8266com_index.json` in *Impostazioni → URL aggiuntive per il Gestore schede*, installa il pacchetto **esp8266** (3.1.x), apri `firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino`, scegli *Generic ESP8266 Module*, *Flash Size: 4MB (FS:1MB OTA:~1019KB)*, *Upload Speed: 115200*, poi Carica. Senza IDE: `esptool.py --port PORTA write_flash 0x0 firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino.bin`.
-3. Scollega l'USB. DIP 1, 2, 3, 4 su ON (gli altri OFF), selettore su RXD3 / TXD3. Monta la scheda sullo shield.
-4. Sulla microSD, in `PRESEPE.INI`: `[WIFI] abilitato = 1`, `ssid`, `password` (oppure `abilitato = 2` per l'access point, che non richiede altro, o `abilitato = 3` per entrambi); cambia `[AUTENTICAZIONE] password`.
-5. Accendi e premi TEST: la prima schermata mostra l'indirizzo IP e `presepe.local`. Aprilo da un telefono sulla stessa rete. Premendo ancora TEST si prosegue con le prove normali.
+**Prima installazione e aggiornamenti:** passo passo in [Passo passo con l'IDE Arduino](#passo-passo-con-lide-arduino) (parte C). In breve: firmware del Mega con DIP 3, 4 su ON; firmware dell'ESP con DIP 5, 6, 7 su ON; poi DIP 1–4 su ON e selettore su RXD3 / TXD3. Senza IDE l'ESP si può caricare con `esptool.py --port PORTA write_flash 0x0 firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino.bin`.
 
 Gli aggiornamenti successivi dell'ESP si possono fare via WiFi (IDE Arduino → *Porta* → porta di rete `presepe`, password di `[AUTENTICAZIONE]`), senza togliere la scheda dallo shield. Dopo aver modificato le pagine (`firmware/web/pannello.html` o `simulation_web/simulator.template.html`) esegui `python3 firmware/tools/build_web.py` (rigenera anche [demo/](demo/README.md)) e ricompila il firmware dell'ESP.
 
