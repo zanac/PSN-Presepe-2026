@@ -188,7 +188,6 @@ button.danger { color: var(--err); border-color: var(--err); }
         <div class="rbar">
           <label class="switch" id="rLiveBox"><input type="checkbox" id="rLive"> Dal vivo sulle strisce</label>
           <button type="button" class="primary" id="rProva">▶ Prova la fase</button>
-          <select id="rVel" aria-label="Durata della prova"><option value="10">in 10 s</option><option value="30" selected>in 30 s</option><option value="60">in 1 min</option><option value="reale">durata reale</option></select>
           <button type="button" id="rUndo" disabled>Annulla</button>
         </div>
         <div class="rpos" id="rPos"></div>
@@ -571,7 +570,7 @@ $("copy").addEventListener("click", async () => {
   setTimeout(() => { $("copy").textContent = "Copia il file"; }, 2000);
 });
 $("play").addEventListener("click", () => { playing = !playing; $("play").textContent = playing ? "Pausa" : "Avvia"; last = performance.now(); });
-$("speed").addEventListener("change", e => { durata = +e.target.value; render(); });
+$("speed").addEventListener("change", e => { durata = +e.target.value; render(); disegnaRegia(); });
 function salta(dir) {
   const fa = faseDi(cfg, p); const next = (fa + (dir > 0 ? 1 : 4)) % 5;
   p = inizio(cfg, dir > 0 ? next : (p - inizio(cfg, fa) > 0.5 ? fa : next)); render();
@@ -812,14 +811,17 @@ $("rLive").addEventListener("change", e => {
 
 // ------------------------------------------------ prova della fase
 let prova = null;
-function durReale() { return Math.max(1, cfg.durate[0] * (fine(cfg, rFase) - inizio(cfg, rFase)) / 100); }
-function fermaProva() { prova = null; $("rProva").textContent = "▶ Prova la fase"; }
-$("rProva").addEventListener("click", () => {
+// sempre a velocita' reale: durata del ciclo scelta con la manopola del presepe (sul presepe),
+// altrimenti quella scelta sotto il palco
+let durataScheda = 0;
+function durReale() { return Math.max(1, (durataScheda || durata) * (fine(cfg, rFase) - inizio(cfg, rFase)) / 100); }
+function etichettaProva() { $("rProva").textContent = prova ? "■ Ferma la prova" : `▶ Prova la fase (${fmt(durReale())})`; }
+function fermaProva() { prova = null; etichettaProva(); }
+$("rProva").addEventListener("click", async () => {
   if (prova) return fermaProva();
-  const v = $("rVel").value;
-  prova = { fase: rFase, t0: performance.now(), dur: (v === "reale" ? durReale() : +v) * 1000 };
-  sel = null; disegnaRegia();
-  $("rProva").textContent = "■ Ferma la prova";
+  if (DEVICE) { try { const s = await (await fetch("/api/stato", { cache: "no-store" })).json(); if (s.durata > 0) durataScheda = s.durata; } catch (e) {} }
+  prova = { fase: rFase, t0: performance.now(), dur: durReale() * 1000 };
+  sel = null; disegnaRegia(); etichettaProva();
 });
 $("rUndo").addEventListener("click", () => {
   if (!annulla.length) return;
@@ -843,7 +845,7 @@ function disegnaRegia() {
   if (f !== firma) { firma = f; costruisci(Ls); }
   Ls.forEach((L, li) => aggiornaCorsia(li, L));
   editor(Ls); elenco(Ls); playhead();
-  $("rVel").options[3].textContent = `durata reale (${fmt(durReale())})`;
+  etichettaProva();
 }
 function costruisci(Ls) {
   const box = $("rLanes"); box.innerHTML = "";
