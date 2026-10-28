@@ -4,8 +4,8 @@ The two pages served by the ESP8266 of a "Mega + WiFi R3" board ([README, WiFi](
 
 | Page | On the board | Open online |
 |---|---|---|
-| `index.html` | `http://presepe.local/`: control panel, cycle commands, web test of strips, stars/houses, relays, buzzer | [open](https://raw.githack.com/zanac/psn-presepe-2026/main/demo/index.html) |
-| `config.html` | `http://presepe.local/config`: `PRESEPE.INI` editor with live preview, save, restart, restore | [open](https://raw.githack.com/zanac/psn-presepe-2026/main/demo/config.html) |
+| `index.html` | `http://presepe.local/`: control panel, cycle commands, web test of strips, stars/houses, relays, buzzer | [open](https://raw.githack.com/zanac/PSN-Presepe-2026/main/demo/index.html) |
+| `config.html` | `http://presepe.local/config`: `PRESEPE.INI` editor with live preview, save, restart, restore | [open](https://raw.githack.com/zanac/PSN-Presepe-2026/main/demo/config.html) |
 
 Or download the folder and open `index.html` with a double-click. The orange bar on top says it is a demo.
 
