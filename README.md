@@ -19,7 +19,7 @@ This repository holds the complete Rev D project:
 - the firmware, with its tests;
 - wiring documentation for building the controller on a breadboard without the PCB.
 
-> **Status (2026-10-04).** The Rev D PCB passed every automated check below. It was ordered from PCBWay (turnkey assembly, see [manufacturing/pcbway-order-2026-10-04](hardware/rev-d/manufacturing/pcbway-order-2026-10-04/README.md)). The physical board has **not been tested yet**. The firmware is built on the version tested on the breadboard, with the new SD configuration added on top.
+> **Status.** The Rev D PCB was ordered from PCBWay (turnkey assembly, see [manufacturing/pcbway-order-2026-10-04](hardware/rev-d/manufacturing/pcbway-order-2026-10-04/README.md)) and the assembled boards have been tested: everything works. **Rev E** (small fixes plus a status LED and test points, same size and connectors, same firmware) is being designed in [`hardware/rev-e`](hardware/rev-e); it has not been ordered yet. See [Rev E](#rev-e-next-revision).
 
 ![Rev D top side](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-gerber-render-top.png)
 
@@ -60,6 +60,7 @@ hardware/
       pcbway-order-2026-10-04/  FROZEN copy of the files actually sent to PCBWay (+ SHA256SUMS, order notes)
     previews/                   renders of the board (KiCad layers and photo-style Gerber renders)
     reports/                    DRC, independent board/Gerber checks, schematic parity, footprint checks
+  rev-e/                        Rev E, the next revision (same layout as rev-d; not ordered yet)
 firmware/
   PSN-Presepe/                  the whole firmware in one sketch (PSN-Presepe.ino), example PRESEPE.INI, prebuilt HEX, Windows flasher
   PSN-Presepe-WiFi/             firmware of the ESP8266 on a "Mega + WiFi R3" board (web pages, OTA), prebuilt BIN
@@ -116,6 +117,21 @@ Default cycle lengths: 1, 3 or 5 minutes, chosen by the potentiometer.
 
 Assembly drawing: [previews/PSN-Presepe-Mega-RevD-assembly.png](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-assembly.png). Schematic: [kicad/PSN-Presepe-Mega-RevD-schematic.pdf](hardware/rev-d/kicad/PSN-Presepe-Mega-RevD-schematic.pdf). The schematic is generated from the board and uses global net labels, so read it together with the tables below.
 
+### Rev E (next revision)
+
+Rev E keeps the Rev D board outline, connectors, placement and pin map, so the same firmware runs on both. Files: [`hardware/rev-e`](hardware/rev-e) (`kicad/`, `manufacturing/`, `previews/`, `reports/`, rebuilt by `hardware/rev-e/build.sh`). Status: designed and verified by the same automated checks as Rev D, **not ordered yet**.
+
+| Change | Why |
+|---|---|
+| BZ1 footprint with **6.5 mm** pin pitch (local footprint `Buzzer_12x9.5RM6.5`) | fits the buzzer PCBWay sources, Same Sky CEM-1203(42); on Rev D they had to bend its pins |
+| C1 on a **polarised** footprint (`CP_Radial_D10.0mm_P5.00mm`: square + pad, "+" on the silkscreen) | Rev D had two identical round pads |
+| Minimum copper clearance **0.22 mm** (Rev D rule 0.20 mm, 0.202 mm measured) | PCBWay asks for 8 mil (0.2032 mm) with 2 oz copper |
+| **Status LED** D1 (green, 3 mm) with RLED 1 kΩ (0805) on Mega D13, top-left next to the microSD | shows at a glance whether the controller runs, is paused, in TEST or STOP (see [Operation](#operation)) |
+| **Test points** TP1–TP4: +12V, +5V, +3V3, GND (plated 2 mm pads, no part) | measure the supplies with a meter without looking for a pin |
+| No vias above the Mega USB-B socket (rule area in the router) | was only checked afterwards on Rev D |
+
+The routing is new (Freerouting), stored in `hardware/rev-e/build/data/routing.ses` so that the build is reproducible. Before ordering, print the 1:1 PDF and check the real buzzer, C1 and LED on it ([Before ordering a new revision](#before-ordering-a-new-revision)).
+
 ## 4. Board connectors (terminal pinout)
 
 Pin 1 is the square pad. The function of each pin is also printed on the silkscreen next to every terminal.
@@ -165,7 +181,10 @@ JR1–JR8 run along the top edge and JR9–JR16 down the right edge. Relay *n* i
 | VIN | +12 V from the board | the Mega is powered through the shield |
 | 5V | to J_OLED / J_POT only | |
 
-Free pins: D9, D10, D13, D14–D19, D41–D43, D47, D48, A1–A15. D9, D10 and D13 can also do PWM.
+| D13 | Status LED | Rev E: green LED D1 through RLED 1 kΩ. Rev D: only the Mega's own "L" LED (under the shield) |
+| D14 / D15 | Serial3 TX3 / RX3 | link to the ESP8266 of a "Mega + WiFi R3" board (no track on the PCB) |
+
+Free pins: D9, D10, D16–D19, D41–D43, D47, D48, A1–A15. D9 and D10 can also do PWM.
 
 ## 6. Power, currents and fusing
 
@@ -366,6 +385,17 @@ Flash with the 12 V supply off: during the upload the outputs toggle, and withou
 | **Potentiometer** | Selects one of the three cycle lengths; the change is applied once the knob settles. |
 
 **Serial monitor** (115200 baud): prints the whole active configuration at boot, including every relay event, followed by a periodic status line (`debug_ms`).
+
+**Status LED** (D13: green LED D1 on Rev E; on Rev D only the Mega's "L" LED under the shield):
+
+| LED | Meaning |
+|---|---|
+| on steadily | starting up |
+| short flash every 2 s | cycle running, `PRESEPE.INI` read without errors |
+| double flash every 2 s | cycle running, but `PRESEPE.INI` has errors, is missing, or there is no card |
+| 1 s on, 1 s off | paused |
+| fast blinking | TEST or colour mode |
+| off | STOP |
 
 ### Colour mode (finding the R, G, B values for the tappe)
 
@@ -608,9 +638,9 @@ Requirements (versions used):
 
 ```sh
 ./build.sh                    # everything into ./out: every hardware/rev-* (routing replayed from build/data/routing.ses) + firmware
-hardware/rev-d/build.sh       # one revision only, into hardware/rev-d/out
+hardware/rev-d/build.sh       # one revision only, into hardware/rev-d/out (same for hardware/rev-e)
 UPDATE_REPO=1 hardware/rev-d/build.sh   # same, then refresh kicad/ manufacturing/ previews/ reports/ of that revision
-REROUTE=1 FREEROUTING_JAR=/path/freerouting-2.2.4.jar JAVA=/path/java hardware/rev-d/build.sh   # route again from scratch
+REROUTE=1 FREEROUTING_JAR=/path/freerouting-2.2.4.jar JAVA=/path/java hardware/rev-e/build.sh   # route again from scratch (FR_TIMEOUT, default 900 s)
 SKIP_PCB=1 ./build.sh         # Mega firmware only (the ESP firmware: firmware/tools/esp_compile.sh)
 SKIP_FIRMWARE=1 ./build.sh    # PCB only (REVS="rev-d" to pick revisions)
 ```
@@ -632,12 +662,12 @@ KiCad 8–10 open the KiCad 7 files, but the scripts were written for the KiCad 
 
 ## 14. Known limitations and open points
 
-- **BZ1 footprint pitch (fix in Rev E).** The BZ1 footprint (`Buzzer_12x9.5RM7.6`) has its holes 7.6 mm apart, but the buzzer actually bought for assembly, Same Sky CEM-1203(42), has pins 6.5 mm apart (datasheet drawing, confirmed by PCBWay with a caliper). On the Rev D boards PCBWay bent the pins outwards, so the buzzer sits slightly above the board; with 5.3 mm pins this still solders correctly. Rev E: change the footprint to 6.5 mm pitch, or choose a passive buzzer with a verified 7.6 mm pitch.
-- **C1 polarity marking (fix in Rev E).** The C1 footprint (`C_Radial_D10.0mm_H12.5mm_P5.00mm`) has two identical round pads and no "+" on the silkscreen. PCBWay fitted it correctly from the BOM (pad 1 = +12 V, pad 2 = GND), but Rev E should use a polarised footprint (`CP_Radial`, square + pad and "+" mark).
+- **BZ1 footprint pitch (Rev D; fixed in Rev E).** The Rev D BZ1 footprint (`Buzzer_12x9.5RM7.6`) has its holes 7.6 mm apart, but the buzzer actually bought for assembly, Same Sky CEM-1203(42), has pins 6.5 mm apart (datasheet drawing, confirmed by PCBWay with a caliper). On the Rev D boards PCBWay bent the pins outwards, so the buzzer sits slightly above the board; with 5.3 mm pins this still solders correctly. Rev E uses a 6.5 mm footprint.
+- **C1 polarity marking (Rev D; fixed in Rev E).** The Rev D C1 footprint (`C_Radial_D10.0mm_H12.5mm_P5.00mm`) has two identical round pads and no "+" on the silkscreen. PCBWay fitted it correctly from the BOM (pad 1 = +12 V, pad 2 = GND). Rev E uses a polarised footprint (square + pad and "+" mark).
 - **USB plug clearance.** The Mega USB-B socket ends about 1.7 mm inside the edge of the shield, and the shield sits about 11 mm above the Mega. Bulky USB plugs may not seat fully. If that happens, use a slim plug, stacking headers, or unplug the Mega to flash it. There is no copper on the shield above the USB socket or the DC jack.
 - **WS2811 data** has no series resistor on the board: add 330 Ω in the cable ([section 7](#7-wiring-the-loads)).
 - **CIELO blue (D4)** is on Timer0, so it stays 8-bit PWM. TRAMONTO and ALBA (and CIELO R/G) are on 16-bit timers and could move to 10–12-bit PWM in a later firmware.
-- **Minimum spacing** is 0.202 mm (7.95 mil), and PCBWay states 8 mil for 2 oz copper. The difference is 1 µm, far below the etching tolerance. It was flagged to PCBWay with the order.
+- **Minimum spacing (Rev D; fixed in Rev E)** is 0.202 mm (7.95 mil) on Rev D, and PCBWay states 8 mil for 2 oz copper. The difference is 1 µm, far below the etching tolerance; it was flagged to PCBWay with the order. Rev E is routed with 0.22 mm and checked against 8 mil.
 - **ERC was not run.** `kicad-cli` 7 has no ERC; connectivity is proven by schematic ↔ PCB parity and by the independent checks instead.
 - **Ordered Gerbers carry revision "C"** in the X2 `ProjectId` header attribute, a leftover title-block value. It is cosmetic, has no effect on fabrication, and is fixed in the scripts. See the frozen order folder.
 - **Annotation warnings:** the `J_*` reference designators make KiCad report annotation warnings. They are harmless.
@@ -660,6 +690,7 @@ KiCad 8–10 open the KiCad 7 files, but the scripts were written for the KiCad 
 | B | Arduino Mega shield with relays, MOSFETs and terminals (previous repository version). |
 | C | Production fixes: G5Q-1 NO/NC pins corrected, ULN2803A DIP-18 footprint, buzzer series resistor, 6 / 5 / 2 mm isolation, 3 mm power trunks, JLCPCB tooling holes, complete verification suite. |
 | D | Push-push microSD with 3.3 V LDO and level shifter; firmware reads `PRESEPE.INI` at boot (with built-in defaults); on-board potentiometer replaced by terminal J_POT; CASETTE chain driven in the cycle; turnkey-assembly files for PCBWay. |
+| E | (in design, not ordered) BZ1 6.5 mm pitch, polarised C1, 0.22 mm minimum clearance, status LED on D13, test points for +12V / +5V / +3V3 / GND, no vias above the Mega USB socket; new routing. Same outline, connectors and firmware as Rev D. |
 
 ---
 

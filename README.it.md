@@ -19,7 +19,7 @@ Questo repository contiene il progetto Rev D completo:
 - il firmware, con i suoi test;
 - la documentazione dei collegamenti per realizzare la centralina su breadboard, senza PCB.
 
-> **Stato (2026-10-04).** Il PCB Rev D ha superato tutti i controlli automatici descritti sotto. È stato ordinato a PCBWay con montaggio chiavi in mano (vedi [manufacturing/pcbway-order-2026-10-04](hardware/rev-d/manufacturing/pcbway-order-2026-10-04/README.md)). La scheda fisica **non è ancora stata provata**. Il firmware parte dalla versione già provata su breadboard, con in più la nuova configurazione da SD.
+> **Stato.** Il PCB Rev D è stato ordinato a PCBWay con montaggio chiavi in mano (vedi [manufacturing/pcbway-order-2026-10-04](hardware/rev-d/manufacturing/pcbway-order-2026-10-04/README.md)) e le schede montate sono state provate: funziona tutto. La **Rev E** (piccole correzioni più un LED di stato e i punti di misura, stesse dimensioni e morsetti, stesso firmware) è in progettazione in [`hardware/rev-e`](hardware/rev-e); non è ancora stata ordinata. Vedi [Rev E](#rev-e-prossima-revisione).
 
 ![Rev D lato superiore](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-gerber-render-top.png)
 
@@ -60,6 +60,7 @@ hardware/
       pcbway-order-2026-10-04/  copia CONGELATA dei file inviati davvero a PCBWay (+ SHA256SUMS, note dell'ordine)
     previews/                   immagini della scheda (strati KiCad e rendering fotografico dei Gerber)
     reports/                    DRC, verifiche indipendenti di scheda e Gerber, parità schema/PCB, controllo footprint
+  rev-e/                        Rev E, la prossima revisione (stessa struttura di rev-d; non ancora ordinata)
 firmware/
   PSN-Presepe/                  tutto il firmware in un solo sketch (PSN-Presepe.ino), PRESEPE.INI di esempio, HEX compilato, flasher Windows
   PSN-Presepe-WiFi/             firmware dell'ESP8266 di una scheda "Mega + WiFi R3" (pagine web, OTA), BIN compilato
@@ -116,6 +117,21 @@ Durate del ciclo di default: 1, 3 o 5 minuti, scelte col potenziometro.
 
 Disegno di montaggio: [previews/PSN-Presepe-Mega-RevD-assembly.png](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-assembly.png). Schema: [kicad/PSN-Presepe-Mega-RevD-schematic.pdf](hardware/rev-d/kicad/PSN-Presepe-Mega-RevD-schematic.pdf). Lo schema è generato dalla scheda e usa etichette di rete globali, quindi va letto insieme alle tabelle qui sotto.
 
+### Rev E (prossima revisione)
+
+La Rev E mantiene contorno, morsetti, posizione dei componenti e pin della Rev D, quindi lo stesso firmware va su entrambe. File: [`hardware/rev-e`](hardware/rev-e) (`kicad/`, `manufacturing/`, `previews/`, `reports/`, ricostruiti da `hardware/rev-e/build.sh`). Stato: progettata e verificata con gli stessi controlli automatici della Rev D, **non ancora ordinata**.
+
+| Modifica | Perché |
+|---|---|
+| Impronta di BZ1 con passo **6,5 mm** (impronta locale `Buzzer_12x9.5RM6.5`) | adatta al buzzer che usa PCBWay, Same Sky CEM-1203(42); sulla Rev D hanno dovuto piegarne i piedini |
+| C1 su impronta **polarizzata** (`CP_Radial_D10.0mm_P5.00mm`: piazzola + quadrata, "+" in serigrafia) | la Rev D aveva due piazzole tonde uguali |
+| Distanza minima tra le piste **0,22 mm** (regola Rev D 0,20 mm, misurata 0,202 mm) | PCBWay chiede 8 mil (0,2032 mm) con rame da 2 oz |
+| **LED di stato** D1 (verde, 3 mm) con RLED 1 kΩ (0805) sul pin D13 della Mega, in alto a sinistra accanto alla microSD | mostra a colpo d'occhio se la centralina è in marcia, in pausa, in TEST o in STOP (vedi [Funzionamento](#funzionamento)) |
+| **Punti di misura** TP1–TP4: +12V, +5V, +3V3, GND (piazzole metallizzate da 2 mm, nessun componente) | misurare le alimentazioni con il tester senza cercare un piedino |
+| Nessuna via sopra la presa USB-B della Mega (area vietata per il router) | sulla Rev D era solo controllato dopo |
+
+Lo sbroglio è nuovo (Freerouting) ed è salvato in `hardware/rev-e/build/data/routing.ses`, così la ricostruzione è riproducibile. Prima di ordinare, stampa il PDF 1:1 e verifica sopra buzzer, C1 e LED veri ([Prima di ordinare una nuova revisione](#prima-di-ordinare-una-nuova-revisione)).
+
 ## 4. Connettori della scheda (piedinatura dei morsetti)
 
 Il pin 1 è la piazzola quadrata. La funzione di ogni pin è stampata anche sulla serigrafia accanto a ogni morsetto.
@@ -165,7 +181,10 @@ JR1–JR8 stanno lungo il bordo superiore e JR9–JR16 lungo il bordo destro. Il
 | VIN | +12 V dalla scheda | la Mega è alimentata dallo shield |
 | 5V | solo verso J_OLED / J_POT | |
 
-Pin liberi: D9, D10, D13, D14–D19, D41–D43, D47, D48, A1–A15. D9, D10 e D13 possono fare anche PWM.
+| D13 | LED di stato | Rev E: LED verde D1 tramite RLED 1 kΩ. Rev D: solo il LED "L" della Mega (sotto lo shield) |
+| D14 / D15 | Serial3 TX3 / RX3 | collegamento con l'ESP8266 di una scheda "Mega + WiFi R3" (nessuna pista sul PCB) |
+
+Pin liberi: D9, D10, D16–D19, D41–D43, D47, D48, A1–A15. D9 e D10 possono fare anche PWM.
 
 ## 6. Alimentazione, correnti e fusibili
 
@@ -366,6 +385,17 @@ Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le 
 | **Potenziometro** | Sceglie una delle tre durate del ciclo; la modifica vale quando la manopola si ferma. |
 
 **Monitor seriale** (115200 baud): all'avvio stampa tutta la configurazione in uso, compresi tutti gli eventi dei relè, poi una riga di stato periodica (`debug_ms`).
+
+**LED di stato** (D13: LED verde D1 sulla Rev E; sulla Rev D solo il LED "L" della Mega sotto lo shield):
+
+| LED | Significato |
+|---|---|
+| acceso fisso | avvio in corso |
+| lampo breve ogni 2 s | ciclo in marcia, `PRESEPE.INI` letto senza errori |
+| doppio lampo ogni 2 s | ciclo in marcia, ma `PRESEPE.INI` ha errori, manca, o non c'è la microSD |
+| 1 s acceso, 1 s spento | pausa |
+| lampeggio veloce | TEST o modalità colore |
+| spento | STOP |
 
 ### Modalità colore (trovare i valori R, G, B per le tappe)
 
@@ -608,9 +638,9 @@ Requisiti (versioni usate):
 
 ```sh
 ./build.sh                    # tutto in ./out: ogni hardware/rev-* (sbroglio riprodotto da build/data/routing.ses) + firmware
-hardware/rev-d/build.sh       # una sola revisione, in hardware/rev-d/out
+hardware/rev-d/build.sh       # una sola revisione, in hardware/rev-d/out (idem per hardware/rev-e)
 UPDATE_REPO=1 hardware/rev-d/build.sh   # come sopra, poi aggiorna kicad/ manufacturing/ previews/ reports/ di quella revisione
-REROUTE=1 FREEROUTING_JAR=/percorso/freerouting-2.2.4.jar JAVA=/percorso/java hardware/rev-d/build.sh   # sbroglio da zero
+REROUTE=1 FREEROUTING_JAR=/percorso/freerouting-2.2.4.jar JAVA=/percorso/java hardware/rev-e/build.sh   # sbroglio da zero (FR_TIMEOUT, predefinito 900 s)
 SKIP_PCB=1 ./build.sh         # solo firmware del Mega (quello dell'ESP: firmware/tools/esp_compile.sh)
 SKIP_FIRMWARE=1 ./build.sh    # solo PCB (REVS="rev-d" per scegliere le revisioni)
 ```
@@ -632,12 +662,12 @@ KiCad 8–10 aprono i file di KiCad 7, ma gli script sono scritti per l'API Pyth
 
 ## 14. Limiti noti e punti aperti
 
-- **Passo dei fori di BZ1 (da correggere nella Rev E).** L'impronta di BZ1 (`Buzzer_12x9.5RM7.6`) ha i fori a 7,6 mm, ma il buzzer acquistato per il montaggio, Same Sky CEM-1203(42), ha i pin a 6,5 mm (disegno del datasheet, misura confermata da PCBWay con il calibro). Sulle schede Rev D PCBWay ha piegato i pin verso l'esterno, quindi il buzzer resta un po' sollevato dalla scheda; con pin da 5,3 mm la saldatura resta corretta. Rev E: portare l'impronta a passo 6,5 mm, oppure scegliere un buzzer passivo con passo 7,6 mm verificato.
-- **Segno di polarità di C1 (da correggere nella Rev E).** L'impronta di C1 (`C_Radial_D10.0mm_H12.5mm_P5.00mm`) ha due piazzole tonde uguali e nessun "+" sulla serigrafia. PCBWay l'ha montato giusto ricavando la polarità dalla BOM (piazzola 1 = +12 V, piazzola 2 = GND), ma nella Rev E va usata un'impronta polarizzata (`CP_Radial`, piazzola + quadrata e segno "+").
+- **Passo dei fori di BZ1 (Rev D; corretto nella Rev E).** L'impronta di BZ1 della Rev D (`Buzzer_12x9.5RM7.6`) ha i fori a 7,6 mm, ma il buzzer acquistato per il montaggio, Same Sky CEM-1203(42), ha i pin a 6,5 mm (disegno del datasheet, misura confermata da PCBWay con il calibro). Sulle schede Rev D PCBWay ha piegato i pin verso l'esterno, quindi il buzzer resta un po' sollevato dalla scheda; con pin da 5,3 mm la saldatura resta corretta. La Rev E usa un'impronta a passo 6,5 mm.
+- **Segno di polarità di C1 (Rev D; corretto nella Rev E).** L'impronta di C1 della Rev D (`C_Radial_D10.0mm_H12.5mm_P5.00mm`) ha due piazzole tonde uguali e nessun "+" sulla serigrafia. PCBWay l'ha montato giusto ricavando la polarità dalla BOM (piazzola 1 = +12 V, piazzola 2 = GND). La Rev E usa un'impronta polarizzata (piazzola + quadrata e segno "+").
 - **Spazio per la spina USB.** La presa USB-B della Mega finisce circa 1,7 mm all'interno del bordo dello shield, e lo shield sta circa 11 mm sopra la Mega. Le spine USB voluminose potrebbero non entrare fino in fondo. In quel caso usa una spina sottile, degli header impilabili, oppure stacca la Mega per programmarla. Sopra la presa USB e il jack di alimentazione non c'è rame sullo shield.
 - **Dati WS2811:** sulla scheda manca la resistenza in serie, va aggiunta da 330 Ω nel cavo ([sezione 7](#7-collegamento-dei-carichi)).
 - **Blu del CIELO (D4):** è sul Timer0, quindi resta a PWM 8 bit. TRAMONTO e ALBA (e R/G del CIELO) sono su timer a 16 bit e in un firmware futuro potrebbero passare a PWM da 10–12 bit.
-- **Distanza minima** di 0,202 mm (7,95 mil), mentre PCBWay indica 8 mil per il rame da 2 oz. La differenza è di 1 µm, molto al di sotto della tolleranza di incisione, ed è stata segnalata a PCBWay con l'ordine.
+- **Distanza minima (Rev D; corretta nella Rev E)** di 0,202 mm (7,95 mil) sulla Rev D, mentre PCBWay indica 8 mil per il rame da 2 oz. La differenza è di 1 µm, molto al di sotto della tolleranza di incisione, ed è stata segnalata a PCBWay con l'ordine. La Rev E è sbrogliata con 0,22 mm e controllata contro gli 8 mil.
 - **ERC non eseguito.** `kicad-cli` 7 non ha l'ERC; le connessioni sono dimostrate dalla parità schema ↔ PCB e dalle verifiche indipendenti.
 - **I Gerber ordinati riportano revisione "C"** nell'attributo di intestazione X2 `ProjectId`, residuo del cartiglio. È solo estetico, non incide sulla produzione ed è corretto negli script. Vedi la cartella congelata dell'ordine.
 - **Avvisi di annotazione:** i riferimenti `J_*` fanno segnalare a KiCad avvisi di annotazione. Sono innocui.
@@ -660,6 +690,7 @@ KiCad 8–10 aprono i file di KiCad 7, ma gli script sono scritti per l'API Pyth
 | B | Shield per Arduino Mega con relè, MOSFET e morsetti (versione precedente del repository). |
 | C | Correzioni per la produzione: pin NO/NC del G5Q-1 corretti, footprint DIP-18 dell'ULN2803A, resistenza in serie al buzzer, isolamenti 6 / 5 / 2 mm, piste di alimentazione da 3 mm, fori di attrezzaggio JLCPCB, suite di verifica completa. |
 | D | microSD push-push con regolatore 3,3 V e traslatore di livello; il firmware legge `PRESEPE.INI` all'avvio (con valori di default incorporati); potenziometro di bordo sostituito dal morsetto J_POT; catena CASETTE gestita nel ciclo; file per il montaggio chiavi in mano PCBWay. |
+| E | (in progettazione, non ordinata) BZ1 a passo 6,5 mm, C1 polarizzato, distanza minima 0,22 mm, LED di stato su D13, punti di misura per +12V / +5V / +3V3 / GND, nessuna via sopra la presa USB della Mega; sbroglio nuovo. Stessi contorno, morsetti e firmware della Rev D. |
 
 ---
 

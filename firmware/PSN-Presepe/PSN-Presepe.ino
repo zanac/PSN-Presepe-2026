@@ -84,6 +84,10 @@ const uint8_t PIN_TEST  = 24;
 const uint8_t PIN_POT   = A0;   // Rev D: potenziometro esterno su morsetto J_POT
 const uint8_t PIN_SD_CS = 53;   // microSD chip select (SPI hardware: D50 MISO, D51 MOSI, D52 SCK)
 const uint8_t PIN_SD_CD = 49;   // contatto "scheda inserita" dello slot (LOW = inserita)
+// LED di stato (PCB Rev E: LED verde D1 + RLED su D13). D13 e' libero anche sulla Rev D,
+// dove lampeggia solo il LED "L" della Mega sotto lo shield. Nome senza PIN_ di proposito:
+// le verifiche della Rev D controllano che ogni PIN_ arrivi a una pista della scheda.
+const uint8_t LED_STATO = 13;
 
 
 // -----------------------------------------------------------------------------
@@ -927,6 +931,7 @@ void setAlba(uint8_t r, uint8_t g, uint8_t b);
 void generaCieloStellato();
 void mostraStelle(float livello);
 void stelleFlush();
+void aggiornaLedStato();
 void setStelle(uint8_t value);
 void tuttoSpento();
 unsigned long durataDaRaw(int raw);
@@ -1986,6 +1991,27 @@ void toggleStartStop() {
 // ============================================================
 // TEST
 // ============================================================
+
+// LED di stato:
+//   ciclo in marcia   lampo breve ogni 2 s (doppio lampo se PRESEPE.INI ha errori o manca la microSD)
+//   pausa             1 s acceso, 1 s spento
+//   TEST / colore     lampeggio veloce (4 al secondo)
+//   STOP              spento
+//   avvio             acceso fisso
+extern bool modalitaColore;
+void aggiornaLedStato() {
+  unsigned long t = millis();
+  bool on;
+  if (fermo) on = false;
+  else if (testInCorso || modalitaColore) on = (t / 125) & 1;
+  else if (!running) on = (t / 1000) & 1;
+  else {
+    unsigned long f = t % 2000;
+    bool avviso = cfg.sdStato != SD_OK;          // errori nel file, file mancante o microSD assente
+    on = f < 80 || (avviso && f >= 240 && f < 320);
+  }
+  digitalWrite(LED_STATO, on ? HIGH : LOW);
+}
 
 void spegniRele() {
   for (uint8_t i = 0; i < 16; i++)
@@ -3441,6 +3467,8 @@ void setup() {
   pinMode(PIN_ALBA_G, OUTPUT);
   pinMode(PIN_ALBA_B, OUTPUT);
   pinMode(PIN_BUZZER, OUTPUT);
+  pinMode(LED_STATO, OUTPUT);
+  digitalWrite(LED_STATO, HIGH);   // acceso fisso durante l'avvio
   noTone(PIN_BUZZER);
   stelle.begin();
   stelle.clear();
@@ -3534,6 +3562,7 @@ void loop() {
   lnkTick();                                   // [WIFI]: comandi della pagina web
   if (lnkRiavvio) { riavviaSoftware(); return; }
   stelleFlush();                               // stelle rimaste da inviare (STOP, test da web)
+  aggiornaLedStato();
 
   if (modalitaColore) { loopModalitaColore(); return; }
 
