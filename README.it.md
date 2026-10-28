@@ -1,4 +1,4 @@
-# PSN-Presepe — Rev D
+# PSN-Presepe
 
 *[English](README.md) · Italiano*
 
@@ -12,16 +12,25 @@ Gestisce un ciclo giorno/notte: **GIORNO → TRAMONTO → CREPUSCOLO → NOTTE �
 
 Tutti i parametri della scenografia si possono cambiare con il file `PRESEPE.INI` su una microSD, letto all'accensione.
 
-Questo repository contiene il progetto Rev D completo:
+Questo repository contiene il progetto completo, per entrambe le revisioni della scheda:
 
 - il PCB (KiCad), con gli script che lo generano e lo verificano;
 - i file di produzione pronti per un assemblatore chiavi in mano;
 - il firmware, con i suoi test;
 - la documentazione dei collegamenti per realizzare la centralina su breadboard, senza PCB.
 
-> **Stato (2026-10-04).** Il PCB Rev D ha superato tutti i controlli automatici descritti sotto. È stato ordinato a PCBWay con montaggio chiavi in mano (vedi [manufacturing/pcbway-order-2026-10-04](manufacturing/pcbway-order-2026-10-04/README.md)). La scheda fisica **non è ancora stata provata**. Il firmware parte dalla versione già provata su breadboard, con in più la nuova configurazione da SD.
+> **Stato.** Il PCB Rev D è stato ordinato a PCBWay con montaggio chiavi in mano (vedi [manufacturing/pcbway-order-2026-10-04](hardware/rev-d/manufacturing/pcbway-order-2026-10-04/README.md)) e le schede montate sono state provate: funziona tutto. La **Rev E** (piccole correzioni più un LED di stato e i punti di misura, stesse dimensioni e morsetti, stesso firmware) è in progettazione in [`hardware/rev-e`](hardware/rev-e); non è ancora stata ordinata. Vedi [Rev E](#rev-e-prossima-revisione).
 
-![Rev D lato superiore](previews/PSN-Presepe-Mega-RevD-gerber-render-top.png)
+**Due release della scheda.** Usano lo stesso firmware, lo stesso `PRESEPE.INI` e gli stessi morsetti, quindi il resto di questo README vale per entrambe:
+
+| Release | Cartella | Stato | Da usare per |
+|---|---|---|---|
+| **Rev D** | [`hardware/rev-d`](hardware/rev-d) | ordinata, montata e provata: funziona | le schede già fatte; riferimento per riordinarla così com'è |
+| **Rev E** | [`hardware/rev-e`](hardware/rev-e) | progettata e verificata, non ancora ordinata | il prossimo ordine: impronta del buzzer CEM-1203(42), C1 polarizzato, spaziature 8 mil, LED di stato, punti di misura |
+
+Per caricare il firmware (Mega normale o Mega + WiFi) vedi [Passo passo con l'IDE Arduino](#passo-passo-con-lide-arduino).
+
+![Rev D lato superiore](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-gerber-render-top.png)
 
 ## Indice
 
@@ -47,25 +56,33 @@ Questo repository contiene il progetto Rev D completo:
 ## 1. Struttura del repository
 
 ```
-build.sh                        ricostruzione + verifica di PCB e firmware con un solo comando
-build/
-  scripts/                      generatore del PCB, collegamento al router, DRC, verifiche indipendenti, esportazioni
-  data/                         netlist/pad di riferimento e sessione di sbroglio salvata (routing.ses)
-  lib/PSN_RevD.pretty/          footprint personalizzati (shield Arduino Mega, foro di attrezzaggio JLC)
-kicad/                          progetto KiCad 7: scheda, regole, schema (+PDF), libreria locale dei footprint
-manufacturing/                  Gerber, mappe di foratura, BOM, file di posizionamento, istruzioni di montaggio, stampa 1:1
-  pcbway-order-2026-10-04/      copia CONGELATA dei file inviati davvero a PCBWay (+ SHA256SUMS, note dell'ordine)
-previews/                       immagini della scheda (strati KiCad e rendering fotografico dei Gerber)
-reports/                        DRC, verifiche indipendenti di scheda e Gerber, parità schema/PCB, controllo footprint
+build.sh                        ricostruzione + verifica di tutte le revisioni del PCB e del firmware con un solo comando
+hardware/
+  rev-d/                        Rev D, la scheda ordinata a PCBWay (congelata; si ricostruisce con Gerber identici)
+    build.sh                    ricostruzione + verifica di questa sola revisione
+    build/
+      scripts/                  generatore del PCB, collegamento al router, DRC, verifiche indipendenti, esportazioni
+      data/                     netlist/pad di riferimento e sessione di sbroglio salvata (routing.ses)
+      lib/PSN_RevD.pretty/      footprint personalizzati (shield Arduino Mega, foro di attrezzaggio JLC)
+    kicad/                      progetto KiCad 7: scheda, regole, schema (+PDF), libreria locale dei footprint
+    manufacturing/              Gerber, mappe di foratura, BOM, file di posizionamento, istruzioni di montaggio, stampa 1:1
+      pcbway-order-2026-10-04/  copia CONGELATA dei file inviati davvero a PCBWay (+ SHA256SUMS, note dell'ordine)
+    previews/                   immagini della scheda (strati KiCad e rendering fotografico dei Gerber)
+    reports/                    DRC, verifiche indipendenti di scheda e Gerber, parità schema/PCB, controllo footprint
+  rev-e/                        Rev E, la prossima revisione (stessa struttura di rev-d; non ancora ordinata)
 firmware/
   PSN-Presepe/                  tutto il firmware in un solo sketch (PSN-Presepe.ino), PRESEPE.INI di esempio, HEX compilato, flasher Windows
-  tools/                        fw_compile.sh, flash.sh (Linux/macOS), run_tests.sh, test_config.cpp
+  PSN-Presepe-WiFi/             firmware dell'ESP8266 di una scheda "Mega + WiFi R3" (pagine web, OTA), BIN compilato
+  web/                          pannello.html, il pannello di controllo servito dall'ESP8266
+  tools/                        fw_compile.sh, esp_compile.sh, flash.sh (Linux/macOS), build_web.py, embed_ini.py, run_tests.sh, test sul PC
+    e2e/                        test end-to-end: codice di collegamento del Mega + sketch ESP veri su una seriale simulata con perdite
 simulation/                     simulazione Wokwi del cablaggio Rev D (diagramma, chip RGB personalizzato, script del pacchetto)
 simulation_web/                 simulatore nel browser del ciclo luci di PRESEPE.INI (apri index.html)
-.github/workflows/firmware.yml  CI: test del parser + compilazione del firmware
+demo/                           le pagine web del WiFi con una scheda simulata, per provarle senza hardware (generate)
+.github/workflows/firmware.yml  CI: test sul PC + compilazione dei due firmware
 ```
 
-Tutto il contenuto di `kicad/`, `manufacturing/` (tranne la cartella congelata dell'ordine), `previews/` e `reports/` è generato da `./build.sh`. Modifica gli script, non i file generati (vedi [sezione 13](#13-ricostruire-tutto)).
+Tutto il contenuto di `hardware/rev-d/kicad/`, `manufacturing/` (tranne la cartella congelata dell'ordine), `previews/` e `reports/` è generato da `hardware/rev-d/build.sh`. Modifica gli script, non i file generati (vedi [sezione 13](#13-ricostruire-tutto)).
 
 ## 2. Come funziona la centralina
 
@@ -105,9 +122,24 @@ Durate del ciclo di default: 1, 3 o 5 minuti, scelte col potenziometro.
 
 | Lato superiore (rame + serigrafia) | Lato inferiore (rame + serigrafia) |
 |---|---|
-| ![sopra](previews/PSN-Presepe-Mega-RevD-top.png) | ![sotto](previews/PSN-Presepe-Mega-RevD-bottom.png) |
+| ![sopra](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-top.png) | ![sotto](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-bottom.png) |
 
-Disegno di montaggio: [previews/PSN-Presepe-Mega-RevD-assembly.png](previews/PSN-Presepe-Mega-RevD-assembly.png). Schema: [kicad/PSN-Presepe-Mega-RevD-schematic.pdf](kicad/PSN-Presepe-Mega-RevD-schematic.pdf). Lo schema è generato dalla scheda e usa etichette di rete globali, quindi va letto insieme alle tabelle qui sotto.
+Disegno di montaggio: [previews/PSN-Presepe-Mega-RevD-assembly.png](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-assembly.png). Schema: [kicad/PSN-Presepe-Mega-RevD-schematic.pdf](hardware/rev-d/kicad/PSN-Presepe-Mega-RevD-schematic.pdf). Lo schema è generato dalla scheda e usa etichette di rete globali, quindi va letto insieme alle tabelle qui sotto.
+
+### Rev E (prossima revisione)
+
+La Rev E mantiene contorno, morsetti, posizione dei componenti e pin della Rev D, quindi lo stesso firmware va su entrambe. File: [`hardware/rev-e`](hardware/rev-e) (`kicad/`, `manufacturing/`, `previews/`, `reports/`, ricostruiti da `hardware/rev-e/build.sh`). Stato: progettata e verificata con gli stessi controlli automatici della Rev D, **non ancora ordinata**.
+
+| Modifica | Perché |
+|---|---|
+| Impronta di BZ1 con passo **6,5 mm** (impronta locale `Buzzer_12x9.5RM6.5`) | adatta al buzzer che usa PCBWay, Same Sky CEM-1203(42); sulla Rev D hanno dovuto piegarne i piedini |
+| C1 su impronta **polarizzata** (`CP_Radial_D10.0mm_P5.00mm`: piazzola + quadrata, "+" in serigrafia) | la Rev D aveva due piazzole tonde uguali |
+| Distanza minima tra le piste **0,22 mm** (regola Rev D 0,20 mm, misurata 0,202 mm) | PCBWay chiede 8 mil (0,2032 mm) con rame da 2 oz |
+| **LED di stato** D1 (verde, 3 mm) con RLED 1 kΩ (0805) sul pin D13 della Mega, in alto a sinistra accanto alla microSD | mostra a colpo d'occhio se la centralina è in marcia, in pausa, in TEST o in STOP (vedi [Funzionamento](#funzionamento)) |
+| **Punti di misura** TP1–TP5 in fila: +12V, GND, +5V, GND, +3V3 (piazzole metallizzate da 2 mm, nessun componente) | misurare le alimentazioni con il tester senza cercare un piedino; se il puntale scivola può solo cortocircuitare un'alimentazione con GND, mai i 12 V sui 5 V |
+| Nessuna via sopra la presa USB-B della Mega (area vietata nella scheda, usata dal router e dal DRC di KiCad) | sulla Rev D era solo controllato dopo |
+
+Lo sbroglio è nuovo (Freerouting) ed è salvato in `hardware/rev-e/build/data/routing.ses`, così la ricostruzione è riproducibile. Prima di ordinare, stampa il PDF 1:1 e verifica sopra buzzer, C1 e LED veri ([Prima di ordinare una nuova revisione](#prima-di-ordinare-una-nuova-revisione)).
 
 ## 4. Connettori della scheda (piedinatura dei morsetti)
 
@@ -158,7 +190,10 @@ JR1–JR8 stanno lungo il bordo superiore e JR9–JR16 lungo il bordo destro. Il
 | VIN | +12 V dalla scheda | la Mega è alimentata dallo shield |
 | 5V | solo verso J_OLED / J_POT | |
 
-Pin liberi: D9, D10, D13, D14–D19, D41–D43, D47, D48, A1–A15. D9, D10 e D13 possono fare anche PWM.
+| D13 | LED di stato | Rev E: LED verde D1 tramite RLED 1 kΩ. Rev D: solo il LED "L" della Mega (sotto lo shield) |
+| D14 / D15 | Serial3 TX3 / RX3 | collegamento con l'ESP8266 di una scheda "Mega + WiFi R3" (nessuna pista sul PCB) |
+
+Pin liberi: D9, D10, D16–D19, D41–D43, D47, D48, A1–A15. D9 e D10 possono fare anche PWM.
 
 ## 6. Alimentazione, correnti e fusibili
 
@@ -169,7 +204,7 @@ Pin liberi: D9, D10, D13, D14–D19, D41–D43, D47, D48, A1–A15. D9, D10 e D1
   - Mega con OLED (circa 0,1 A).
 - **Fusibile** sull'uscita a 12 V dell'alimentatore: **non più di 8 A**. Le piste principali +12 V / GND da 3 mm, 2 oz, portano circa 9 A con 10 °C di riscaldamento.
 - **Canali RGB:** ogni canale colore è una pista da 1,5 mm, 2 oz, attraverso un IRLZ44N. Tieni ogni canale entro **4 A**. Una tipica striscia RGB 5050 da 1 m assorbe circa 0,4 A per colore.
-- **Contatti dei relè:** 10 A / 250 V AC su carico resistivo, secondo i dati del relè. Le piste dei contatti sono doppie, una per strato (2 mm, 2 oz ciascuna), quindi il limite è il relè e non il rame.
+- **Contatti dei relè:** contatto NO 10 A / 250 V AC su carico resistivo, contatto NC solo 3 A / 250 V AC (dati Omron G5Q-1). I carichi pesanti vanno su COM–NO. Le piste dei contatti sono doppie, una per strato (2 mm, 2 oz ciascuna), quindi il limite è il relè e non il rame.
   - Motori e altri carichi induttivi hanno un picco di corrente all'accensione: tieni un buon margine.
   - Carichi in corrente continua oltre circa 30 V sono sconsigliati, perché in DC questi contatti faticano a spegnere l'arco.
 - **Carichi di segnale:** il G5Q-1 ha contatti di potenza in lega d'argento, fatti per commutare ampere. Correnti molto piccole, come gli ingressi logici (pochi mA), non vengono commutate in modo affidabile. Per quelle usa un relè di segnale con contatti dorati; il carico minimo è nel datasheet Omron.
@@ -304,7 +339,7 @@ Librerie: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (con Adafruit BusIO)
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Occupazione: 59,6 kB di flash (23 %), 3,7 kB di RAM statica. I buffer dei LED e dell'OLED sono allocati in esecuzione, e restano liberi circa 3 kB.
+Occupazione: 89,4 kB di flash (35 %, di cui 15,4 kB sono il `PRESEPE.INI` predefinito incorporato), 4,8 kB di RAM statica. Restano circa 3,4 kB per heap e stack; il buffer dell'OLED (1 kB) e quelli dei LED (3 byte per pixel) sono allocati in esecuzione, dopo di che restano liberi circa 2 kB.
 
 ### Compilazione
 
@@ -315,48 +350,115 @@ Occupazione: 59,6 kB di flash (23 %), 3,7 kB di RAM statica. I buffer dei LED e 
   arduino-cli core install arduino:avr
   arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
   firmware/tools/fw_compile.sh                       # -> firmware/PSN-Presepe/build/PSN-Presepe.ino.hex
-  firmware/tools/run_tests.sh                        # 76 controlli su PRESEPE.INI e tappe + simulazione della modalità colore
+  firmware/tools/esp_compile.sh                      # firmware dell'ESP8266 (serve il pacchetto esp8266, vedi WiFi sotto)
+  firmware/tools/run_tests.sh                        # lettura di PRESEPE.INI, modalità colore, collegamento WiFi, test end-to-end ESP <-> Mega
   ```
 
 Lo sketch dichiara i suoi prototipi esplicitamente, quindi non dipende dalla generazione automatica dei prototipi dell'IDE.
 
 ### Caricare l'HEX già compilato
 
-- **Windows:** metti `PSN-Presepe.ino.hex` e `flash-windows.bat` nella stessa cartella ed esegui il BAT. Al primo avvio scarica arduino-cli e trova da solo la Mega.
+- **Windows:** metti `PSN-Presepe.ino.hex` e `flash-windows.bat` nella stessa cartella ed esegui il BAT. Al primo avvio scarica arduino-cli e trova da solo una Mega originale; con una compatibile CH340 (WeMos e altre) chiede la porta COM.
 - **Linux / macOS:** `firmware/tools/flash.sh [porta]`.
 
 Carica il firmware con l'alimentazione a 12 V spenta: durante il caricamento le uscite cambiano stato, e senza 12 V nessun relè può scattare. La Mega può restare innestata sulla scheda, a patto che la spina USB entri ([sezione 14](#14-limiti-noti-e-punti-aperti)).
+
+### Passo passo con l'IDE Arduino
+
+Lo stesso firmware va su entrambe le revisioni della scheda (Rev D e Rev E) e su entrambe le centraline:
+
+- **Arduino Mega 2560** (originale o compatibile): solo il firmware del Mega, parti A e B.
+- **"Mega + WiFi R3"** (WeMos / RobotDyn, ATmega2560 + ESP8266 sulla stessa basetta, chip USB CH340): entrambi i firmware, parti A e C.
+
+Scarica il repository (*Code → Download ZIP* su GitHub) ed estrailo in una **cartella nuova e vuota**. Una vecchia cartella dello sketch con file rimasti (per esempio un vecchio `PresepeConfig.cpp`) fa fallire la compilazione con errori *multiple definition*.
+
+**A. Una volta sola: IDE Arduino, librerie, pacchetto ESP8266**
+
+1. Installa l'IDE Arduino 2.x da arduino.cc.
+2. *Strumenti → Gestisci librerie*: installa **Adafruit NeoPixel**, **Adafruit GFX Library**, **Adafruit SSD1306** (rispondi *Installa tutto* per aggiungere Adafruit BusIO) e controlla che **SD** (di Arduino) sia installata.
+3. Solo per la scheda WiFi: *File → Impostazioni → URL aggiuntive per il Gestore schede*, aggiungi `https://arduino.esp8266.com/stable/package_esp8266com_index.json`; poi *Strumenti → Scheda → Gestore schede*, installa **esp8266** (di ESP8266 Community) versione **3.1.2**.
+4. Le schede compatibili con chip USB CH340 (la WeMos e molte Mega) su Windows vogliono il driver CH340: la scheda deve comparire in *Gestione dispositivi → Porte* come "USB-SERIAL CH340 (COMx)".
+
+**B. Arduino Mega 2560**
+
+1. Collega la Mega via USB. Se è già sullo shield, spegni l'alimentatore a 12 V.
+2. Apri `firmware/PSN-Presepe/PSN-Presepe.ino`. Deve comparire una sola scheda.
+3. *Strumenti → Scheda → Arduino AVR Boards → Arduino Mega or Mega 2560*, *Processore: ATmega2560*, *Porta*: la COM della Mega.
+4. **Carica**. L'IDE indica circa 89 kB (35 %) di memoria programma.
+5. Controllo: il *Monitor seriale* a **115200 baud** stampa la configurazione all'avvio.
+
+**C. Scheda "Mega + WiFi R3" (due firmware)**
+
+Con la scheda montata i DIP switch restano sotto lo shield: fai C1–C3 con la scheda fuori dallo shield, alimentata solo dall'USB, e **scollega sempre l'USB prima di spostare un DIP**.
+
+*C1 – firmware del Mega*
+1. DIP **3 e 4 su ON**, tutti gli altri su OFF. Collega l'USB.
+2. Come nella parte B: apri `PSN-Presepe.ino`, scheda *Arduino Mega or Mega 2560*, la COM del CH340, **Carica**.
+
+*C2 – firmware dell'ESP8266*
+1. Scollega l'USB. DIP **5, 6 e 7 su ON**, tutti gli altri su OFF (il DIP 7 mette l'ESP8266 in modo programmazione). Collega l'USB.
+2. Apri `firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino`. Compaiono due schede: lo sketch e `pagine_web.h` (le pagine web, generate; deve restare nella stessa cartella).
+3. *Strumenti*: **Scheda: Generic ESP8266 Module**, **Flash Size: 4MB (FS:1MB OTA:~1019KB)**, **Upload Speed: 115200**, *Porta*: la stessa COM. Le altre voci lasciale come sono.
+4. **Carica**. La prima compilazione dura qualche minuto; poi "Connecting…", "Writing at … (100 %)" e "Hard resetting via RTS pin…". Se compare *Failed to connect to ESP8266*, scollega e ricollega l'USB con i DIP 5, 6, 7 ancora su ON e carica di nuovo.
+5. Controllo: scollega l'USB, metti il DIP 7 su OFF (5 e 6 restano su ON), ricollega, *Monitor seriale* a 115200: una riga `@HELLO*B4` ogni 2 s vuol dire che il firmware dell'ESP gira e sta chiamando il Mega.
+
+*C3 – impostazione definitiva e montaggio*
+1. Scollega l'USB. DIP **1, 2, 3 e 4 su ON**, 5–8 su OFF. Selettore della seriale accanto ai DIP su **RXD3 / TXD3**.
+2. Ricontrolla DIP e selettore, poi monta la scheda sullo shield; verifica che sotto niente tocchi il modulo ESP o i DIP.
+
+*C4 – prima prova, senza rete di casa*
+1. Metti nello shield una microSD **vuota** formattata FAT32 e accendi con il 12 V: il display mostra **PRESEPE.INI CREATO**. Spegni.
+2. Sul PC apri `PRESEPE.INI`, metti `[WIFI] abilitato = 2` (access point), salva, rimetti la microSD e accendi.
+3. Durante il ciclo premi **TEST**: la prima schermata mostra `WI-FI ACCESS POINT`, `rete Presepe`, `IP: 192.168.4.1`.
+4. Dal telefono collegati alla rete WiFi **Presepe** (password `presepe2026`; se il telefono avvisa che non c'è Internet, resta collegato) e apri **http://192.168.4.1/**, utente **admin**, password **presepe2026**.
+5. Poi scegli il modo definitivo in `[WIFI]` (1 = rete di casa con `ssid` e `password`, 3 = rete di casa con l'access point di riserva) e cambia le password di `[AUTENTICAZIONE]` e `[ACCESS_POINT]`.
+
+**Aggiornamenti successivi (senza togliere la scheda):**
+- **Mega:** con l'impostazione normale (DIP 1–4 su ON) l'USB arriva al Mega: carica come nella parte B.
+- **ESP8266:** via WiFi. Il PC deve essere sulla stessa rete del presepe (in modo access point: collegato alla rete del presepe). In *Strumenti → Porta* scegli la porta di rete **presepe** invece della COM e carica; l'IDE chiede la password di `[AUTENTICAZIONE]`. Senza la porta di rete: `python espota.py -i <IP> -p 8266 -a <password> -f PSN-Presepe-WiFi.ino.bin` (`espota.py` è nella cartella `tools` del pacchetto esp8266 installato). Solo se un firmware dell'ESP non riparte più la scheda va tolta per passare dall'USB (DIP 5, 6, 7).
 
 ### Funzionamento
 
 **Avvio:**
 1. Carica i valori di default.
-2. Legge `/PRESEPE.INI` dalla microSD, oppure `/PRESEPE.TXT` se il primo manca.
-3. Mostra sull'OLED la schermata iniziale "by Vanni" per 3 s, sempre (anche con `fastboot = 1`). Premendo TEST in questi 3 s si entra nella modalità colore.
-4. Mostra lo stato della SD (con `fastboot = 1` solo se `PRESEPE.INI` contiene errori):
+2. Legge `/PRESEPE.INI` dalla microSD, oppure `/PRESEPE.TXT` se il primo manca. Se un salvataggio dalla pagina web è stato interrotto da una mancanza di corrente mentre il file nuovo veniva copiato, prima completa quella copia. Se sulla scheda non c'è nessuno dei due file, ci scrive il `PRESEPE.INI` di esempio (valori predefiniti e spiegazioni) e usa quello.
+3. Mostra sull'OLED la schermata iniziale "by Vanni 039" per 3 s, sempre (anche con `fastboot = 1`). Premendo TEST in questi 3 s si entra nella modalità colore: l'autotest viene saltato e il ciclo parte quando si esce dalla modalità colore.
+4. Mostra lo stato della SD (con `fastboot = 1` solo se `PRESEPE.INI` contiene errori o è appena stato creato):
 
    | Messaggio OLED | Significato |
    |---|---|
    | `PRESEPE.INI OK` (o `PRESEPE.TXT OK`) | file letto, nessun errore |
    | `INI CON ERRORI` | file letto con errori; indica quanti sono e la prima riga sbagliata |
-   | `MANCA PRESEPE.INI` | scheda presente, nessuno dei due file trovato |
+   | `PRESEPE.INI CREATO` | scheda presente senza file: il file di esempio è appena stato scritto (resta 4 s, anche con `fastboot = 1`) |
+   | `MANCA PRESEPE.INI` | scheda presente, nessun file, e la scheda non si è potuta scrivere (protetta o piena) |
    | `SD ASSENTE` | nessuna scheda |
 
-5. Esegue l'autotest (circa 22 s) con melodia opzionale. Saltato con `fastboot = 1`.
+5. Esegue l'autotest (circa 22 s), con una melodia opzionale che suona durante l'autotest. Saltato con `fastboot = 1`.
 6. Avvia il ciclo dall'inizio del GIORNO, in marcia o in pausa secondo `partenza`.
 
-**Avvio rapido** (`[SISTEMA] fastboot`, predefinito **1** dalla release 038): mantiene solo i 3 s della schermata iniziale e salta la schermata della SD (tranne se il file ha errori), l'autotest e la melodia, così la scena parte subito. Con `fastboot = 0` l'avvio è completo, e `autotest_avvio` e `melodia_avvio` decidono se eseguire autotest e melodia.
+**Avvio rapido** (`[SISTEMA] fastboot`, predefinito **1** dalla release 038): mantiene solo i 3 s della schermata iniziale e salta la schermata della SD (tranne se il file ha errori), l'autotest e la melodia, così la scena parte subito. Con `fastboot = 0` l'avvio è completo, e `autotest_avvio` e `melodia_avvio` decidono se eseguire autotest e melodia (la melodia suona solo durante l'autotest, quindi con `autotest_avvio = 0` `melodia_avvio` non ha effetto).
 
 **Pulsanti:**
 
 | Pulsante | Azione |
 |---|---|
-| **START/STOP** | Pausa o ripresa; riparte esattamente da dove si era fermato. In modalità TEST, esce dal TEST. |
+| **START/STOP** | Pressione breve (al rilascio): pausa o ripresa; riparte esattamente da dove si era fermato. In modalità TEST, esce dal TEST. **Tenuto 2 s: STOP**: tutto spento (relè, anche quelli forzati con `forzaN = on`, strisce, stelle, casette); l'OLED mostra `STOP`, NEXT e TEST sono ignorati. Una pressione breve in STOP è **PLAY**: il ciclo riparte dall'inizio del GIORNO. Pensato per le cerimonie. |
 | **AVANTI (NEXT)** | Salta all'inizio della fase successiva. |
-| **TEST** | Entra in modalità TEST, poi scorre 34 prove: ogni colore di ogni striscia, colori di stelle e casette, tutto insieme, poi i relè 1–16 uno alla volta, con il loro nome se definito. Durante il TEST il tempo del ciclo è fermo. |
+| **TEST** | Entra in modalità TEST, poi scorre 34 prove (con `[WIFI] abilitato` 1, 2 o 3 la prima schermata mostra lo stato del WiFi: indirizzo IP e `<nome>.local`, in modo access point anche il nome della rete; `non collegato` con 1, `cerco la rete...` con 3 mentre sta ancora provando, `ESP non risponde` in modo access point quando l'ESP8266 non risponde): ogni colore di ogni striscia, colori di stelle e casette, tutto insieme, poi i relè 1–16 uno alla volta, con il loro nome se definito. Durante il TEST il tempo del ciclo è fermo. |
 | **Potenziometro** | Sceglie una delle tre durate del ciclo; la modifica vale quando la manopola si ferma. |
 
 **Monitor seriale** (115200 baud): all'avvio stampa tutta la configurazione in uso, compresi tutti gli eventi dei relè, poi una riga di stato periodica (`debug_ms`).
+
+**LED di stato** (D13: LED verde D1 sulla Rev E; sulla Rev D solo il LED "L" della Mega sotto lo shield):
+
+| LED | Significato |
+|---|---|
+| acceso fisso | avvio in corso |
+| lampo breve ogni 2 s | ciclo in marcia, `PRESEPE.INI` letto senza errori |
+| doppio lampo ogni 2 s | ciclo in marcia, ma `PRESEPE.INI` ha errori, manca, o non c'è la microSD |
+| 1 s acceso, 1 s spento | pausa |
+| lampeggio veloce | TEST o modalità colore |
+| spento | STOP |
 
 ### Modalità colore (trovare i valori R, G, B per le tappe)
 
@@ -376,22 +478,80 @@ Il firmware gira invariato nel simulatore Wokwi con il cablaggio Rev D: barre RG
 
 Per provare i valori di `PRESEPE.INI` senza hardware, apri [`simulation_web/index.html`](simulation_web/index.html) nel browser: incolli il file e vedi lungo il ciclo le strisce CIELO, TRAMONTO e ALBA, le stelle, le casette e i relè. Vedi [simulation_web/README.md](simulation_web/README.md).
 
+### WiFi (scheda Mega + WiFi R3)
+
+Lo stesso firmware e la stessa scheda Rev D funzionano anche con una scheda **"Mega + WiFi R3"** (WeMos / RobotDyn: ATmega2560 ed ESP8266 sulla stessa basetta, stessa impronta del Mega) al posto dell'Arduino Mega. Con `[WIFI] abilitato = 0` (il predefinito) si comporta esattamente come un Mega normale, e lo stesso HEX va bene per entrambi.
+
+**Prova le pagine senza hardware:** [demo/](demo/README.md) le fa girare nel browser con una scheda simulata.
+
+Con `abilitato = 1` l'ESP8266 si collega alla rete WPA/WPA2 indicata in `[WIFI]`; con `abilitato = 2` invece crea una sua rete (access point, vedi sotto); con `abilitato = 3` prova prima la rete di casa e apre l'access point se non si collega. In tutti i casi offre due pagine, protette da utente e password di `[AUTENTICAZIONE]`:
+
+- **`http://presepe.local/`** (oppure `http://<IP>/`): il pannello di controllo. Mostra la fase, il punto del ciclo e i colori delle strisce, e ha *Pausa / Avvia*, *Fase successiva*, *Entra in test*, *Modifica configurazione* e *Stop: spegni tutto* (lo stesso STOP di START tenuto 2 s; la pagina mostra allora solo il pulsante *Play*, e i comandi di test sono rifiutati fino a Play). In test (dalla pagina, o con TEST sulla scheda) mostra:
+  - le tre strisce: scegli TRAMONTO / CIELO / ALBA, prendi un colore dal gradiente e regola la luminosità con la levetta, oppure scrivi R, G, B (*Spegni* spegne la striscia); la striscia segue subito, e il colore compare come riga `cielo = %, R, G, B` pronta da copiare;
+  - stelle o casette, un pulsante per ogni pixel (`numero` del file) per accenderli e spegnerli uno alla volta, più *Tutti accesi / Tutti spenti*;
+  - i 16 relè con il loro nome, ON/OFF uno per uno;
+  - *Bip del buzzer* ed *Esci dal test* (il ciclo prosegue, in marcia o in pausa come era prima del test).
+- **`http://presepe.local/config`**: `PRESEPE.INI` così com'è sulla scheda, nello stesso editor del [simulatore web](simulation_web/README.md), con l'anteprima del ciclo e l'elenco degli errori. *Salva sul presepe* scrive il file (il precedente resta come `PRESEPE.BAK`, *Ripristina il file precedente* li scambia); *Riavvia il presepe* fa ripartire il Mega, che rilegge la scheda. Prima di salvare l'editor chiede conferma se il file ha errori o spegne il WiFi. Il file viene prima inviato tutto in `PRESEPE.NEW`; se il trasferimento si interrompe, resta il file vecchio. Se manca la corrente mentre `PRESEPE.NEW` viene copiato sopra il file vecchio, la copia viene completata alla riaccensione successiva (file segnale `PRESEPE.CMT`). L'editor invia al massimo 24000 caratteri.
+
+Il Mega resta il padrone di tutto: l'ESP8266 fa solo da ponte tra la rete e la `Serial3` del Mega (D14/D15, non usati dalla scheda). Se la rete non c'è o la password è sbagliata la scheda parte e funziona normalmente; la schermata di TEST mostra `non collegato` (`cerco la rete...` con `abilitato = 3`) e l'ESP continua a provare a collegarsi.
+
+**DIP switch** (sulla scheda WeMos, sotto lo shield una volta montata: impostali prima di innestarla, con il cavo USB scollegato):
+
+| DIP su ON | L'USB è collegata a | Uso |
+|---|---|---|
+| 3, 4 | ATmega2560 | caricare solo il firmware del Mega |
+| 5, 6, 7 | ESP8266, modo programmazione | caricare il firmware dell'ESP |
+| 5, 6 | ESP8266, in funzione | monitor seriale dell'ESP (debug) |
+| 1, 2, 3, 4 | ATmega2560, **e** `Serial3` dell'ATmega ↔ ESP8266 | **uso normale** (il Mega si può ancora caricare via USB) |
+
+Il selettore della seriale accanto ai DIP deve stare su **RXD3 / TXD3**. Tutti gli altri DIP su OFF.
+
+**Prima installazione e aggiornamenti:** passo passo in [Passo passo con l'IDE Arduino](#passo-passo-con-lide-arduino) (parte C). In breve: firmware del Mega con DIP 3, 4 su ON; firmware dell'ESP con DIP 5, 6, 7 su ON; poi DIP 1–4 su ON e selettore su RXD3 / TXD3. Senza IDE l'ESP si può caricare con `esptool.py --port PORTA write_flash 0x0 firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino.bin`.
+
+Gli aggiornamenti successivi dell'ESP si possono fare via WiFi (IDE Arduino → *Porta* → porta di rete `presepe`, password di `[AUTENTICAZIONE]`), senza togliere la scheda dallo shield. Dopo aver modificato le pagine (`firmware/web/pannello.html` o `simulation_web/simulator.template.html`) esegui `python3 firmware/tools/build_web.py` (rigenera anche [demo/](demo/README.md)) e ricompila il firmware dell'ESP.
+
+**Access point (`abilitato = 2`).** Per i posti senza rete WiFi (chiesa, piazza, mostra). L'ESP8266 crea la rete descritta in `[ACCESS_POINT]`, pronta all'uso così com'è: collega il telefono a **Presepe** (password `presepe2026`) e apri `http://192.168.4.1/`. Il telefono può avvisare che la rete non ha Internet: scegli di restare collegato. La schermata di TEST mostra nome della rete e indirizzo. Chiavi:
+
+| Chiave | Predefinito | Significato |
+|---|---|---|
+| `ssid` | `Presepe` | nome della rete, 1–32 caratteri (virgolette ammesse) |
+| `password` | `presepe2026` | WPA2, 8–63 caratteri; vuota = rete aperta (sconsigliato) |
+| `canale` | `6` | canale WiFi 1–13; cambialo se molte reti vicine usano lo stesso |
+| `nascosta` | `0` | 1 = rete nascosta (non compare nell'elenco, va aggiunta a mano sul telefono) |
+| `max_client` | `4` | dispositivi collegati insieme, 1–8 |
+| `ip` | `192.168.4.1` | indirizzo della centralina, rete /24, ultimo numero 1–55; i telefoni ricevono indirizzi da ultimo numero + 99 a + 199 (.100–.200 con il predefinito) |
+| `attesa` | `60` | solo con `abilitato = 3`: secondi di tentativi sulla rete di casa prima di aprire l'access point (10–600) |
+| `portale` | `0` | 1 = portale: qualsiasi indirizzo scritto nel browser porta al pannello, e molti telefoni lo aprono da soli appena collegati ("Accedi alla rete") |
+
+**Automatico (`abilitato = 3`).** L'ESP8266 prova la rete di casa di `[WIFI]` come con 1. Se non si collega entro `attesa` secondi (`[ACCESS_POINT]`, predefinito 60, 10–600) apre l'access point come con 2 e resta così fino al riavvio successivo; la schermata di TEST mostra allora `WI-FI ACCESS POINT`. Se la rete di casa si è collegata, la centralina resta su quella anche se poi cade (si ricollega da sola). Con `ssid` vuoto l'access point si apre subito. Comodo quando il presepe passa da casa a un altro posto: la stessa microSD va bene per entrambi.
+
+`[WIFI] nome` vale anche qui: `http://<nome>.local` (sui telefoni che supportano `.local`). Se cambi queste chiavi e premi *Riavvia il presepe*, l'ESP riparte con la nuova rete: il telefono va ricollegato.
+
+**Sicurezza.** Le pagine usano l'autenticazione HTTP Basic su HTTP semplice: la password viaggia in chiaro sulla rete di casa. In modo access point cambia anche la password della rete: chi la conosce arriva alla pagina di accesso. Usa la scheda solo su una rete fidata e non riutilizzare una password importante. Il monitor seriale avvisa se è ancora in uso la password predefinita.
+
+**Problemi:** l'access point non compare sul telefono → `nascosta = 1`, oppure dispositivo solo 5 GHz; se la connessione cade prova un altro `canale`. `non collegato` → controlla SSID e password (8–63 caratteri, rete a 2,4 GHz: l'ESP8266 non vede il 5 GHz). La pagina non si apre per nome → alcuni Android non risolvono `.local`, usa l'IP. Per controllare il collegamento tra Mega ed ESP8266 indipendentemente dalla rete, metti per un momento `abilitato = 2`: se la schermata di TEST mostra `ESP non risponde` invece di un indirizzo, controlla DIP 1, 2, il selettore RXD3, oppure il firmware dell'ESP (non caricato).
+
 ## 10. Configurazione da microSD (PRESEPE.INI)
 
-Copia [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) nella **radice** di una microSD o microSDHC (2–32 GB, FAT16/FAT32). Le schede da 64 GB in su escono formattate exFAT, che la libreria SD di Arduino non legge: riformattale prima in FAT32.
+Copia [`firmware/PSN-Presepe/PRESEPE.INI`](firmware/PSN-Presepe/PRESEPE.INI) nella **radice** di una microSD o microSDHC (2–32 GB, FAT16/FAT32), oppure inserisci semplicemente una scheda vuota: all'accensione il firmware ci scrive lo stesso file (con alcune righe iniziali che lo spiegano e i ritorni a capo CR LF di Windows), pronto da modificare sul PC. Le schede da 64 GB in su escono formattate exFAT, che la libreria SD di Arduino non legge: riformattale prima in FAT32.
 
-La scheda viene letta **una sola volta, all'accensione**. Se `PRESEPE.INI` manca, il firmware cerca `PRESEPE.TXT` con lo stesso contenuto (comodo per Wokwi, o se Windows ha salvato il file come `.txt`). Il file di esempio contiene esattamente i valori di default, e ogni chiave è spiegata in italiano nei commenti.
+La scheda viene letta all'accensione, e di nuovo dopo *Riavvia il presepe* dalla pagina web ([WiFi](#wifi-scheda-mega--wifi-r3)). Se `PRESEPE.INI` manca, il firmware cerca `PRESEPE.TXT` con lo stesso contenuto (comodo per Wokwi, o se Windows ha salvato il file come `.txt`). Il file di esempio contiene esattamente i valori di default, e ogni chiave è spiegata in italiano nei commenti. Il firmware ne tiene una copia in flash (`INI_PREDEFINITO`): dopo aver modificato `PRESEPE.INI` esegui `python3 firmware/tools/embed_ini.py`, `python3 firmware/tools/build_web.py` (la demo usa lo stesso file) e `python3 simulation_web/build_simulator.py`; `run_tests.sh` (e quindi la CI) fallisce finché uno di questi non è aggiornato.
 
 | Sezione | Chiavi |
 |---|---|
 | `[CICLO]` | `durata1..3` (s, 10–86400), `pot_min`, `pot_max`, `pot_invertito`, `partenza = marcia / pausa` |
-| `[FASI]` | % di inizio di `tramonto`, `crepuscolo`, `notte`, `alba` (devono essere strettamente crescenti) |
-| `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 caratteri), `forza1..16 = auto / on / off` |
+| `[FASI]` | % di inizio di `tramonto`, `crepuscolo`, `notte`, `alba` (1–99, devono essere strettamente crescenti) |
+| `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 caratteri, senza virgole; definiscili prima degli eventi che li usano), `forza1..16 = auto / on / off` |
 | `[GIORNO]`, `[TRAMONTO]`, `[CREPUSCOLO]`, `[NOTTE]`, `[ALBA]` | cosa succede in quella fase: `cielo` / `tramonto` / `alba = %, R, G, B [, morbida / lineare]` (colori delle strisce, fino a 20 tappe per striscia) e `rele = RELÈ, ON/OFF, %` (fino a 64 eventi in tutto), vedi sotto |
 | `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
 | `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tinta in %) |
 | `[CASETTE]` | `numero` (≤ 100, 0 = spente), `colore`, `accendi = FASE, %`, `spegni = FASE, %` (può scavalcare la fine del ciclo), `fuoco` (0–100), `dissolvenza_ms` |
 | `[SISTEMA]` | `fastboot` (predefinito 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (entrambi solo con `fastboot = 0`), `oled`, `debug_ms` |
+| `[WIFI]` | `abilitato` (predefinito 0; 1 = rete di casa, 2 o `ap` = access point, 3 o `auto` = rete di casa, access point se non si collega), `ssid` (≤ 32 caratteri), `password` (vuota = rete aperta, altrimenti 8–63 caratteri, WPA/WPA2), `nome` (nome in rete, fino a 24 tra lettere, cifre e `-`, non all'inizio; predefinito `presepe` → `http://presepe.local`) |
+| `[ACCESS_POINT]` | rete creata con `abilitato = 2` (o 3 senza rete di casa): `ssid` (predefinito `Presepe`), `password` (predefinita `presepe2026`), `canale` (1–13, predefinito 6), `nascosta` (0/1), `max_client` (1–8, predefinito 4), `ip` (predefinito `192.168.4.1`), `portale` (0/1), `attesa` (s, 10–600, predefinito 60, solo per 3); vedi [WiFi](#wifi-scheda-mega--wifi-r3) |
+| `[AUTENTICAZIONE]` | `utente` e `password` (1–32 caratteri ciascuno) chiesti dalla pagina web (predefiniti `admin` / `presepe2026`; sono anche la password OTA dell'ESP8266) |
+
+I valori di testo di `[WIFI]`, `[ACCESS_POINT]` e `[AUTENTICAZIONE]` si possono scrivere tra virgolette doppie, così possono contenere `;`, `#` o spazi all'inizio e alla fine: `password = "la;mia#password"`. Le virgolette non fanno parte del valore. Altrove (per esempio nei nomi dei relè) le virgolette sono caratteri normali. Le righe sono al massimo di 126 caratteri.
 
 ### Le sezioni di fase: colori delle strisce e relè
 
@@ -434,7 +594,7 @@ rele     = 3, ON, 30              ; relè 3 acceso al 30 % del tramonto
 
 Per aggiungere un colore intermedio, per esempio un passaggio rosso fra il picco arancio e il bianco tenue, basta una riga in mezzo: `tramonto = 60, 140, 30, 10`.
 
-**Relè.** Una riga è un evento: `rele = RELÈ, ON|OFF, %`. RELÈ è 1–16, `Grp_GG_RR` (relè = (GG − 1) × 4 + RR) o un nome definito in `[RELE]`. Un relè mantiene lo stato fino al suo evento successivo. La prima riga `rele` valida sostituisce tutta la tabella di eventi predefinita (predefinito: relè 3 acceso al 30 % del TRAMONTO, spento al 50 % della NOTTE). Fino a 64 eventi.
+**Relè.** Una riga è un evento: `rele = RELÈ, ON|OFF, %`. RELÈ è 1–16, `Grp_GG_RR` (relè = (GG − 1) × 4 + RR) o un nome definito in `[RELE]`. Un relè mantiene lo stato fino al suo evento successivo nello stesso ciclo; all'inizio di ogni ciclo (GIORNO 0 %) i relè non forzati con `forzaN` ripartono spenti. Per tenerne uno acceso a cavallo della fine del ciclo aggiungi `rele = N, ON, 0` in `[GIORNO]`. La prima riga `rele` valida sostituisce tutta la tabella di eventi predefinita (predefinito: relè 3 acceso al 30 % del TRAMONTO, spento al 50 % della NOTTE). Fino a 64 eventi.
 
 Esempio: il motorino del mulino sul relè 1 gira dal 10 % del GIORNO fino a quando arriva la notte.
 
@@ -449,11 +609,12 @@ rele = Mulino, ON, 10
 rele = Mulino, OFF, 0
 ```
 
-Il cielo predefinito è: caldo a inizio GIORNO, quasi bianco (80 % della strada) al 30 %, bianco pieno dal 45 % al 55 %, di nuovo quasi bianco al 70 %, caldo a fine GIORNO; nel TRAMONTO sbiadisce e si spegne, resta spento fino al 38 % dell'ALBA, poi si accende rapidamente a un minimo caldo e sale fino al colore caldo del giorno. Le strisce del tramonto e dell'alba si accendono solo nella loro fase.
+Il cielo predefinito è: caldo a fine ALBA e a inizio GIORNO, quasi bianco (80 % della strada) al 30 %, bianco pieno dal 45 % al 55 %, di nuovo quasi bianco al 70 %, caldo a fine GIORNO; nel TRAMONTO sbiadisce e si spegne, resta spento fino al 38 % dell'ALBA, poi si accende rapidamente a un minimo caldo e sale fino al colore caldo del giorno. Le strisce del tramonto e dell'alba si accendono solo nella loro fase.
 
 Gestione degli errori:
 - Una riga sbagliata viene saltata e contata, e quella chiave mantiene il valore di default.
-- Percentuali delle fasi non crescenti, o un intervallo del potenziometro inutilizzabile, tornano ai valori di default.
+- Percentuali delle fasi non crescenti, una corsa del potenziometro sotto 30 (`pot_max − pot_min`), `lum_min` maggiore di `lum_max` o `scintillio_min` maggiore di `scintillio_max` tornano ai valori di default e contano ciascuno come un errore; l'OLED mostra allora `valori incoerenti` al posto del numero di riga.
+- `attive` maggiore di `numero` viene ridotto a `numero` senza errore.
 
 ## 11. Regole di progetto del PCB e verifiche
 
@@ -471,7 +632,7 @@ Non ci sono via sulle reti a tensione di rete.
 
 Le 48 reti dei contatti (COM/NO/NC × 16) collegano ciascuna un solo pin del relè al suo morsetto, quindi i 230 V non raggiungono mai il resto della scheda. Questo viene controllato in automatico.
 
-### Controlli automatici (`reports/`)
+### Controlli automatici (`hardware/rev-d/reports/`)
 
 | Controllo | Risultato |
 |---|---|
@@ -499,14 +660,14 @@ La distanza minima tra rame sulla scheda è 0,202 mm (7,95 mil).
 
    | Campo | File |
    |---|---|
-   | Gerber | `manufacturing/PSN-Presepe-Mega-RevD-gerbers.zip` |
+   | Gerber | `hardware/rev-d/manufacturing/PSN-Presepe-Mega-RevD-gerbers.zip` |
    | BOM | `…-BOM-PCBWay.csv` (codici produttore e note di montaggio) |
    | Centroid | `…-Centroid-PCBWay.csv` (comprende MCU1 sul lato inferiore) |
    | Other files | `…-Assembly-Instructions.pdf` (header Mega sul lato inferiore, fori ICSP vuoti, note sulle polarità) |
 
 4. Attendi la revisione (*audit*) e il DFM. Il costo dei componenti viene quotato solo dopo la revisione.
 
-I file e le impostazioni esatte dell'ordine del 2026-10-04 sono congelati in `manufacturing/pcbway-order-2026-10-04/`.
+I file e le impostazioni esatte dell'ordine del 2026-10-04 sono congelati in `hardware/rev-d/manufacturing/pcbway-order-2026-10-04/`.
 
 ### JLCPCB (alternativa)
 
@@ -529,17 +690,20 @@ Requisiti (versioni usate):
 | `rsvg-convert` | | immagini |
 | `zip` | | archivio dei Gerber |
 | arduino-cli | 1.1.1 | con arduino:avr |
-| compilatore C++11 | | test del parser |
+| compilatore C++14 | | test sul PC (`run_tests.sh`) |
+| Node.js | | facoltativo: controllo della sintassi degli script delle pagine in `run_tests.sh` |
 | Freerouting 2.2.4 + Java 25 | | solo per rifare lo sbroglio da zero |
 
 ```sh
-./build.sh                    # tutto in ./out (PCB riprodotto da build/data/routing.ses + firmware)
-UPDATE_REPO=1 ./build.sh      # come sopra, poi aggiorna kicad/ manufacturing/ previews/ reports/ nel repo
-REROUTE=1 FREEROUTING_JAR=/percorso/freerouting-2.2.4.jar JAVA=/percorso/java ./build.sh   # sbroglio da zero
-SKIP_PCB=1 ./build.sh         # solo firmware
+./build.sh                    # tutto in ./out: ogni hardware/rev-* (sbroglio riprodotto da build/data/routing.ses) + firmware
+hardware/rev-d/build.sh       # una sola revisione, in hardware/rev-d/out (idem per hardware/rev-e)
+UPDATE_REPO=1 hardware/rev-d/build.sh   # come sopra, poi aggiorna kicad/ manufacturing/ previews/ reports/ di quella revisione
+REROUTE=1 FREEROUTING_JAR=/percorso/freerouting-2.2.4.jar JAVA=/percorso/java hardware/rev-e/build.sh   # sbroglio da zero (FR_TIMEOUT, predefinito 900 s)
+SKIP_PCB=1 ./build.sh         # solo firmware del Mega (quello dell'ESP: firmware/tools/esp_compile.sh)
+SKIP_FIRMWARE=1 ./build.sh    # solo PCB (REVS="rev-d" per scegliere le revisioni)
 ```
 
-Come funziona la catena del PCB (`build/scripts/pipeline.sh`):
+Come funziona la catena del PCB (`hardware/<rev>/build/scripts/pipeline.sh`):
 1. Piazza tutti i footprint a partire dalla netlist di riferimento (`build_board.py`).
 2. Scrive le classi di rete e le regole di isolamento (`make_rules.py`).
 3. Pre-sbroglia i percorsi di rete, le piste di alimentazione e le zone vietate (`route_mains.py`).
@@ -550,16 +714,18 @@ Come funziona la catena del PCB (`build/scripts/pipeline.sh`):
 
 La sessione di sbroglio salvata rende la ricostruzione deterministica: una ricostruzione pulita da questo albero produce una geometria identica ai Gerber ordinati. Freerouting invece non è deterministico, quindi rifare lo sbroglio da zero dà un tracciato diverso, ma comunque verificato.
 
-A ogni build KiCad assegna nuovi identificativi interni (`tstamp`) a tutti gli elementi della scheda, quindi in git `kicad/*.kicad_pcb` mostra grandi differenze anche quando non è cambiato nulla. Per giudicare una ricostruzione usa `reports/` (soprattutto `gerber-equivalence-vs-pcbway-order.txt`), non il diff testuale.
+A ogni build KiCad assegna nuovi identificativi interni (`tstamp`) a tutti gli elementi della scheda, quindi in git `hardware/*/kicad/*.kicad_pcb` mostra grandi differenze anche quando non è cambiato nulla. Per giudicare una ricostruzione usa `reports/` della revisione (soprattutto `gerber-equivalence-vs-pcbway-order.txt`), non il diff testuale.
 
 KiCad 8–10 aprono i file di KiCad 7, ma gli script sono scritti per l'API Python di KiCad 7.
 
 ## 14. Limiti noti e punti aperti
 
+- **Passo dei fori di BZ1 (Rev D; corretto nella Rev E).** L'impronta di BZ1 della Rev D (`Buzzer_12x9.5RM7.6`) ha i fori a 7,6 mm, ma il buzzer acquistato per il montaggio, Same Sky CEM-1203(42), ha i pin a 6,5 mm (disegno del datasheet, misura confermata da PCBWay con il calibro). Sulle schede Rev D PCBWay ha piegato i pin verso l'esterno, quindi il buzzer resta un po' sollevato dalla scheda; con pin da 5,3 mm la saldatura resta corretta. La Rev E usa un'impronta a passo 6,5 mm.
+- **Segno di polarità di C1 (Rev D; corretto nella Rev E).** L'impronta di C1 della Rev D (`C_Radial_D10.0mm_H12.5mm_P5.00mm`) ha due piazzole tonde uguali e nessun "+" sulla serigrafia. PCBWay l'ha montato giusto ricavando la polarità dalla BOM (piazzola 1 = +12 V, piazzola 2 = GND). La Rev E usa un'impronta polarizzata (piazzola + quadrata e segno "+").
 - **Spazio per la spina USB.** La presa USB-B della Mega finisce circa 1,7 mm all'interno del bordo dello shield, e lo shield sta circa 11 mm sopra la Mega. Le spine USB voluminose potrebbero non entrare fino in fondo. In quel caso usa una spina sottile, degli header impilabili, oppure stacca la Mega per programmarla. Sopra la presa USB e il jack di alimentazione non c'è rame sullo shield.
 - **Dati WS2811:** sulla scheda manca la resistenza in serie, va aggiunta da 330 Ω nel cavo ([sezione 7](#7-collegamento-dei-carichi)).
 - **Blu del CIELO (D4):** è sul Timer0, quindi resta a PWM 8 bit. TRAMONTO e ALBA (e R/G del CIELO) sono su timer a 16 bit e in un firmware futuro potrebbero passare a PWM da 10–12 bit.
-- **Distanza minima** di 0,202 mm (7,95 mil), mentre PCBWay indica 8 mil per il rame da 2 oz. La differenza è di 1 µm, molto al di sotto della tolleranza di incisione, ed è stata segnalata a PCBWay con l'ordine.
+- **Distanza minima (Rev D; corretta nella Rev E)** di 0,202 mm (7,95 mil) sulla Rev D, mentre PCBWay indica 8 mil per il rame da 2 oz. La differenza è di 1 µm, molto al di sotto della tolleranza di incisione, ed è stata segnalata a PCBWay con l'ordine. La Rev E è sbrogliata con 0,22 mm e controllata contro gli 8 mil.
 - **ERC non eseguito.** `kicad-cli` 7 non ha l'ERC; le connessioni sono dimostrate dalla parità schema ↔ PCB e dalle verifiche indipendenti.
 - **I Gerber ordinati riportano revisione "C"** nell'attributo di intestazione X2 `ProjectId`, residuo del cartiglio. È solo estetico, non incide sulla produzione ed è corretto negli script. Vedi la cartella congelata dell'ordine.
 - **Avvisi di annotazione:** i riferimenti `J_*` fanno segnalare a KiCad avvisi di annotazione. Sono innocui.
@@ -582,6 +748,7 @@ KiCad 8–10 aprono i file di KiCad 7, ma gli script sono scritti per l'API Pyth
 | B | Shield per Arduino Mega con relè, MOSFET e morsetti (versione precedente del repository). |
 | C | Correzioni per la produzione: pin NO/NC del G5Q-1 corretti, footprint DIP-18 dell'ULN2803A, resistenza in serie al buzzer, isolamenti 6 / 5 / 2 mm, piste di alimentazione da 3 mm, fori di attrezzaggio JLCPCB, suite di verifica completa. |
 | D | microSD push-push con regolatore 3,3 V e traslatore di livello; il firmware legge `PRESEPE.INI` all'avvio (con valori di default incorporati); potenziometro di bordo sostituito dal morsetto J_POT; catena CASETTE gestita nel ciclo; file per il montaggio chiavi in mano PCBWay. |
+| E | (in progettazione, non ordinata) BZ1 a passo 6,5 mm, C1 polarizzato, distanza minima 0,22 mm, LED di stato su D13, punti di misura per +12V / GND / +5V / GND / +3V3, nessuna via sopra la presa USB della Mega; sbroglio nuovo. Stessi contorno, morsetti e firmware della Rev D. |
 
 ---
 

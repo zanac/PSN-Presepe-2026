@@ -2,9 +2,9 @@ name: firmware
 
 on:
   push:
-    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+    paths: ["firmware/**", "simulation_web/**", "demo/**", ".github/workflows/firmware.yml"]
   pull_request:
-    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+    paths: ["firmware/**", "simulation_web/**", "demo/**", ".github/workflows/firmware.yml"]
   workflow_dispatch:
 
 permissions:
@@ -21,11 +21,21 @@ jobs:
           arduino-cli core update-index
           arduino-cli core install arduino:avr
           arduino-cli lib install "Adafruit NeoPixel" "Adafruit GFX Library" "Adafruit SSD1306" "SD"
-      - name: Parser tests (host)
+      - name: Install ESP8266 core
+        run: |
+          arduino-cli core update-index --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          arduino-cli core install esp8266:esp8266 --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
+      - name: Host tests (parser, colour mode, WiFi link, end to end)
         run: firmware/tools/run_tests.sh
+      - name: Web pages header up to date
+        run: python3 firmware/tools/build_web.py --check
       - name: Compile for Arduino Mega 2560
         run: firmware/tools/fw_compile.sh firmware/PSN-Presepe "$RUNNER_TEMP/fw"
+      - name: Compile ESP8266 firmware (Mega + WiFi board)
+        run: firmware/tools/esp_compile.sh "$RUNNER_TEMP/esp"
       - uses: actions/upload-artifact@v4
         with:
           name: PSN-Presepe-firmware
-          path: ${{ runner.temp }}/fw/PSN-Presepe.ino.*
+          path: |
+            ${{ runner.temp }}/fw/PSN-Presepe.ino.*
+            ${{ runner.temp }}/esp/PSN-Presepe-WiFi.ino.bin

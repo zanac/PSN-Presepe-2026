@@ -25,7 +25,8 @@
     D25..D40    = rele' 1..16 tramite ULN2803A U1/U2 -> morsetti JR1..JR16 (COM/NO/NC)
 
   COMANDI (pulsanti NO verso GND, INPUT_PULLUP: nessuna resistenza esterna)
-    D22 = START/STOP   (morsetto J_START)
+    D22 = START/STOP   (morsetto J_START): breve = pausa/ripresa, tenuto 2 s = STOP
+                       (tutto spento), in STOP breve = PLAY (ciclo dall'inizio del GIORNO)
     D23 = AVANTI/NEXT  (morsetto J_NEXT)
     D24 = TEST         (morsetto J_TEST)
     A0  = potenziometro lineare 10k esterno (morsetto J_POT: 5V / cursore / GND)
@@ -83,6 +84,10 @@ const uint8_t PIN_TEST  = 24;
 const uint8_t PIN_POT   = A0;   // Rev D: potenziometro esterno su morsetto J_POT
 const uint8_t PIN_SD_CS = 53;   // microSD chip select (SPI hardware: D50 MISO, D51 MOSI, D52 SCK)
 const uint8_t PIN_SD_CD = 49;   // contatto "scheda inserita" dello slot (LOW = inserita)
+// LED di stato (PCB Rev E: LED verde D1 + RLED su D13). D13 e' libero anche sulla Rev D,
+// dove lampeggia solo il LED "L" della Mega sotto lo shield. Nome senza PIN_ di proposito:
+// le verifiche della Rev D controllano che ogni PIN_ arrivi a una pista della scheda.
+const uint8_t LED_STATO = 13;
 
 
 // -----------------------------------------------------------------------------
@@ -109,7 +114,7 @@ const uint8_t OLED_H = 64;
 Adafruit_SSD1306 display(OLED_W, OLED_H, &Wire, -1);
 bool oledPresente = false;
 unsigned long oledPopupFino = 0;
-enum OledPopup : uint8_t { OLED_NESSUNO, OLED_PAUSA, OLED_RIPRESA, OLED_AVANTI, OLED_TEST, OLED_VELOCITA };
+enum OledPopup : uint8_t { OLED_NESSUNO, OLED_PAUSA, OLED_RIPRESA, OLED_AVANTI, OLED_TEST, OLED_VELOCITA, OLED_PLAY };
 OledPopup oledPopup = OLED_NESSUNO;
 int ultimoPotOled = -1;
 int potRawOled = 0;
@@ -157,6 +162,10 @@ enum EventoTasto : uint8_t { TASTO_NULLA = 0, TASTO_BREVE, TASTO_LUNGO };
 #define CFG_MAX_EVENTI    64   // righe "evento" della schedulazione rele'
 #define CFG_NOME_LEN      13   // 12 caratteri + terminatore (nome rele' su OLED)
 #define CFG_MAX_TAPPE     20   // tappe di colore massime per striscia RGB (CIELO / TRAMONTO / ALBA)
+#define CFG_SSID_LEN      33   // SSID WiFi: max 32 caratteri + terminatore
+#define CFG_WPWD_LEN      64   // password WPA/WPA2: 8..63 caratteri (vuota = rete aperta)
+#define CFG_HOST_LEN      25   // nome in rete (mDNS): max 24 caratteri a-z 0-9 -
+#define CFG_UTENTE_LEN    33   // utente e password della pagina web: max 32 caratteri
 #define CFG_FILE_NAME     "PRESEPE.INI"   // file cercato per primo nella radice della microSD
 #define CFG_FILE_NAME_ALT "PRESEPE.TXT"   // alternativa (Wokwi non accetta file .ini; utile anche su Windows)
 
@@ -233,6 +242,21 @@ struct PresepeConfig {
   uint8_t  fastboot;                      // 1 = avvio rapido: niente schermata SD, autotest e melodia (lo splash di 3 s resta)
   uint16_t beepHz, beepMs;
   uint32_t debugMs;
+  // [WIFI] scheda Mega + WiFi (ESP8266 collegato alla Serial3)
+  uint8_t  wifiAbilitato;                 // 0 = Serial3 non usata: come un Mega senza WiFi, 1 = rete di casa,
+                                          // 2 = access point, 3 = rete di casa, se non si collega access point
+  char     wifiSsid[CFG_SSID_LEN];
+  char     wifiPassword[CFG_WPWD_LEN];
+  char     wifiNome[CFG_HOST_LEN];        // nome in rete: http://<nome>.local
+  // [ACCESS_POINT] rete creata dall'ESP8266 (abilitato = 2, oppure 3 senza rete di casa)
+  char     apSsid[CFG_SSID_LEN];
+  char     apPassword[CFG_WPWD_LEN];
+  uint8_t  apCanale, apNascosta, apMaxClient, apPortale;
+  uint8_t  apIp[4];
+  uint16_t apAttesa;                      // abilitato = 3: secondi di tentativi sulla rete di casa
+  // [AUTENTICAZIONE] utente e password della pagina web
+  char     webUtente[CFG_UTENTE_LEN];
+  char     webPassword[CFG_UTENTE_LEN];
   // stato lettura (non configurabile)
   uint8_t  sdStato;
   uint16_t righeLette, errori, primaRigaErrata;
@@ -390,6 +414,18 @@ void cfgDefault(PresepeConfig &c) {
   c.buzzer = 1; c.melodiaAvvio = 1; c.autotestAvvio = 1; c.oled = 1;
   c.fastboot = 1;   // dalla release 038 l'avvio rapido e' il predefinito
   c.beepHz = 900; c.beepMs = 90; c.debugMs = 5000UL;
+  // [WIFI] spento: la scheda si comporta come un Arduino Mega senza WiFi.
+  c.wifiAbilitato = 0;
+  strcpy(c.wifiNome, "presepe");
+  // [ACCESS_POINT] pronto all'uso: rete "Presepe", password presepe2026, http://192.168.4.1
+  strcpy(c.apSsid, "Presepe");
+  strcpy(c.apPassword, "presepe2026");
+  c.apCanale = 6; c.apNascosta = 0; c.apMaxClient = 4; c.apPortale = 0;
+  c.apIp[0] = 192; c.apIp[1] = 168; c.apIp[2] = 4; c.apIp[3] = 1;
+  c.apAttesa = 60;
+  // [AUTENTICAZIONE] della pagina web (da cambiare nel file).
+  strcpy(c.webUtente, "admin");
+  strcpy(c.webPassword, "presepe2026");
   c.sdStato = SD_NON_LETTA;
 }
 
@@ -618,10 +654,88 @@ static bool sezSistema(PresepeConfig &c, const char *k, char *v) {
   if (ugualeCI(k, "debug_ms")) { if (!leggiLong(v, n, 0, 3600000L)) return false; c.debugMs = (uint32_t)n; return true; }
   return false;
 }
+// Testo libero: "valore" tra virgolette (puo' contenere ; # = e spazi) oppure senza.
+// Copia in dst (capienza cap, terminatore compreso) solo se lungo minimo..cap-1.
+static bool leggiTesto(const char *v, char *dst, size_t cap, size_t minimo) {
+  size_t l = strlen(v);
+  if (l && v[0] == '"') {
+    if (l < 2 || v[l - 1] != '"') return false;
+    v++; l -= 2;
+    for (size_t i = 0; i < l; i++) if (v[i] == '"') return false;   // nessuna virgoletta interna
+  }
+  if (l < minimo || l >= cap) return false;
+  for (size_t i = 0; i < l; i++) if ((unsigned char)v[i] < 32) return false;
+  memcpy(dst, v, l); dst[l] = 0;
+  return true;
+}
+static bool leggiPasswordWpa(const char *v, char *dst) {   // vuota (rete aperta) oppure 8..63 caratteri
+  char tmp[CFG_WPWD_LEN];
+  if (!leggiTesto(v, tmp, CFG_WPWD_LEN, 0)) return false;
+  if (tmp[0] && strlen(tmp) < 8) return false;
+  strcpy(dst, tmp); return true;
+}
+static bool sezWifi(PresepeConfig &c, const char *k, char *v) {
+  if (ugualeCI(k, "abilitato")) {             // 0/1 (anche si/no...), 2 o "ap" = access point, 3 o "auto"
+    if (ugualeCI(v, "2") || ugualeCI(v, "ap")) { c.wifiAbilitato = 2; return true; }
+    if (ugualeCI(v, "3") || ugualeCI(v, "auto")) { c.wifiAbilitato = 3; return true; }
+    return leggiBool(v, c.wifiAbilitato);
+  }
+  if (ugualeCI(k, "ssid")) return leggiTesto(v, c.wifiSsid, CFG_SSID_LEN, 0);
+  if (ugualeCI(k, "password")) return leggiPasswordWpa(v, c.wifiPassword);
+  if (ugualeCI(k, "nome")) {
+    char tmp[CFG_HOST_LEN];
+    if (!leggiTesto(v, tmp, CFG_HOST_LEN, 1) || tmp[0] == '-') return false;
+    for (char *p = tmp; *p; p++) {
+      if (!(isalnum((unsigned char)*p) || *p == '-')) return false;
+      *p = (char)tolower((unsigned char)*p);
+    }
+    strcpy(c.wifiNome, tmp); return true;
+  }
+  return false;
+}
+static bool sezAccessPoint(PresepeConfig &c, const char *k, char *v) {
+  long n;
+  if (ugualeCI(k, "ssid")) return leggiTesto(v, c.apSsid, CFG_SSID_LEN, 1);
+  if (ugualeCI(k, "password")) return leggiPasswordWpa(v, c.apPassword);
+  if (ugualeCI(k, "canale")) { if (!leggiLong(v, n, 1, 13)) return false; c.apCanale = (uint8_t)n; return true; }
+  if (ugualeCI(k, "nascosta")) return leggiBool(v, c.apNascosta);
+  if (ugualeCI(k, "max_client")) { if (!leggiLong(v, n, 1, 8)) return false; c.apMaxClient = (uint8_t)n; return true; }
+  if (ugualeCI(k, "portale")) return leggiBool(v, c.apPortale);
+  if (ugualeCI(k, "attesa")) { if (!leggiLong(v, n, 10, 600)) return false; c.apAttesa = (uint16_t)n; return true; }
+  if (ugualeCI(k, "ip")) {                    // a.b.c.d, rete /24: l'ultimo numero da 1 a 55
+    // (il DHCP dell'ESP8266 da' ai telefoni da ultimo+99 a ultimo+199: oltre 55 sforerebbe il 255)
+    uint8_t x[4]; const char *s = v;
+    for (uint8_t i = 0; i < 4; i++) {
+      if (!isdigit((unsigned char)*s)) return false;
+      char *fine; long q = strtol(s, &fine, 10);
+      if (fine - s > 3 || q < 0 || q > 255 || (i < 3 ? *fine != '.' : *fine != 0)) return false;
+      x[i] = (uint8_t)q; s = fine + 1;
+    }
+    if (x[3] == 0 || x[3] > 55 || x[0] == 0 || x[0] >= 224 || x[0] == 127) return false;
+    memcpy(c.apIp, x, 4); return true;
+  }
+  return false;
+}
+static bool sezAutenticazione(PresepeConfig &c, const char *k, char *v) {
+  if (ugualeCI(k, "utente")) return leggiTesto(v, c.webUtente, CFG_UTENTE_LEN, 1);
+  if (ugualeCI(k, "password")) return leggiTesto(v, c.webPassword, CFG_UTENTE_LEN, 1);
+  return false;
+}
 
 void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRiga) {
   c.righeLette = numeroRiga;
-  for (char *p = riga; *p; p++) if (*p == ';' || *p == '#') { *p = 0; break; }   // commenti
+  // Commenti: da ; o # in poi. Se il valore comincia con " il commento si cerca solo
+  // dopo la virgoletta di chiusura (la password puo' contenere ; e #). Una " in mezzo
+  // a un valore normale (es. nome1 = TV 12") non cambia nulla.
+  char *inizio = riga;
+  char *ug = strchr(riga, '=');
+  if (ug && !memchr(riga, ';', ug - riga) && !memchr(riga, '#', ug - riga)) {
+    char *q = ug + 1;
+    while (*q == ' ' || *q == '\t') q++;
+    if (*q == '"') { char *chiusa = strchr(q + 1, '"'); inizio = chiusa ? chiusa + 1 : q + strlen(q); }
+  }
+  for (char *p = inizio; *p; p++)
+    if (*p == ';' || *p == '#') { *p = 0; break; }
   char *s = trim(riga);
   if (!*s) return;
   if (*s == '[') {
@@ -633,7 +747,8 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
     if (!(ugualeCI(n, "CICLO") || ugualeCI(n, "FASI") || ugualeCI(n, "RELE") || ugualeCI(n, "COLORI") ||
           ugualeCI(n, "GIORNO") || ugualeCI(n, "TRAMONTO") || ugualeCI(n, "CREPUSCOLO") ||
           ugualeCI(n, "NOTTE") || ugualeCI(n, "ALBA") ||
-          ugualeCI(n, "STELLE") || ugualeCI(n, "CASETTE") || ugualeCI(n, "SISTEMA"))) { errore(c, numeroRiga); sezione[0] = 0; }
+          ugualeCI(n, "STELLE") || ugualeCI(n, "CASETTE") || ugualeCI(n, "SISTEMA") ||
+          ugualeCI(n, "WIFI") || ugualeCI(n, "ACCESS_POINT") || ugualeCI(n, "AUTENTICAZIONE"))) { errore(c, numeroRiga); sezione[0] = 0; }
     return;
   }
   char *uguale = strchr(s, '=');
@@ -648,6 +763,9 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
   else if (ugualeCI(sezione, "STELLE")) ok = sezStelle(c, k, v);
   else if (ugualeCI(sezione, "CASETTE")) ok = sezCasette(c, k, v);
   else if (ugualeCI(sezione, "SISTEMA")) ok = sezSistema(c, k, v);
+  else if (ugualeCI(sezione, "WIFI")) ok = sezWifi(c, k, v);
+  else if (ugualeCI(sezione, "ACCESS_POINT")) ok = sezAccessPoint(c, k, v);
+  else if (ugualeCI(sezione, "AUTENTICAZIONE")) ok = sezAutenticazione(c, k, v);
   else {
     uint8_t fase;
     if (leggiFase(sezione, fase)) ok = sezFase(c, fase, k, v);   // [GIORNO] .. [ALBA]
@@ -745,6 +863,30 @@ uint8_t cfgAggancioAggiorna(CfgAggancio &a, uint8_t attuale, uint8_t daPot) {
   a.lato = lato;
   return 0;
 }
+// ---------------------------------------------------------------- collegamento WiFi
+// Righe dall'ESP8266: "@COMANDO argomenti*HH". HH = somma dei byte prima di '*'
+// (modulo 256) in esadecimale maiuscolo. Una riga senza somma corretta viene ignorata:
+// l'ESP non riceve risposta e la ritrasmette.
+uint8_t lnkSomma(const char *s, size_t n) {
+  uint8_t x = 0;
+  for (size_t i = 0; i < n; i++) x = (uint8_t)(x + (uint8_t)s[i]);
+  return x;
+}
+static int8_t esa(char ch) {
+  if (ch >= '0' && ch <= '9') return (int8_t)(ch - '0');
+  if (ch >= 'A' && ch <= 'F') return (int8_t)(ch - 'A' + 10);
+  return -1;
+}
+// Controlla e toglie "*HH" in coda. Ritorna false se manca o non corrisponde.
+bool lnkVerifica(char *riga) {
+  size_t l = strlen(riga);
+  if (l < 4 || riga[0] != '@' || riga[l - 3] != '*') return false;
+  int8_t h = esa(riga[l - 2]), b = esa(riga[l - 1]);
+  if (h < 0 || b < 0) return false;
+  if (lnkSomma(riga, l - 3) != (uint8_t)(h * 16 + b)) return false;
+  riga[l - 3] = 0;
+  return true;
+}
 // ==== CONFIG END ====
 
 int potLimita(int raw) { return constrain(raw, (int)cfg.potMin, (int)cfg.potMax); }
@@ -760,6 +902,7 @@ int potRawStabile = 0;
 
 const unsigned long DEBOUNCE_MS = 20;
 #define DEBUG_INTERVAL_MS (cfg.debugMs)   // [SISTEMA] debug_ms (0 = nessun log periodico)
+#define START_STOP_MS 2000UL              // START tenuto cosi' a lungo = STOP
 
 // ============================================================
 // STATO
@@ -787,6 +930,8 @@ void setTramonto(uint8_t r, uint8_t g, uint8_t b);
 void setAlba(uint8_t r, uint8_t g, uint8_t b);
 void generaCieloStellato();
 void mostraStelle(float livello);
+void stelleFlush();
+void aggiornaLedStato();
 void setStelle(uint8_t value);
 void tuttoSpento();
 unsigned long durataDaRaw(int raw);
@@ -828,6 +973,19 @@ void aggiornaMelodiaBoot(unsigned long elapsedTotale);
 void mostraOledBoot(const __FlashStringHelper *fase, uint8_t step, unsigned long elapsedStep);
 void attesaBoot(const __FlashStringHelper *fase, uint8_t step);
 void eseguiSequenzaBoot();
+bool lnkQuiet();
+void lnkInizio();
+void lnkTick();
+bool lnkRecupera();
+bool iniCreaPredefinito();
+extern bool iniCreato;
+void entraTest();
+void entraTestWeb();
+void fermaPresepe();
+void avviaPresepe();
+void mostraOledStop();
+void riavviaSoftware();
+void setup();
 
 
 // ============================================================
@@ -840,7 +998,13 @@ void eseguiSequenzaBoot();
 #define NUM_EVENTI_RELE (cfg.numEventi)
 
 bool running = true;
+bool fermo = false;          // STOP: tutto spento (rele', strisce, stelle, casette) fino a PLAY
 bool testInCorso = false;
+bool testMostraIP = false;   // [WIFI] abilitato: primo passo del test = indirizzo IP
+bool testWeb = false;        // test comandato dalla pagina web (strisce, pixel, rele' uno a uno)
+uint16_t releStato = 0;      // bit i = rele' i+1 acceso (per la pagina web)
+char wifiIp[16] = "none";    // indirizzo comunicato dall'ESP8266 ("none" = non collegato)
+bool wifiAp = false;         // l'ESP8266 ha creato l'access point (abilitato = 2, o 3 senza rete di casa)
 uint8_t testIndice = 0;
 bool testEraInMarcia = false;
 unsigned long testPausaMs = 0;
@@ -1043,6 +1207,7 @@ void generaCieloStellato() {
   cieloGenerato = true;
 }
 
+bool stelleInSospeso = false;   // pixel delle stelle cambiati ma non ancora inviati (vedi stelleFlush)
 void mostraStelle(float livello) {
   livello = constrain(livello, 0.0f, 1.0f);
   stelle.clear();
@@ -1103,13 +1268,23 @@ void mostraStelle(float livello) {
       (uint8_t)((v * cfg.coloreStelle.b) / 100U)
     ));
   }
-  // NeoPixel disabilita gli interrupt durante la trasmissione.
-  // Limitiamo il refresh a 50 Hz per non alterare millis()/Timer0.
+  stelleInSospeso = true;
+  stelleFlush();
+}
+
+// NeoPixel disabilita gli interrupt durante la trasmissione.
+// Limitiamo il refresh a 50 Hz per non alterare millis()/Timer0.
+// Mentre arrivano byte dall'ESP8266 (Serial3) niente show(): gli interrupt
+// spenti dalla trasmissione WS2811 farebbero perdere caratteri. Un aggiornamento
+// rimandato resta in sospeso e lo manda loop() appena possibile (serve quando la
+// scena non viene piu' ricalcolata: STOP, test da web).
+void stelleFlush() {
   static unsigned long ultimoShowStelleUs = 0;
   unsigned long adessoUs = micros();
-  if ((unsigned long)(adessoUs - ultimoShowStelleUs) >= 20000UL) {
+  if (stelleInSospeso && (unsigned long)(adessoUs - ultimoShowStelleUs) >= 20000UL && !lnkQuiet()) {
     stelle.show();
     ultimoShowStelleUs = adessoUs;
+    stelleInSospeso = false;
   }
 }
 
@@ -1238,6 +1413,7 @@ uint8_t indiceFase(Fase f) {
 
 void scriviRele(uint8_t indice, bool acceso) {
   if (indice >= 16) return;
+  if (acceso) releStato |= (uint16_t)(1U << indice); else releStato &= (uint16_t)~(1U << indice);
   digitalWrite(PIN_RELE[indice],
                acceso ? (RELE_ACTIVE_LOW ? LOW : HIGH)
                       : (RELE_ACTIVE_LOW ? HIGH : LOW));
@@ -1309,6 +1485,7 @@ bool casetteAccese(float p) {
 
 void aggiornaCasette(float p) {
   if (NUM_CASETTE == 0) return;
+  if (lnkQuiet()) return;           // ricezione dall'ESP8266 in corso (vedi mostraStelle)
   unsigned long now = millis();
   unsigned long dt = now - casetteUltimoMs;
   if (dt < 20) return;              // max 50 Hz: NeoPixel sospende gli interrupt
@@ -1373,6 +1550,25 @@ void mostraOledTest() {
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
   display.setCursor(0,0); display.print(F("MODALITA' TEST"));
+  if (testWeb) {                     // comandi dalla pagina web
+    display.setCursor(0,18); display.print(F("TEST DA WEB"));
+    display.setCursor(0,32); display.print(F("comandi dal telefono"));
+    display.setCursor(0,48); display.print(F("TEST=passi START=esci"));
+    display.display();
+    return;
+  }
+  if (testMostraIP) {                // [WIFI] abilitato: passo con l'indirizzo
+    bool ap = cfg.wifiAbilitato == 2 || wifiAp;
+    display.setCursor(0,14); display.print(ap ? F("WI-FI ACCESS POINT") : F("WI-FI"));
+    if (ap) { display.setCursor(0,24); display.print(F("rete ")); display.print(cfg.apSsid); }
+    display.setCursor(0, ap ? 34 : 28); display.print(F("IP: ")); display.print(wifiIp);
+    display.setCursor(0, ap ? 43 : 38);
+    if (strcmp(wifiIp, "none") != 0) { display.print(cfg.wifiNome); display.print(F(".local")); }
+    else display.print(ap ? F("ESP non risponde") : cfg.wifiAbilitato == 3 ? F("cerco la rete...") : F("non collegato"));
+    display.setCursor(0,52); display.print(F("TEST=avanti START=esci"));
+    display.display();
+    return;
+  }
   display.setCursor(0,18); display.print(F("Test ")); display.print(testIndice + 1); display.print(F("/34"));
   display.setCursor(0,32);
   if (testIndice < 18) {
@@ -1475,6 +1671,7 @@ void aggiornaOled(unsigned long durata, float p) {
     switch(oledPopup) {
       case OLED_PAUSA: display.print(F("PAUSA")); break;
       case OLED_RIPRESA: display.print(F("RIPRESA")); break;
+      case OLED_PLAY: display.print(F("PLAY")); break;
       case OLED_AVANTI: display.print(F("AVANTI")); break;
       case OLED_TEST: display.print(F("TEST")); break;
       case OLED_VELOCITA: display.print(F("VELOCITA")); break;
@@ -1489,6 +1686,8 @@ void aggiornaOled(unsigned long durata, float p) {
       display.print(F("Fase: ")); display.print(nomeFase(faseDaPercentuale(p)));
     } else if (oledPopup==OLED_TEST) {
       display.print(F("Test uscite in corso"));
+    } else if (oledPopup==OLED_PLAY) {
+      display.print(F("Ciclo dall'inizio"));
     } else {
       display.print(running ? F("Ciclo in esecuzione") : F("Ciclo fermo"));
     }
@@ -1523,7 +1722,7 @@ bool inizializzaOled() {
   display.setTextSize(1);
   // Startup splash: PSN-Presepe! by Vanni
   display.setCursor(27,18); display.print(F("PSN-Presepe!"));
-  display.setCursor(30,30); display.print(F("by Vanni 038"));
+  display.setCursor(30,30); display.print(F("by Vanni 039"));
   display.setCursor(18,46);
   stampaDurataOled(durataCicloStabile);
   display.print(F(" (mm:ss)"));
@@ -1537,8 +1736,20 @@ bool inizializzaOled() {
 void mostraStatoSD() {
   if (!oledPresente) return;
   // [SISTEMA] fastboot = 1: la schermata compare solo se PRESEPE.INI contiene errori.
-  if (cfg.fastboot && cfg.sdStato != SD_OK_ERRORI) return;
+  if (cfg.fastboot && cfg.sdStato != SD_OK_ERRORI && !iniCreato) return;
   display.clearDisplay();
+  if (iniCreato) {               // primo avvio con questa microSD: si vede sempre, anche con fastboot
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    display.setCursor(0, 0);  display.print(F("MICRO SD"));
+    display.setCursor(0, 16); display.print(F("PRESEPE.INI CREATO"));
+    display.setCursor(0, 28); display.print(F("valori predefiniti"));
+    display.setCursor(0, 40); display.print(F("modificalo dal PC"));
+    display.setCursor(0, 52); display.print(F("e riavvia"));
+    display.display();
+    delay(4000);
+    return;
+  }
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
   display.setCursor(0, 0);  display.print(F("MICRO SD"));
@@ -1568,6 +1779,7 @@ void mostraStatoSD() {
 }
 
 void stampaConfig() {
+  if (iniCreato) Serial.println(F("microSD: PRESEPE.INI mancante -> creato con i valori predefiniti e le spiegazioni"));
   Serial.print(F("microSD: "));
   switch (cfg.sdStato) {
     case SD_OK:        Serial.print(cfgFileLetto); Serial.println(F(" letto senza errori")); break;
@@ -1605,6 +1817,27 @@ void stampaConfig() {
   Serial.print(F("Casette: ")); Serial.print(cfg.numCasette); Serial.print(F(" pixel, accese da "));
   Serial.print(cfgNomeFase(cfg.accendiFase)); Serial.print(' '); Serial.print(cfg.accendiPct); Serial.print(F("% a "));
   Serial.print(cfgNomeFase(cfg.spegniFase)); Serial.print(' '); Serial.print(cfg.spegniPct); Serial.println('%');
+  if (cfg.wifiAbilitato == 3) {
+    Serial.print(F("WiFi: automatico, rete di casa \"")); Serial.print(cfg.wifiSsid);
+    Serial.print(F("\"; se non si collega entro ")); Serial.print(cfg.apAttesa); Serial.println(F(" s apre l'access point"));
+  }
+  if (cfg.wifiAbilitato >= 2) {
+    Serial.print(F("WiFi: access point, rete \"")); Serial.print(cfg.apSsid);
+    Serial.print(F("\"")); if (cfg.apNascosta) Serial.print(F(" (nascosta)"));
+    Serial.print(F(", canale ")); Serial.print(cfg.apCanale);
+    Serial.print(F(", pagina http://")); for (uint8_t i = 0; i < 4; i++) { if (i) Serial.print('.'); Serial.print(cfg.apIp[i]); }
+    Serial.print(F("/ o http://")); Serial.print(cfg.wifiNome); Serial.print(F(".local utente "));
+    Serial.println(cfg.webUtente);
+    if (!strcmp(cfg.apPassword, "presepe2026")) Serial.println(F("WiFi: ATTENZIONE password dell'access point ancora quella di default"));
+    if (!strcmp(cfg.webPassword, "presepe2026")) Serial.println(F("WiFi: ATTENZIONE password della pagina ancora quella di default"));
+  } else if (cfg.wifiAbilitato) {
+    Serial.print(F("WiFi: abilitato, rete \"")); Serial.print(cfg.wifiSsid);
+    Serial.print(F("\", pagina http://")); Serial.print(cfg.wifiNome); Serial.print(F(".local utente "));
+    Serial.println(cfg.webUtente);
+    if (!strcmp(cfg.webPassword, "presepe2026")) Serial.println(F("WiFi: ATTENZIONE password della pagina ancora quella di default"));
+  } else {
+    Serial.println(F("WiFi: spento ([WIFI] abilitato = 0)"));
+  }
 }
 
 void saltaAPercentuale(float p) {
@@ -1711,6 +1944,8 @@ void toggleStartStop() {
     spegniRele();
     testInCorso = false;
     testIndice = 0;
+    testWeb = false;
+    testMostraIP = false;
 
     // Il tempo passato in TEST non deve far avanzare il ciclo.
     if (testEraInMarcia) {
@@ -1757,9 +1992,72 @@ void toggleStartStop() {
 // TEST
 // ============================================================
 
+// LED di stato:
+//   ciclo in marcia   lampo breve ogni 2 s (doppio lampo se PRESEPE.INI ha errori o manca la microSD)
+//   pausa             1 s acceso, 1 s spento
+//   TEST / colore     lampeggio veloce (4 al secondo)
+//   STOP              spento
+//   avvio             acceso fisso
+extern bool modalitaColore;
+void aggiornaLedStato() {
+  unsigned long t = millis();
+  bool on;
+  if (fermo) on = false;
+  else if (testInCorso || modalitaColore) on = (t / 125) & 1;
+  else if (!running) on = (t / 1000) & 1;
+  else {
+    unsigned long f = t % 2000;
+    bool avviso = cfg.sdStato != SD_OK;          // errori nel file, file mancante o microSD assente
+    on = f < 80 || (avviso && f >= 240 && f < 320);
+  }
+  digitalWrite(LED_STATO, on ? HIGH : LOW);
+}
+
 void spegniRele() {
   for (uint8_t i = 0; i < 16; i++)
     scriviRele(i, false);
+}
+
+// STOP (START tenuto 2 s, o pulsante Stop della pagina web): spegne tutto, anche i
+// rele' forzati con forzaN = on, e resta cosi' finche' non arriva PLAY.
+void fermaPresepe() {
+  if (fermo) return;
+  if (testInCorso) { testInCorso = false; testWeb = false; testMostraIP = false; testIndice = 0; }
+  fermo = true;
+  running = false;
+  pauseStartedMs = millis();
+  oledPopup = OLED_NESSUNO;
+  tuttoSpento();
+  spegniRele();
+  casetteLivello = 0.0f;
+  buzzerBeep();
+  Serial.println(F("STOP: tutto spento (START breve = PLAY)"));
+  mostraOledStop();
+}
+
+// PLAY: riparte dall'inizio del GIORNO, in marcia.
+void avviaPresepe() {
+  if (!fermo) return;
+  fermo = false;
+  running = true;
+  cycleStartMs = millis();
+  cieloGenerato = false; ultimaFaseStelle = GIORNO;
+  casetteLivello = 0.0f;
+  buzzerBeep();
+  Serial.println(F("PLAY: ciclo dall'inizio del GIORNO"));
+  oledMostraPopup(OLED_PLAY);
+}
+
+void mostraOledStop() {
+  if (!oledPresente) return;
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(3);
+  display.setCursor(28, 8); display.print(F("STOP"));
+  display.setTextSize(1);
+  display.setCursor(0, 40); display.print(F("tutto spento"));
+  display.setCursor(0, 54); display.print(F("START = PLAY"));
+  display.display();
 }
 
 void accendiRele(uint8_t indice) {
@@ -1771,6 +2069,13 @@ void accendiRele(uint8_t indice) {
 void applicaTestCorrente() {
   tuttoSpento();
   spegniRele();
+
+  if (testMostraIP) {
+    Serial.print(F("TEST - WIFI IP: "));
+    Serial.println(wifiIp);
+    mostraOledTest();
+    return;
+  }
 
   if (testIndice >= 18) {
     uint8_t n = testIndice - 18;
@@ -1856,7 +2161,7 @@ void applicaTestCorrente() {
       for (uint16_t i = 0; i < NUM_STELLE; i++)
         stelle.setPixelColor(i, stelle.Color(70, 50, 27));
       stelle.show();
-      Serial.println(F("TEST 13/34 - TUTTE LE 50 STELLE"));
+      Serial.println(F("TEST 13/34 - TUTTE LE STELLE"));
       break;
     case 13:
       casette.clear();
@@ -1903,25 +2208,51 @@ void applicaTestCorrente() {
   mostraOledTest();
 }
 
+// Entra nella modalita' test (stato comune a TEST fisico e pagina web).
+void entraTest() {
+  testInCorso = true;
+  testIndice = 0;
+  testWeb = false;
+  testMostraIP = cfg.wifiAbilitato != 0;   // con il WiFi il primo passo mostra l'IP
+  testEraInMarcia = running;
+  testPausaMs = millis();
+  running = false;
+  oledPopup = OLED_NESSUNO;
+
+  Serial.println();
+  Serial.println(F("=== MODALITA' TEST ==="));
+  Serial.println(F("TEST = test successivo, START = esci"));
+}
+
 void testUscite() {
   if (!testInCorso) {
-    testInCorso = true;
+    entraTest();
+  } else if (testWeb) {              // TEST durante il test da web: torna ai passi
+    testWeb = false;
+    testMostraIP = false;
     testIndice = 0;
-    testEraInMarcia = running;
-    testPausaMs = millis();
-    running = false;
-    oledPopup = OLED_NESSUNO;
-
-    Serial.println();
-    Serial.println(F("=== MODALITA' TEST ==="));
-    Serial.println(F("TEST = test successivo, START = esci"));
-    buzzerBeep();
+  } else if (testMostraIP) {
+    testMostraIP = false;
+    testIndice = 0;
+  } else if (testIndice >= 33) {     // dopo l'ultimo passo: da capo (dall'IP se c'e' il WiFi)
+    testIndice = 0;
+    testMostraIP = cfg.wifiAbilitato != 0;
   } else {
-    testIndice = (testIndice + 1) % 34;
-    buzzerBeep();
+    testIndice++;
   }
-
+  buzzerBeep();
   applicaTestCorrente();
+}
+
+// Test comandato dalla pagina web: uscite tutte spente, poi i comandi del telefono.
+void entraTestWeb() {
+  if (!testInCorso) entraTest();
+  testWeb = true;
+  testMostraIP = false;
+  tuttoSpento();
+  spegniRele();
+  Serial.println(F("TEST DA WEB"));
+  mostraOledTest();
 }
 
 // ============================================================
@@ -1944,7 +2275,7 @@ void stampaStato(unsigned long durata, float p) {
   Serial.print(analogRead(PIN_POT));
 
   Serial.print(F(" | "));
-  Serial.println(running ? F("RUN") : F("PAUSA"));
+  Serial.println(fermo ? F("STOP") : running ? F("RUN") : F("PAUSA"));
 }
 
 // ============================================================
@@ -2332,6 +2663,773 @@ bool attesaSplash(unsigned long durataMs) {
   return false;
 }
 
+// ==== LINK WIFI BEGIN ====
+// =============================================================================
+// COLLEGAMENTO CON L'ESP8266 (scheda Mega + WiFi, [WIFI] abilitato = 1, 2 o 3)
+// =============================================================================
+// Serial3 (D14 TX3 / D15 RX3), 115200 baud, una riga per messaggio.
+//   ESP -> Mega: "@COMANDO argomenti*HH" (somma di controllo, vedi lnkVerifica);
+//                il Mega risponde "@OK ..." oppure "@ERR motivo". Senza risposta
+//                l'ESP ritrasmette. I comandi con effetto non ripetibile (RUN, NEXT,
+//                COMMIT, RESTORE) portano un numero: se arriva di nuovo lo stesso numero
+//                il Mega rimanda l'esito della prima volta senza ripetere il comando.
+//                W e C hanno il loro numero di pezzo. COMMIT e RESTORE rispondono
+//                subito "@ACK" (lavoro sulla SD in corso), poi "@OK"/"@ERR".
+//   Mega -> ESP: configurazione WiFi (@SSID @WPWD @USER @APWD @HOST @MODE @APSSID @APPWD
+//                @APOPT @APIP @NREL @GO),
+//                stato ogni secondo (@ST), contenuto del file (@L @C @END).
+// Con [WIFI] abilitato = 0 la Serial3 non viene nemmeno aperta.
+#define LNK_SERIAL Serial3
+#define LNK_RIGA_MAX 200
+#define LNK_PEZZO_MAX 120          // righe del file spezzate in pezzi da 120 caratteri
+#define LNK_FILE_NUOVO "PRESEPE.NEW"
+#define LNK_FILE_BACKUP "PRESEPE.BAK"
+#define LNK_FILE_SEGNO "PRESEPE.CMT"   // copia .NEW -> file in corso (contiene il nome del file)
+
+bool lnkAttivo = false;
+char lnkRiga[LNK_RIGA_MAX + 1];
+uint8_t lnkLen = 0;
+bool lnkRigaLunga = false;
+unsigned long lnkSilenzioFino = 0;   // fino a quando non aggiornare le WS2811
+unsigned long lnkStatoMs = 0;
+bool lnkRiavvio = false;             // "@REBOOT" ricevuto: riavvio dopo la risposta
+// scrittura del nuovo PRESEPE.INI
+File lnkFile;
+bool lnkScrittura = false;
+uint16_t lnkSeq = 0xFFFF;            // ultimo pezzo scritto (le ritrasmissioni non si ripetono)
+uint32_t lnkByte = 0;
+unsigned long lnkScritturaMs = 0;
+// pixel del test da web: bit per pixel, STELLE (0) e CASETTE (1)
+uint8_t webPixel[2][(CFG_MAX_STELLE + 7) / 8];
+// ultimo comando numerato eseguito e il suo esito (vedi lnkEsito)
+uint16_t lnkIdFatto = 0;
+uint8_t lnkIdEsito = 0;
+CfgRGB webPixelColore = { 70, 50, 27 };
+
+bool lnkQuiet() {
+  return lnkAttivo && (long)(millis() - lnkSilenzioFino) < 0;
+}
+
+// Prossimo campo separato da spazio (modifica la stringa); nullptr se finita.
+char *lnkCampo(char *&s) {
+  while (*s == ' ') s++;
+  if (!*s) return 0;
+  char *inizio = s;
+  while (*s && *s != ' ') s++;
+  if (*s) *s++ = 0;
+  return inizio;
+}
+bool lnkNumero(char *&s, long &out, long minimo, long massimo) {
+  char *c = lnkCampo(s);
+  if (!c) return false;
+  char *fine; long v = strtol(c, &fine, 10);
+  if (*fine || v < minimo || v > massimo) return false;
+  out = v; return true;
+}
+
+void lnkOk() { LNK_SERIAL.println(F("@OK")); }
+void lnkErr(const __FlashStringHelper *motivo) { LNK_SERIAL.print(F("@ERR ")); LNK_SERIAL.println(motivo); }
+
+// Esiti dei comandi numerati (rimandati uguali a una ritrasmissione).
+enum { ES_OK, ES_OK_INI, ES_OK_TXT, ES_LUNGHEZZA, ES_BACKUP, ES_COPIA, ES_SD, ES_NO_BACKUP, ES_VUOTO, ES_TEST, ES_PUT, ES_STOP };
+void lnkRispondi(uint8_t e) {
+  switch (e) {
+    case ES_OK: lnkOk(); break;
+    case ES_OK_INI: LNK_SERIAL.println(F("@OK " CFG_FILE_NAME)); break;
+    case ES_OK_TXT: LNK_SERIAL.println(F("@OK " CFG_FILE_NAME_ALT)); break;
+    case ES_LUNGHEZZA: lnkErr(F("lunghezza")); break;
+    case ES_BACKUP: lnkErr(F("backup")); break;
+    case ES_COPIA: lnkErr(F("copia")); break;
+    case ES_SD: lnkErr(F("sd")); break;
+    case ES_NO_BACKUP: lnkErr(F("nessun backup")); break;
+    case ES_VUOTO: lnkErr(F("vuoto")); break;
+    case ES_TEST: lnkErr(F("test")); break;
+    case ES_STOP: lnkErr(F("stop")); break;
+    default: lnkErr(F("put")); break;
+  }
+}
+// Legge il numero del comando (facoltativo per RUN/NEXT). Se e' quello dell'ultimo comando
+// eseguito rimanda il suo esito e ritorna true: il comando non va ripetuto.
+bool lnkGiaFatto(char *&s, uint16_t &id) {
+  long v; id = 0;
+  char *prima = s;
+  if (!lnkNumero(s, v, 1, 65535)) { s = prima; return false; }
+  id = (uint16_t)v;
+  if (id != lnkIdFatto) return false;
+  lnkRispondi(lnkIdEsito);
+  return true;
+}
+void lnkFatto(uint16_t id, uint8_t esito) {
+  if (id) { lnkIdFatto = id; lnkIdEsito = esito; }
+  lnkRispondi(esito);
+}
+
+void lnkInviaConfig() {
+  LNK_SERIAL.print(F("@SSID ")); LNK_SERIAL.println(cfg.wifiSsid);
+  LNK_SERIAL.print(F("@WPWD ")); LNK_SERIAL.println(cfg.wifiPassword);
+  LNK_SERIAL.print(F("@USER ")); LNK_SERIAL.println(cfg.webUtente);
+  LNK_SERIAL.print(F("@APWD ")); LNK_SERIAL.println(cfg.webPassword);
+  LNK_SERIAL.print(F("@HOST ")); LNK_SERIAL.println(cfg.wifiNome);
+  LNK_SERIAL.print(F("@MODE ")); LNK_SERIAL.println(cfg.wifiAbilitato);
+  LNK_SERIAL.print(F("@APSSID ")); LNK_SERIAL.println(cfg.apSsid);
+  LNK_SERIAL.print(F("@APPWD ")); LNK_SERIAL.println(cfg.apPassword);
+  LNK_SERIAL.print(F("@APOPT ")); LNK_SERIAL.print(cfg.apCanale); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print(cfg.apNascosta); LNK_SERIAL.print(' '); LNK_SERIAL.print(cfg.apMaxClient); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print(cfg.apPortale); LNK_SERIAL.print(' '); LNK_SERIAL.println(cfg.apAttesa);
+  LNK_SERIAL.print(F("@APIP "));
+  for (uint8_t i = 0; i < 4; i++) { if (i) LNK_SERIAL.print('.'); LNK_SERIAL.print(cfg.apIp[i]); }
+  LNK_SERIAL.println();
+  for (uint8_t i = 0; i < 16; i++) {
+    LNK_SERIAL.print(F("@NREL ")); LNK_SERIAL.print(i + 1); LNK_SERIAL.print(' ');
+    LNK_SERIAL.println(cfg.nome[i]);
+  }
+  LNK_SERIAL.println(F("@GO"));
+}
+
+void lnkInizio() {
+  lnkAttivo = cfg.wifiAbilitato != 0;
+  if (!lnkAttivo) return;
+  LNK_SERIAL.begin(115200);
+  pinMode(15, INPUT_PULLUP);   // RX3: senza ESP (DIP 1-2 su OFF) il pin non resta flottante
+  strcpy(wifiIp, "none"); wifiAp = false;
+  lnkLen = 0; lnkRigaLunga = false;
+  lnkInviaConfig();
+}
+
+// Modo per la pagina: 0 ciclo, 1 test a passi, 2 test da web, 3 modalita' colore, 4 STOP.
+extern bool modalitaColore;
+void lnkInviaStato() {
+  unsigned long durata = durataCiclo();
+  float p = percentualeCiclo(durata);
+  Fase f = faseDaPercentuale(p);
+  uint8_t modo = modalitaColore ? 3 : fermo ? 4 : (testInCorso ? (testWeb ? 2 : 1) : 0);
+  LNK_SERIAL.print(F("@ST "));
+  LNK_SERIAL.print(modo); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print(running ? 1 : 0); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print((int)f); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print((int)(percentualeFase(p, f) + 0.5f)); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print((int)(p * 10.0f)); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print(durata / 1000UL); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print(cfg.sdStato); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print(cfg.errori); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print(cfg.primaRigaErrata); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print(cfg.numStelle); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print(cfg.numCasette); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print(releStato); LNK_SERIAL.print(' ');
+  const uint8_t v[9] = { rgbCieloR, rgbCieloG, rgbCieloB, rgbTramontoR, rgbTramontoG, rgbTramontoB,
+                         rgbAlbaR, rgbAlbaG, rgbAlbaB };
+  for (uint8_t i = 0; i < 9; i++) { LNK_SERIAL.print(v[i]); LNK_SERIAL.print(' '); }
+  LNK_SERIAL.print(testMostraIP ? 0 : testIndice + 1);
+  LNK_SERIAL.println();
+}
+
+// Nome del file di configurazione sulla SD: quello esistente, altrimenti PRESEPE.INI.
+const char *lnkNomeFile() {
+  if (SD.exists(CFG_FILE_NAME)) return CFG_FILE_NAME;
+  if (SD.exists(CFG_FILE_NAME_ALT)) return CFG_FILE_NAME_ALT;
+  return CFG_FILE_NAME;
+}
+
+// Copia un file sulla SD. Ritorna i byte copiati, -1 se non si apre.
+long lnkCopia(const char *da, const char *a) {
+  File s = SD.open(da, FILE_READ);
+  if (!s) return -1;
+  if (SD.exists(a)) SD.remove(a);
+  File d = SD.open(a, FILE_WRITE);
+  if (!d) { s.close(); return -1; }
+  uint8_t buf[64];
+  long tot = 0;
+  while (true) {
+    int n = s.read(buf, sizeof(buf));
+    if (n <= 0) break;
+    if ((int)d.write(buf, n) != n) { tot = -1; break; }
+    tot += n;
+  }
+  s.close(); d.close();
+  return tot;
+}
+
+// Copia .NEW sul file di configurazione. Prima scrive il segno PRESEPE.CMT: se la corrente
+// manca durante la copia, al riavvio lnkRecupera() la rifa' (.NEW e' gia' completo e
+// controllato). Se la copia fallisce rimette il file da .BAK. Ritorna true se riuscita.
+bool lnkApplicaNuovo(const char *nome, long attesi) {
+  if (SD.exists(LNK_FILE_SEGNO)) SD.remove(LNK_FILE_SEGNO);
+  File m = SD.open(LNK_FILE_SEGNO, FILE_WRITE);
+  if (!m) return false;
+  m.print(nome); m.close();
+  bool ok = lnkCopia(LNK_FILE_NUOVO, nome) == attesi;
+  if (!ok && SD.exists(LNK_FILE_BACKUP) && lnkCopia(LNK_FILE_BACKUP, nome) < 0) return false;   // il segno resta
+  SD.remove(LNK_FILE_NUOVO);
+  SD.remove(LNK_FILE_SEGNO);
+  return ok;
+}
+
+// All'avvio: completa una copia .NEW -> file interrotta da un'interruzione di corrente.
+// Ritorna true se ha riscritto il file di configurazione (va riletto).
+bool lnkRecupera() {
+  bool fatto = false;
+  if (!SD.begin(PIN_SD_CS)) return false;
+  if (SD.exists(LNK_FILE_SEGNO)) {
+    char nome[13] = CFG_FILE_NAME;
+    File m = SD.open(LNK_FILE_SEGNO, FILE_READ);
+    if (m) {
+      char b[13]; int n = m.read((uint8_t *)b, 12); m.close();
+      if (n > 0) { b[n] = 0; if (!strcmp(b, CFG_FILE_NAME_ALT)) strcpy(nome, CFG_FILE_NAME_ALT); }
+    }
+    if (!SD.exists(LNK_FILE_NUOVO)) SD.remove(LNK_FILE_SEGNO);
+    else if (lnkCopia(LNK_FILE_NUOVO, nome) >= 0) {
+      SD.remove(LNK_FILE_NUOVO); SD.remove(LNK_FILE_SEGNO);
+      Serial.print(F("SD: completato il salvataggio interrotto di ")); Serial.println(nome);
+      fatto = true;
+    }
+  }
+  SD.end();
+  return fatto;
+}
+
+void lnkChiudiScrittura(bool cancella) {
+  if (lnkScrittura) { lnkFile.close(); lnkScrittura = false; }
+  if (cancella && SD.exists(LNK_FILE_NUOVO)) SD.remove(LNK_FILE_NUOVO);
+  SD.end();
+}
+
+// "@GET": invia il file riga per riga (pezzi da 120 caratteri, @C = continua).
+void lnkInviaFile() {
+  if (lnkScrittura) { lnkErr(F("occupato")); return; }
+  if (!SD.begin(PIN_SD_CS)) { lnkErr(F("sd")); return; }
+  const char *nome = lnkNomeFile();
+  File f = SD.open(nome, FILE_READ);
+  uint16_t righe = 0; uint32_t tot = 0;
+  LNK_SERIAL.print(F("@FILE ")); LNK_SERIAL.println(nome);
+  if (f) {
+    char pezzo[LNK_PEZZO_MAX + 1]; uint8_t l = 0;
+    while (true) {
+      int ch = f.read();
+      if (ch < 0) break;
+      tot++;
+      if (ch == '\r') continue;
+      if (ch == '\n') { pezzo[l] = 0; LNK_SERIAL.print(F("@L ")); LNK_SERIAL.println(pezzo); l = 0; righe++; continue; }
+      pezzo[l++] = (char)ch;
+      if (l == LNK_PEZZO_MAX) { pezzo[l] = 0; LNK_SERIAL.print(F("@C ")); LNK_SERIAL.println(pezzo); l = 0; }
+    }
+    if (l) { pezzo[l] = 0; LNK_SERIAL.print(F("@L ")); LNK_SERIAL.println(pezzo); righe++; }
+    f.close();
+  }
+  SD.end();
+  LNK_SERIAL.print(F("@END ")); LNK_SERIAL.print(righe); LNK_SERIAL.print(' '); LNK_SERIAL.println(tot);
+}
+
+
+void webPixelMostra(uint8_t catena) {
+  Adafruit_NeoPixel &np = catena ? casette : stelle;
+  uint16_t n = catena ? NUM_CASETTE : NUM_STELLE;
+  np.clear();
+  for (uint16_t i = 0; i < n; i++)
+    if (webPixel[catena][i >> 3] & (1 << (i & 7)))
+      np.setPixelColor(i, np.Color(webPixelColore.r, webPixelColore.g, webPixelColore.b));
+  np.show();
+}
+
+// Comandi che richiedono il test da web: lo attivano se serve (solo da test o ciclo).
+bool lnkPerTest() {
+  if (modalitaColore) { lnkErr(F("modo colore")); return false; }
+  if (fermo) { lnkErr(F("stop")); return false; }
+  if (!testWeb) { entraTestWeb(); memset(webPixel, 0, sizeof(webPixel)); }
+  return true;
+}
+
+void lnkComando(char *riga) {
+  if (!lnkVerifica(riga)) return;            // riga rovinata: l'ESP ritrasmette
+  char *s = riga + 1;
+  char *cmd = lnkCampo(s);
+  if (!cmd) return;
+  long a, b, c, d;
+
+  if (!strcmp(cmd, "HELLO")) { lnkInviaConfig(); return; }
+  if (!strcmp(cmd, "IP")) {
+    char *ip = lnkCampo(s);                  // IP indirizzo [AP]
+    if (!ip || strlen(ip) >= sizeof(wifiIp)) { lnkErr(F("ip")); return; }
+    char *tipo = lnkCampo(s);
+    bool ap = tipo && !strcmp(tipo, "AP");
+    if (strcmp(ip, wifiIp) != 0 || ap != wifiAp) {
+      strcpy(wifiIp, ip); wifiAp = ap;
+      Serial.print(F("WiFi: IP ")); Serial.print(wifiIp); Serial.println(ap ? F(" (access point)") : F(""));
+      if (testInCorso && testMostraIP && !testWeb) mostraOledTest();
+    }
+    lnkOk(); return;
+  }
+  // ---------------------------------------------------------------- test da web
+  if (!strcmp(cmd, "T")) { if (lnkPerTest()) lnkOk(); return; }
+  if (!strcmp(cmd, "X")) { if (testInCorso) toggleStartStop(); lnkOk(); return; }
+  if (!strcmp(cmd, "S")) {                  // S striscia R G B   (0 CIELO, 1 TRAMONTO, 2 ALBA)
+    if (!lnkNumero(s, a, 0, 2) || !lnkNumero(s, b, 0, 255) || !lnkNumero(s, c, 0, 255) || !lnkNumero(s, d, 0, 255)) { lnkErr(F("arg")); return; }
+    if (!lnkPerTest()) return;
+    if (a == 0) setCielo(b, c, d); else if (a == 1) setTramonto(b, c, d); else setAlba(b, c, d);
+    lnkOk(); return;
+  }
+  if (!strcmp(cmd, "P") || !strcmp(cmd, "PA")) {   // P catena pixel 0/1  |  PA catena 0/1
+    bool tutti = cmd[1] == 'A';
+    if (!lnkNumero(s, a, 0, 1)) { lnkErr(F("arg")); return; }
+    uint16_t n = a ? NUM_CASETTE : NUM_STELLE;
+    if (!tutti && (!lnkNumero(s, b, 0, (long)n - 1))) { lnkErr(F("arg")); return; }
+    if (!lnkNumero(s, c, 0, 1)) { lnkErr(F("arg")); return; }
+    if (!lnkPerTest()) return;
+    for (uint16_t i = 0; i < n; i++) {
+      if (!tutti && i != b) continue;
+      if (c) webPixel[a][i >> 3] |= (uint8_t)(1 << (i & 7)); else webPixel[a][i >> 3] &= (uint8_t)~(1 << (i & 7));
+    }
+    webPixelMostra((uint8_t)a);
+    lnkOk(); return;
+  }
+  if (!strcmp(cmd, "PC")) {                 // PC R G B: colore dei pixel accesi
+    if (!lnkNumero(s, a, 0, 255) || !lnkNumero(s, b, 0, 255) || !lnkNumero(s, c, 0, 255)) { lnkErr(F("arg")); return; }
+    if (!lnkPerTest()) return;
+    webPixelColore = rgb((uint8_t)a, (uint8_t)b, (uint8_t)c);
+    webPixelMostra(0); webPixelMostra(1);
+    lnkOk(); return;
+  }
+  if (!strcmp(cmd, "R")) {                  // R rele' 1..16 0/1
+    if (!lnkNumero(s, a, 1, 16) || !lnkNumero(s, b, 0, 1)) { lnkErr(F("arg")); return; }
+    if (!lnkPerTest()) return;
+    scriviRele((uint8_t)(a - 1), b != 0);
+    lnkOk(); return;
+  }
+  if (!strcmp(cmd, "B")) { buzzerBeep(); lnkOk(); return; }
+  // ---------------------------------------------------------------- ciclo
+  if (!strcmp(cmd, "RUN") || !strcmp(cmd, "NEXT")) {     // RUN [id] | NEXT [id]
+    uint16_t id;
+    if (lnkGiaFatto(s, id)) return;
+    if (fermo) { lnkFatto(id, ES_STOP); return; }
+    if (testInCorso || modalitaColore) { lnkFatto(id, ES_TEST); return; }
+    if (cmd[0] == 'R') toggleStartStop(); else faseAvanti();
+    lnkFatto(id, ES_OK); return;
+  }
+  if (!strcmp(cmd, "STOP") || !strcmp(cmd, "PLAY")) {     // STOP [id] | PLAY [id]
+    uint16_t id;
+    if (lnkGiaFatto(s, id)) return;
+    if (modalitaColore) { lnkFatto(id, ES_TEST); return; }
+    if (cmd[0] == 'S') fermaPresepe(); else avviaPresepe();
+    lnkFatto(id, ES_OK); return;
+  }
+  // ---------------------------------------------------------------- file sulla SD
+  if (!strcmp(cmd, "GET")) { lnkInviaFile(); return; }
+  if (!strcmp(cmd, "PUT")) {
+    if (lnkScrittura) lnkChiudiScrittura(true);
+    if (!SD.begin(PIN_SD_CS)) { lnkErr(F("sd")); return; }
+    if (SD.exists(LNK_FILE_NUOVO)) SD.remove(LNK_FILE_NUOVO);
+    lnkFile = SD.open(LNK_FILE_NUOVO, FILE_WRITE);
+    if (!lnkFile) { SD.end(); lnkErr(F("sd")); return; }
+    lnkScrittura = true; lnkSeq = 0xFFFF; lnkByte = 0; lnkScritturaMs = millis();
+    lnkOk(); return;
+  }
+  if (!strcmp(cmd, "W") || !strcmp(cmd, "C")) {     // W seq testo (riga)  |  C seq testo (pezzo)
+    if (!lnkScrittura) { lnkErr(F("put")); return; }
+    if (!lnkNumero(s, a, 0, 65534)) { lnkErr(F("arg")); return; }
+    lnkScritturaMs = millis();
+    if ((uint16_t)a != lnkSeq) {                      // una ritrasmissione non scrive due volte
+      size_t l = strlen(s);                           // testo = tutto dopo "seq " (spazi iniziali compresi)
+      if (lnkFile.write((const uint8_t *)s, l) != l) { lnkChiudiScrittura(true); lnkErr(F("sd")); return; }
+      lnkByte += l;
+      if (cmd[0] == 'W') { if (lnkFile.write((const uint8_t *)"\n", 1) != 1) { lnkChiudiScrittura(true); lnkErr(F("sd")); return; } lnkByte++; }
+      lnkSeq = (uint16_t)a;
+    }
+    lnkOk(); return;
+  }
+  if (!strcmp(cmd, "ABORT")) { lnkChiudiScrittura(true); lnkOk(); return; }
+  if (!strcmp(cmd, "COMMIT")) {      // COMMIT byte id: controlla, poi file -> .BAK, .NEW -> file
+    if (!lnkNumero(s, a, 0, 2000000L)) { lnkErr(F("arg")); return; }
+    uint16_t id;
+    if (!lnkGiaFatto(s, id)) {
+      if (!id) { lnkErr(F("arg")); return; }
+      if (!lnkScrittura) { lnkFatto(id, ES_PUT); return; }
+      LNK_SERIAL.println(F("@ACK"));
+      lnkFile.close(); lnkScrittura = false;
+      if (a == 0) { lnkChiudiScrittura(true); lnkFatto(id, ES_VUOTO); return; }   // mai un file vuoto
+      if ((uint32_t)a != lnkByte) { lnkChiudiScrittura(true); lnkFatto(id, ES_LUNGHEZZA); return; }
+      const char *nome = lnkNomeFile();
+      if (SD.exists(nome) && lnkCopia(nome, LNK_FILE_BACKUP) < 0) { lnkChiudiScrittura(true); lnkFatto(id, ES_BACKUP); return; }
+      bool ok = lnkApplicaNuovo(nome, (long)lnkByte);
+      SD.end();
+      if (!ok) { lnkFatto(id, ES_COPIA); return; }
+      Serial.print(F("WiFi: salvato ")); Serial.println(nome);
+      lnkFatto(id, strcmp(nome, CFG_FILE_NAME_ALT) ? ES_OK_INI : ES_OK_TXT);
+    }
+    return;
+  }
+  if (!strcmp(cmd, "RESTORE")) {     // RESTORE id: scambia il file con la copia precedente
+    uint16_t id;
+    if (lnkGiaFatto(s, id)) return;
+    if (!id) { lnkErr(F("arg")); return; }
+    LNK_SERIAL.println(F("@ACK"));
+    if (lnkScrittura) lnkChiudiScrittura(true);
+    if (!SD.begin(PIN_SD_CS)) { lnkFatto(id, ES_SD); return; }
+    const char *nome = lnkNomeFile();
+    if (!SD.exists(LNK_FILE_BACKUP)) { SD.end(); lnkFatto(id, ES_NO_BACKUP); return; }
+    // .BAK -> .NEW, file -> .BAK, poi .NEW -> file come un salvataggio normale (con il segno)
+    long n = lnkCopia(LNK_FILE_BACKUP, LNK_FILE_NUOVO);
+    bool ok = n > 0;
+    if (ok && SD.exists(nome) && lnkCopia(nome, LNK_FILE_BACKUP) < 0) { lnkCopia(LNK_FILE_NUOVO, LNK_FILE_BACKUP); ok = false; }
+    ok = ok && lnkApplicaNuovo(nome, n);
+    if (SD.exists(LNK_FILE_NUOVO) && !SD.exists(LNK_FILE_SEGNO)) SD.remove(LNK_FILE_NUOVO);
+    SD.end();
+    lnkFatto(id, !ok ? ES_SD : strcmp(nome, CFG_FILE_NAME_ALT) ? ES_OK_INI : ES_OK_TXT);
+    return;
+  }
+  if (!strcmp(cmd, "REBOOT")) { lnkOk(); lnkRiavvio = true; return; }
+  lnkErr(F("comando"));
+}
+
+void lnkTick() {
+  if (!lnkAttivo) return;
+  unsigned long ultimoByte = millis();
+  while (true) {
+    while (LNK_SERIAL.available()) {
+      int ch = LNK_SERIAL.read();
+      if (ch < 0) break;
+      ultimoByte = millis();
+      lnkSilenzioFino = ultimoByte + 150UL;
+      if (ch == '\r') continue;
+      if (ch == '\n') {
+        lnkRiga[lnkLen] = 0;
+        if (!lnkRigaLunga && lnkLen) lnkComando(lnkRiga);
+        lnkLen = 0; lnkRigaLunga = false;
+        continue;
+      }
+      if (lnkLen < LNK_RIGA_MAX) lnkRiga[lnkLen++] = (char)ch;
+      else lnkRigaLunga = true;
+    }
+    // Durante un salvataggio aspetta qui la riga successiva (l'ESP la manda subito dopo @OK):
+    // tornare al ciclo principale (display, scena) renderebbe il trasferimento molto lento.
+    if (!lnkScrittura || millis() - ultimoByte >= 50UL) break;
+  }
+  // Un salvataggio interrotto (ESP spento a meta') non lascia il file aperto.
+  if (lnkScrittura && millis() - lnkScritturaMs > 30000UL) lnkChiudiScrittura(true);
+  if (millis() - lnkStatoMs >= 1000UL) { lnkStatoMs = millis(); lnkInviaStato(); }
+}
+// ==== LINK WIFI END ====
+
+// =============================================================================
+// PRESEPE.INI PREDEFINITO: scritto sulla microSD quando manca
+// =============================================================================
+// ==== INI PREDEFINITO BEGIN ====
+// GENERATED from PRESEPE.INI by firmware/tools/embed_ini.py - do not edit by hand.
+// Scritto sulla microSD come PRESEPE.INI quando manca (vedi iniCreaPredefinito).
+const char INI_PREDEFINITO[] PROGMEM =
+  "; -----------------------------------------------------------------------------\n"
+  "; Questo file l'ha scritto la centralina, perche' sulla microSD non c'era.\n"
+  "; Contiene i valori predefiniti e la spiegazione di ogni parametro.\n"
+  "; Modificalo dal computer con un editor di testo (anche Blocco note), salva e\n"
+  "; riavvia la centralina. Con la scheda Mega + WiFi: imposta [WIFI] in fondo al file,\n"
+  "; poi lo puoi modificare anche dal telefono, su http://presepe.local/config\n"
+  "; -----------------------------------------------------------------------------\n"
+  "; =============================================================================\n"
+  "; PSN-Presepe - parametri della scenografia\n"
+  "; =============================================================================\n"
+  "; Copia questo file nella RADICE della microSD (non in una cartella).\n"
+  "; Viene letto all'accensione: dopo una modifica riavvia la centralina (con la scheda\n"
+  "; WiFi basta il pulsante \"Riavvia il presepe\" della pagina web).\n"
+  ";\n"
+  "; Se una chiave manca, e' scritta male o ha un valore fuori dai limiti, quella\n"
+  "; chiave mantiene il valore predefinito (i valori scritti qui SONO i predefiniti).\n"
+  "; Senza microSD la centralina usa solo i predefiniti. Se la microSD non ha questo\n"
+  "; file, la centralina lo scrive da sola (PRESEPE.INI con i predefiniti) e lo usa.\n"
+  ";\n"
+  "; Dopo l'avvio il display mostra l'esito della lettura:\n"
+  ";   \"PRESEPE.INI OK\"        file letto senza errori\n"
+  ";   \"INI CON ERRORI\"        alcune righe ignorate: numero di errori e prima riga sbagliata\n"
+  ";   \"PRESEPE.INI CREATO\"    file mancante: scritto ora con i predefiniti\n"
+  ";   \"MANCA PRESEPE.INI\"     file mancante e microSD non scrivibile\n"
+  ";   \"SD ASSENTE\"            nessuna microSD\n"
+  "; Il monitor seriale (115200 baud) stampa tutta la configurazione in uso.\n"
+  ";\n"
+  "; Nome del file: PRESEPE.INI. Se manca, la centralina cerca anche PRESEPE.TXT\n"
+  "; con lo stesso contenuto (serve per il simulatore Wokwi, che non accetta .ini).\n"
+  "; microSD: FAT16 o FAT32 (SD/SDHC fino a 32 GB).\n"
+  ";\n"
+  "; SINTASSI\n"
+  ";   [SEZIONE]            inizio di una sezione\n"
+  ";   chiave = valore      un parametro per riga\n"
+  ";   ; oppure #           da qui a fine riga e' un commento\n"
+  ";   Maiuscole e minuscole sono indifferenti. Massimo 126 caratteri per riga.\n"
+  ";   Numeri con decimali: usa il PUNTO (33.33), perche' la virgola separa i campi.\n"
+  ";   Si/no: 1/0, si/no, on/off, true/false, acceso/spento.\n"
+  ";   Colori: R, G, B con valori da 0 (spento) a 255 (massimo).\n"
+  ";   Fasi: GIORNO, TRAMONTO, CREPUSCOLO, NOTTE, ALBA.\n"
+  ";   \"% della fase\": 0 = inizio della fase, 50 = meta', 100 = fine della fase.\n"
+  "; =============================================================================\n"
+  "\n"
+  "[CICLO]\n"
+  "; Il potenziometro sceglie fra tre durate del ciclo completo (in secondi, 10..86400).\n"
+  "durata1 = 60          ; primo terzo della corsa della manopola\n"
+  "durata2 = 180         ; terzo centrale\n"
+  "durata3 = 300         ; ultimo terzo\n"
+  "; Corsa utile della manopola, letta su A0 (0..1023). Con il potenziometro alimentato\n"
+  "; a 5 V dalla scheda Rev D la corsa e' 0..1023. Vecchi cablaggi misuravano 0..680.\n"
+  "pot_min = 0\n"
+  "pot_max = 1023\n"
+  "pot_invertito = 1     ; 1 = manopola tutta a destra = ciclo piu' corto (cablaggio storico)\n"
+  "partenza = marcia     ; marcia = il ciclo parte subito dopo l'avvio, pausa = parte in pausa\n"
+  "\n"
+  "[FASI]\n"
+  "; Inizio di ogni fase, in % del ciclo completo. Il GIORNO parte sempre da 0 e\n"
+  "; l'ALBA finisce a 100. I valori devono essere crescenti, altrimenti tornano\n"
+  "; tutti e quattro ai predefiniti.\n"
+  "tramonto   = 40\n"
+  "crepuscolo = 50\n"
+  "notte      = 55\n"
+  "alba       = 85\n"
+  "\n"
+  "[RELE]\n"
+  "; Logica delle uscite: alta = livello HIGH eccita il rele'.\n"
+  "; Con la scheda Rev D (ULN2803) lascia \"alta\". Usa \"bassa\" solo con moduli\n"
+  "; rele' del commercio attivi bassi (montaggio su breadboard).\n"
+  "logica = alta\n"
+  "; Nomi facoltativi (massimo 12 caratteri), mostrati sul display in TEST e sul seriale.\n"
+  "; Definisci i nomi PRIMA degli eventi che li usano.\n"
+  ";nome1  = Mulino\n"
+  ";nome2  = Pompa\n"
+  ";nome3  = Casa luce\n"
+  "; Forzatura di un'uscita, indipendente dalla schedulazione: auto | on | off\n"
+  ";forza16 = off\n"
+  "; Gli eventi dei rele' si scrivono nelle sezioni delle fasi (rele = ...).\n"
+  "\n"
+  "; =============================================================================\n"
+  "; LE FASI: [GIORNO]  [TRAMONTO]  [CREPUSCOLO]  [NOTTE]  [ALBA]\n"
+  "; =============================================================================\n"
+  "; Ogni sezione descrive cosa succede in quella fase: colori delle strisce RGB\n"
+  "; (cielo, tramonto, alba) e accensioni dei rele'. Il % e' sempre riferito alla\n"
+  "; fase della sezione: 0 = inizio della fase, 50 = meta', 100 = fine.\n"
+  ";\n"
+  "; STRISCE RGB - una riga = una \"tappa\":\n"
+  ";   cielo    = %, R, G, B [, curva]\n"
+  ";   tramonto = %, R, G, B [, curva]\n"
+  ";   alba     = %, R, G, B [, curva]\n"
+  "; In quel punto la striscia ha esattamente quel colore (0..255, 0,0,0 = spenta);\n"
+  "; fra una tappa e la successiva della stessa striscia il colore cambia gradualmente,\n"
+  "; anche attraversando piu' fasi. Dopo l'ultima tappa del ciclo la striscia va\n"
+  "; verso la prima tappa del ciclo successivo.\n"
+  ";   curva (facoltativa) = come si ARRIVA a questa tappa dalla precedente:\n"
+  ";     morbida  (predefinita) parte piano, accelera e rallenta arrivando\n"
+  ";     lineare  velocita' costante per tutto il tratto\n"
+  ";   Per tenere una striscia spenta in un tratto: una tappa 0,0,0 all'inizio e una\n"
+  ";   alla fine del tratto.\n"
+  ";   Per un'accensione rapida: una tappa 0,0,0 e, poco dopo (es. all'1 %), il colore\n"
+  ";   acceso. Piu' le due tappe sono vicine, piu' l'accensione e' rapida (anche 0.5).\n"
+  ";   Il 100 % di una fase e' lo stesso istante dello 0 % della fase successiva:\n"
+  ";   conviene scrivere sia il colore di inizio (0) sia quello di fine (100) di ogni\n"
+  ";   fase, cosi' ogni sezione si legge da sola. Nei due punti scrivi lo stesso colore.\n"
+  ";   Le righe delle diverse strisce si possono mescolare in qualsiasi ordine: il\n"
+  ";   firmware ordina da solo le tappe di ogni striscia. Massimo 20 tappe per striscia.\n"
+  ";   Le righe di una striscia in una fase sostituiscono le tappe predefinite di\n"
+  ";   QUELLA striscia in QUELLA fase; le altre fasi restano predefinite.\n"
+  ";\n"
+  "; RELE' - una riga = un evento:\n"
+  ";   rele = RELE', ON|OFF, %\n"
+  ";   RELE' = 1..16, Grp_GG_RR o un nome definito in [RELE]. Il rele' resta nello\n"
+  ";   stato raggiunto fino al suo evento successivo nello stesso ciclo: all'inizio\n"
+  ";   di ogni ciclo (GIORNO 0 %) i rele' ripartono spenti. Per tenerne uno acceso\n"
+  ";   anche a cavallo della fine del ciclo aggiungi \"rele = N, ON, 0\" in [GIORNO].\n"
+  ";   Massimo 64 eventi in tutto.\n"
+  ";\n"
+  "; PER TROVARE I VALORI R, G, B: \"modalita' colore\". Premi TEST durante la\n"
+  "; schermata iniziale \"by Vanni\" (3 s). AVANTI sceglie la striscia (bianca), START\n"
+  "; conferma; poi START / AVANTI / TEST = canale R / G / B, la manopola lo regola\n"
+  "; (prima va \"agganciata\"); due clic entro 1 s = regolazione fine (+/-16).\n"
+  "; START tenuto 2 s = torna alla scelta; TEST tenuto 2 s = esce.\n"
+  "\n"
+  "[GIORNO]\n"
+  "; Cielo: dal caldo al quasi bianco, bianco pieno a mezzogiorno, di nuovo caldo.\n"
+  "cielo    =   0,    210,  82,  18     ; inizio giorno: luce calda\n"
+  "cielo    =  30,    246, 220, 208     ; quasi bianca (80 % fra caldo e bianco)\n"
+  "cielo    =  45,    255, 255, 255     ; bianco pieno...\n"
+  "cielo    =  55,    255, 255, 255     ; ...tenuto fino a mezzogiorno\n"
+  "cielo    =  70,    246, 220, 208     ; di nuovo quasi bianca...\n"
+  "cielo    = 100,    210,  82,  18     ; ...e a fine giorno di nuovo calda\n"
+  "\n"
+  "[TRAMONTO]\n"
+  "; Il cielo sbiadisce e si spegne; la striscia sinistra fa il tramonto arancio.\n"
+  "cielo    =   0,    210,  82,  18     ; calda all'inizio del tramonto (come a fine giorno)\n"
+  "cielo    =  30,     16,  16,  16     ; perde colore fino a un bianco tenue\n"
+  "cielo    =  38,      0,   0,   0     ; spenta...\n"
+  "cielo    = 100,      0,   0,   0     ; ...fino a fine tramonto\n"
+  "tramonto =   0,      0,   0,   0     ; spenta all'inizio del tramonto\n"
+  "tramonto =   1,     18,  10,   4     ; si accende rapidamente, tenue e calda\n"
+  "tramonto =  10,    155,  92,  16     ; picco arancio\n"
+  "tramonto =  82,     16,  16,  16     ; perde colore fino a un bianco tenue\n"
+  "tramonto = 100,      0,   0,   0     ; spenta a fine tramonto\n"
+  "rele     = 3, ON, 30                 ; Grp_01_03 acceso al 30 % del tramonto\n"
+  "\n"
+  "[CREPUSCOLO]\n"
+  "; Nessuna tappa: cielo, tramonto e alba restano spente (l'ultima tappa di ognuna\n"
+  "; e' 0,0,0 e la successiva anche). Compaiono le stelle (vedi [STELLE]).\n"
+  "\n"
+  "[NOTTE]\n"
+  "; Nessuna tappa: le strisce restano spente; stelle accese (vedi [STELLE]).\n"
+  "rele     = 3, OFF, 50                ; Grp_01_03 spento a meta' notte\n"
+  "\n"
+  "[ALBA]\n"
+  "; La striscia destra fa l'alba; il cielo si riaccende al 38 % e sale fino al giorno.\n"
+  "alba     =   0,      0,   0,   0     ; spenta all'inizio dell'alba\n"
+  "alba     =   1,     18,  12,   5     ; si accende rapidamente, tenue e chiara\n"
+  "alba     =  38,    155,  78,  22     ; picco arancio chiaro\n"
+  "alba     =  82,     16,  16,  16     ; perde colore fino a un bianco tenue\n"
+  "alba     = 100,      0,   0,   0     ; spenta a fine alba\n"
+  "cielo    =   0,      0,   0,   0     ; cielo spento all'inizio dell'alba...\n"
+  "cielo    =  38,      0,   0,   0     ; ...e fino al 38 %\n"
+  "cielo    =  39,     10,   4,   1     ; si accende rapidamente a un minimo caldo...\n"
+  "cielo    = 100,    210,  82,  18     ; ...e sale fino al caldo del GIORNO\n"
+  "\n"
+  "[COLORI]\n"
+  "; Limite di luminosita' per striscia, in % (0..100). Abbassa tutta la striscia in\n"
+  "; proporzione, compresa la modalita' TEST; limita anche la corrente assorbita.\n"
+  "lum_cielo    = 100\n"
+  "lum_tramonto = 100\n"
+  "lum_alba     = 100\n"
+  "; Correzione \"gamma\": 1 = i valori 0..255 vengono convertiti in modo che l'occhio\n"
+  "; percepisca passi di luminosita' regolari (senza, le luci basse salgono troppo in\n"
+  "; fretta e quelle alte sembrano tutte uguali). 0 = il valore va diretto sul PWM.\n"
+  "gamma = 1\n"
+  "; 1 = uscite PWM invertite. Solo per moduli MOSFET del commercio \"attivi bassi\";\n"
+  "; con la scheda Rev D lascia 0.\n"
+  "pwm_invertito = 0\n"
+  "\n"
+  "[STELLE]\n"
+  "numero  = 50          ; pixel WS2811 della catena STELLE (massimo 100)\n"
+  "attive  = 20          ; quante stelle si accendono ogni notte, scelte a caso\n"
+  "lum_min = 22          ; luminosita' minima e massima di ogni stella (0..255, tienile tenui)\n"
+  "lum_max = 75\n"
+  "livello_notte = 235   ; luminosita' complessiva delle stelle a notte piena (0..255)\n"
+  "; Scintillio: ogni stella si spegne e si riaccende piano con un proprio periodo,\n"
+  "; scelto fra questi due valori (in millisecondi). Valori alti = scintillio lento.\n"
+  "scintillio_min = 6400\n"
+  "scintillio_max = 12200\n"
+  "; Tinta delle stelle in % per canale R, G, B (100 = pieno): 100,72,38 = bianco caldo.\n"
+  "colore = 100,72,38\n"
+  "\n"
+  "[CASETTE]\n"
+  "numero  = 50              ; pixel WS2811 della catena CASETTE (massimo 100, 0 = non usata)\n"
+  "colore  = 90,55,20        ; colore delle finestre, R, G, B (0..255): luce calda\n"
+  "accendi = TRAMONTO, 50    ; si accendono al 50 % del TRAMONTO\n"
+  "spegni  = ALBA, 50        ; si spengono al 50 % dell'ALBA (puo' scavalcare la fine del ciclo)\n"
+  "fuoco   = 20              ; tremolio di ogni casa, 0..100 (0 = luce fissa, 100 = fuoco vivace)\n"
+  "dissolvenza_ms = 3000     ; durata dell'accensione e dello spegnimento morbidi, in ms\n"
+  "\n"
+  "[SISTEMA]\n"
+  "; Avvio rapido. 1 = dopo la schermata iniziale \"by Vanni\" (3 s, sempre presente:\n"
+  "; in quei secondi TEST attiva la modalita' colore) la centralina parte subito\n"
+  "; dall'inizio del GIORNO: niente schermata della microSD (compare solo se\n"
+  "; PRESEPE.INI contiene errori), niente autotest luci e niente melodia.\n"
+  "; 0 = avvio completo: schermata iniziale, esito della microSD, poi autotest e\n"
+  "; melodia secondo autotest_avvio e melodia_avvio qui sotto.\n"
+  "fastboot = 1\n"
+  "buzzer = 1            ; 0 = silenzio totale (nessun bip, nessuna melodia)\n"
+  "beep_hz = 900         ; tono del bip dei tasti, in Hz\n"
+  "beep_ms = 90          ; durata del bip, in ms\n"
+  "melodia_avvio = 1     ; \"Astro del ciel\" durante l'autotest (solo con fastboot = 0)\n"
+  "autotest_avvio = 1    ; autotest luci di circa 22 s all'accensione (solo con fastboot = 0)\n"
+  "oled = 1              ; 0 = non usare il display anche se collegato\n"
+  "debug_ms = 5000       ; ogni quanti ms il seriale stampa lo stato (0 = mai)\n"
+  "\n"
+  "[WIFI]\n"
+  "; Solo con la scheda \"Mega + WiFi R3\" (ATmega2560 + ESP8266 sulla stessa basetta):\n"
+  "; sull'ESP8266 va caricato firmware/PSN-Presepe-WiFi, DIP switch 1-2 su ON e\n"
+  "; selettore su RXD3/TXD3 (vedi README). Con un Arduino Mega normale lascia 0.\n"
+  "; 0 = WiFi spento: la centralina si comporta esattamente come senza WiFi.\n"
+  "; 1 = RETE DI CASA: all'avvio il Mega passa SSID e password (qui sotto) all'ESP8266,\n"
+  ";     che si collega alla rete in sottofondo (il presepe parte comunque, anche se\n"
+  ";     la rete non c'e'). Premendo TEST durante il ciclo, il primo passo mostra\n"
+  ";     l'indirizzo IP (\"none\" = non collegato). Pagina: http://<indirizzo IP>/ oppure\n"
+  ";     http://<nome>.local/ (iPhone, Mac, Windows; su alcuni Android serve l'IP).\n"
+  ";     La rete deve essere WPA o WPA2 a 2,4 GHz (l'ESP8266 non vede i 5 GHz e il solo WPA3).\n"
+  "; 2 = ACCESS POINT: l'ESP8266 crea una sua rete WiFi (sezione [ACCESS_POINT]);\n"
+  ";     colleghi il telefono a quella rete e apri http://192.168.4.1/ . Serve dove\n"
+  ";     non c'e' una rete WiFi (presepe in chiesa, in piazza, a una mostra).\n"
+  ";     Con 2 le chiavi ssid e password di questa sezione non servono.\n"
+  "; 3 = AUTOMATICO: prova la rete di casa (come 1); se non si collega entro \"attesa\"\n"
+  ";     secondi (sezione [ACCESS_POINT], predefinito 60) apre l'access point (come 2)\n"
+  ";     e resta cosi' fino al riavvio. Comodo quando porti il presepe in un posto nuovo.\n"
+  ";     Se la rete di casa si e' collegata, resta su quella anche se poi cade.\n"
+  ";     Con ssid vuoto apre subito l'access point.\n"
+  "; Se SSID o password contengono ; # oppure spazi all'inizio o alla fine, scrivili\n"
+  "; tra virgolette:  password = \"la;mia#password\"   (le virgolette non sono comprese).\n"
+  "abilitato = 0\n"
+  "ssid =                ; nome della rete WiFi di casa (massimo 32 caratteri)\n"
+  "password =            ; password della rete: 8..63 caratteri, vuota = rete aperta\n"
+  "nome = presepe        ; nome in rete: http://presepe.local (lettere, numeri e -), vale per 1, 2 e 3\n"
+  "\n"
+  "[ACCESS_POINT]\n"
+  "; Rete creata dalla centralina quando [WIFI] abilitato = 2 (oppure 3 e la rete di\n"
+  "; casa non si collega). Pronta all'uso cosi'\n"
+  "; com'e': sul telefono cerca la rete \"Presepe\", password presepe2026, poi apri\n"
+  "; http://192.168.4.1/ (utente e password di [AUTENTICAZIONE]).\n"
+  "; Premendo TEST durante il ciclo, il primo passo mostra nome della rete e indirizzo.\n"
+  "; Il telefono puo' avvisare \"rete senza Internet\": scegli di restare collegato.\n"
+  "ssid = Presepe        ; nome della rete (1..32 caratteri)\n"
+  "password = presepe2026 ; password WPA2: 8..63 caratteri; vuota = rete APERTA (sconsigliato)\n"
+  "canale = 6            ; canale WiFi 1..13: cambialo se ci sono molte reti vicine sullo stesso\n"
+  "nascosta = 0          ; 1 = la rete non compare nell'elenco: va aggiunta a mano sul telefono\n"
+  "max_client = 4        ; quanti telefoni/computer insieme (1..8)\n"
+  "ip = 192.168.4.1      ; indirizzo della centralina, ultimo numero 1..55; i telefoni ricevono da .100 a .200\n"
+  "portale = 0           ; 1 = qualsiasi indirizzo scritto nel browser porta alla pagina del presepe,\n"
+  "                      ;     e molti telefoni la aprono da soli appena collegati (\"Accedi alla rete\")\n"
+  "attesa = 60           ; solo con abilitato = 3: secondi di tentativi sulla rete di casa (10..600)\n"
+  "\n"
+  "[AUTENTICAZIONE]\n"
+  "; Utente e password chiesti dal browser per aprire la pagina del presepe\n"
+  "; (anche per l'aggiornamento via WiFi del firmware dell'ESP8266).\n"
+  "; CAMBIALI: chi e' collegato alla tua rete WiFi (o all'access point) potrebbe aprire la pagina.\n"
+  "; Viaggiano in chiaro sulla rete di casa: non usare una password importante.\n"
+  "utente = admin\n"
+  "password = presepe2026\n";
+// ==== INI PREDEFINITO END ====
+
+// ==== INI SCRIVI BEGIN ====
+bool iniCreato = false;   // a questo avvio PRESEPE.INI e' stato creato (lo dice il display)
+
+// microSD senza PRESEPE.INI ne' PRESEPE.TXT: scrive PRESEPE.INI con il testo di esempio
+// completo (valori predefiniti + spiegazioni), con ritorni a capo CR LF per Blocco note.
+// Se la scrittura non riesce non lascia un file a meta'. Ritorna true se riuscita.
+bool iniCreaPredefinito() {
+  if (!SD.begin(PIN_SD_CS)) return false;
+  if (SD.exists(CFG_FILE_NAME) || SD.exists(CFG_FILE_NAME_ALT)) { SD.end(); return false; }
+  File f = SD.open(CFG_FILE_NAME, FILE_WRITE);
+  bool ok = (bool)f;
+  uint8_t buf[64]; uint8_t n = 0;
+  for (const char *p = INI_PREDEFINITO; ok; p++) {
+    char c = (char)pgm_read_byte(p);
+    if (c == '\n') buf[n++] = '\r';
+    if (c) buf[n++] = (uint8_t)c;
+    if (n >= sizeof(buf) - 1 || !c) {
+      if (n && f.write(buf, n) != n) ok = false;
+      n = 0;
+    }
+    if (!c) break;
+  }
+  if (f) f.close();
+  if (!ok && SD.exists(CFG_FILE_NAME)) SD.remove(CFG_FILE_NAME);
+  SD.end();
+  return ok;
+}
+// ==== INI SCRIVI END ====
+
+// Riavvio senza staccare l'alimentazione (pulsante "Riavvia" della pagina web):
+// rilegge PRESEPE.INI e riparte dallo splash, come all'accensione.
+void riavviaSoftware() {
+  Serial.println(F("RIAVVIO (dalla pagina web)"));
+  lnkRiavvio = false;
+  if (lnkAttivo) LNK_SERIAL.flush();
+  noTone(PIN_BUZZER);
+  buzzerAttivo = false;
+  running = true; fermo = false; testInCorso = false; testWeb = false; testMostraIP = false; testIndice = 0;
+  modalitaColore = false;
+  oledPopup = OLED_NESSUNO;
+  cieloGenerato = false; ultimaFaseStelle = GIORNO;
+  casetteLivello = 0.0f;
+  ultimoPotOled = -1; potBeepRiferimento = -1; potBeepInAttesa = false; potPopupInAttesa = false;
+  lastStartRead = stableStart = HIGH; lastNextRead = stableNext = HIGH; lastTestRead = stableTest = HIGH;
+  setup();
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -2344,6 +3442,15 @@ void setup() {
   pinMode(PIN_SD_CS, OUTPUT);
   digitalWrite(PIN_SD_CS, HIGH);
   cfgCaricaDaSD(PIN_SD_CS, PIN_SD_CD);
+  // Salvataggio dalla pagina web interrotto da un'interruzione di corrente: completalo e rileggi.
+  if (cfg.sdStato != SD_ASSENTE && lnkRecupera()) { cfgDefault(cfg); cfgCaricaDaSD(PIN_SD_CS, PIN_SD_CD); }
+  // microSD senza file: scrive il PRESEPE.INI di esempio, da modificare poi dal computer.
+  iniCreato = false;
+  if (cfg.sdStato == SD_NO_FILE && iniCreaPredefinito()) {
+    iniCreato = true;
+    cfgDefault(cfg); cfgCaricaDaSD(PIN_SD_CS, PIN_SD_CD);
+  }
+  lnkInizio();                 // [WIFI] abilitato: invia SSID e password all'ESP8266 (non blocca)
   stelle.updateLength(cfg.numStelle);
   casette.updateLength(cfg.numCasette);
   for (uint16_t i = 0; i < CFG_MAX_CASETTE; i++) { casettaFuoco[i] = 255; casettaTarget[i] = 255; }
@@ -2360,6 +3467,8 @@ void setup() {
   pinMode(PIN_ALBA_G, OUTPUT);
   pinMode(PIN_ALBA_B, OUTPUT);
   pinMode(PIN_BUZZER, OUTPUT);
+  pinMode(LED_STATO, OUTPUT);
+  digitalWrite(LED_STATO, HIGH);   // acceso fisso durante l'avvio
   noTone(PIN_BUZZER);
   stelle.begin();
   stelle.clear();
@@ -2450,23 +3559,52 @@ void loop() {
 
   buzzerTick();
 
+  lnkTick();                                   // [WIFI]: comandi della pagina web
+  if (lnkRiavvio) { riavviaSoftware(); return; }
+  stelleFlush();                               // stelle rimaste da inviare (STOP, test da web)
+  aggiornaLedStato();
+
   if (modalitaColore) { loopModalitaColore(); return; }
 
   // ----- comandi fisici -----
 
+  // START: breve (al rilascio) = pausa/ripresa, o uscita dal TEST; tenuto 2 s = STOP
+  // (tutto spento); in STOP una pressione breve = PLAY.
+  static bool startGiu = false, startLungo = false;
+  static unsigned long startGiuMs = 0;
   if (pulsantePremuto(PIN_START,
                       lastStartRead, stableStart, dbStartMs)) {
-    toggleStartStop();
+    startGiu = true; startLungo = false; startGiuMs = millis();
+  }
+  if (startGiu) {
+    if (stableStart == HIGH) {                         // rilasciato
+      startGiu = false;
+      if (!startLungo) { if (fermo) avviaPresepe(); else toggleStartStop(); }
+    } else if (!startLungo && !fermo && !testInCorso && millis() - startGiuMs >= START_STOP_MS) {
+      startLungo = true;                               // il rilascio non fa altro
+      fermaPresepe();
+    }
   }
 
   if (pulsantePremuto(PIN_NEXT,
                       lastNextRead, stableNext, dbNextMs)) {
-    if (!testInCorso) faseAvanti();
+    if (!testInCorso && !fermo) faseAvanti();
   }
 
   if (pulsantePremuto(PIN_TEST,
                       lastTestRead, stableTest, dbTestMs)) {
-    testUscite();
+    if (!fermo) testUscite();
+  }
+
+  // ----- STOP: tutto resta spento -----
+  if (fermo) {
+    static unsigned long stopOledMs = 0;
+    if (millis() - stopOledMs >= 2000) { stopOledMs = millis(); mostraOledStop(); }
+    if (DEBUG_INTERVAL_MS && millis() - lastDebugMs >= DEBUG_INTERVAL_MS) {
+      lastDebugMs = millis();
+      Serial.println(F("STOP (START breve = PLAY)"));
+    }
+    return;
   }
 
   // ----- ciclo scenografico -----

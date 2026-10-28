@@ -1,0 +1,25 @@
+Positive controls - each run forces ONE isolation rule to an impossible value:
+--control=selv:
+    499     Rule: MAINS to SELV 60.0mm
+    199     Rule: MAINS to non-MAINS holes 60.0mm
+--control=inter:
+    499     Rule: MAINS inter-relay 50.0mm
+--control=intra:
+     36     Rule: MAINS intra-relay R1 4.9mm
+     26     Rule: MAINS intra-relay R10 4.9mm
+     26     Rule: MAINS intra-relay R11 4.9mm
+     26     Rule: MAINS intra-relay R12 4.9mm
+     26     Rule: MAINS intra-relay R13 4.9mm
+     26     Rule: MAINS intra-relay R14 4.9mm
+     26     Rule: MAINS intra-relay R15 4.9mm
+     26     Rule: MAINS intra-relay R16 4.9mm
+     36     Rule: MAINS intra-relay R2 4.9mm
+     36     Rule: MAINS intra-relay R3 4.9mm
+     36     Rule: MAINS intra-relay R4 4.9mm
+     36     Rule: MAINS intra-relay R5 4.9mm
+     36     Rule: MAINS intra-relay R6 4.9mm
+     36     Rule: MAINS intra-relay R7 4.9mm
+     36     Rule: MAINS intra-relay R8 4.9mm
+     26     Rule: MAINS intra-relay R9 4.9mm
+--control=edge:
+    199     Rule: MAINS to board edge 30.0mm

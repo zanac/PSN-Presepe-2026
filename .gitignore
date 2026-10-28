@@ -1,5 +1,6 @@
 # build outputs (./build.sh, arduino-cli)
 /out/
+hardware/*/out/
 firmware/PSN-Presepe/build/
 # KiCad local state and backups
 *.kicad_prl
@@ -17,3 +18,4 @@ firmware/PSN-Presepe/arduino-cli.exe
 firmware/PSN-Presepe/arduino-cli.yaml
 firmware/PSN-Presepe/.arduino-*/
 simulation/wokwi-bundle/
+firmware/PSN-Presepe-WiFi/build/

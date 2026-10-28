@@ -30,7 +30,7 @@ To try a different configuration:
 
 **Colour mode in Wokwi:** click the TEST button during the 3 s "by Vanni" splash, then use the buttons and the potentiometer as on the real board.
 
-Rename the file to check the defaults: the serial monitor then reports the file as missing (and, with `fastboot = 0`, the OLED shows `MANCA PRESEPE.INI`).
+Rename the file to check the defaults: the firmware then finds no configuration file and writes the example `PRESEPE.INI` to the card (OLED `PRESEPE.INI CREATO`, also with `fastboot = 1`) if Wokwi lets it write; otherwise the serial monitor reports the file as missing (and, with `fastboot = 0`, the OLED shows `MANCA PRESEPE.INI`).
 
 ## What is simulated
 

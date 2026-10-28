@@ -1,0 +1,384 @@
+<title>Pannello presepe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Pannello servito dall'ESP8266 del presepe: stato del ciclo, comandi e test da telefono.
+   Stessa palette del simulatore (laboratorio chiaro, accento ambra lanterna, palco buio). */
+:root {
+  --bg: #eef0f4; --panel: #ffffff; --ink: #1b2130; --muted: #5b6478; --line: #d5dae4;
+  --accent: #c9781a; --accent-ink: #ffffff; --soft: #f7f8fb;
+  --on: #2f9e68; --on-ink: #ffffff; --err: #b42318; --err-bg: #fdecea; --ok: #1f7a4d; --ok-bg: #e5f4ec;
+  --stage: #07090e; --stage-ink: #c9d0e0; --stage-line: #252b38;
+  --f-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11141b; --panel: #181c26; --ink: #e6e9f0; --muted: #9aa3b6; --line: #2a3040;
+    --accent: #e59a3c; --accent-ink: #1a1206; --soft: #12161f; --on: #3fbf7f; --on-ink: #04140b;
+    --err: #ff8a7a; --err-bg: #3a1a17; --ok: #6fd3a0; --ok-bg: #12291f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11141b; --panel: #181c26; --ink: #e6e9f0; --muted: #9aa3b6; --line: #2a3040;
+  --accent: #e59a3c; --accent-ink: #1a1206; --soft: #12161f; --on: #3fbf7f; --on-ink: #04140b;
+  --err: #ff8a7a; --err-bg: #3a1a17; --ok: #6fd3a0; --ok-bg: #12291f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45; margin: 0; padding: 16px 16px 40px; }
+.wrap { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: 1.8rem; margin: 0; letter-spacing: .01em; }
+h1 span { color: var(--accent); }
+.net { font-family: var(--f-mono); font-size: 12.5px; color: var(--muted); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--err); margin-right: 6px; vertical-align: 1px; }
+.dot.on { background: var(--on); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card h2 { font-family: var(--f-display); font-weight: 600; font-size: 1.02rem; text-transform: uppercase; letter-spacing: .08em; margin: 0; color: var(--muted); }
+.card h3 { font-family: var(--f-display); font-weight: 600; font-size: .95rem; text-transform: uppercase; letter-spacing: .07em; margin: 4px 0 0; color: var(--muted); }
+.stage { background: var(--stage); color: var(--stage-ink); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.phase { font-family: var(--f-display); font-weight: 700; font-size: 1.7rem; letter-spacing: .04em; color: #f3d7a8; }
+.meta { font-family: var(--f-mono); font-size: 12.5px; color: #aeb6c8; font-variant-numeric: tabular-nums; }
+.bar { height: 8px; border-radius: 4px; background: #1b2130; overflow: hidden; }
+.bar i { display: block; height: 100%; background: #f0b45a; width: 0; }
+.sw { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.sw div { border: 1px solid var(--stage-line); border-radius: 6px; padding: 6px 8px; font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
+.sw b { font-family: var(--f-display); letter-spacing: .07em; font-weight: 600; text-transform: uppercase; }
+.sw span.c { height: 10px; border-radius: 3px; background: #000; border: 1px solid var(--stage-line); }
+.sw code { font-family: var(--f-mono); font-size: 11.5px; color: #e9edf6; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select, input[type=number] { font-family: var(--f-body); font-size: 15px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 9px 14px; min-height: 42px; }
+button { cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button:hover { border-color: var(--accent); }
+button.danger { background: var(--err-bg); color: var(--err); border-color: var(--err); font-weight: 600; }
+button.big { min-height: 56px; font-size: 18px; padding: 12px 28px; }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a.btn { display: inline-flex; align-items: center; min-height: 42px; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--accent); color: var(--accent); text-decoration: none; font-weight: 600; }
+.seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.seg.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.seg button { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 6px; min-width: 0; font-family: var(--f-display); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.seg button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--soft); }
+.seg i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--line); background: #000; flex: none; }
+canvas#picker { width: 100%; height: 170px; border-radius: 8px; display: block; touch-action: none; cursor: crosshair; border: 1px solid var(--line); }
+.slider { display: flex; align-items: center; gap: 10px; }
+.slider label { font-size: 13.5px; color: var(--muted); min-width: 90px; }
+input[type=range] { flex: 1; accent-color: var(--accent); min-width: 0; height: 32px; }
+.val { font-family: var(--f-mono); font-size: 13px; min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+.rgbin { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 6px; align-items: center; }
+.rgbin input { width: 100%; font-family: var(--f-mono); font-variant-numeric: tabular-nums; min-width: 0; }
+.iniline { font-family: var(--f-mono); font-size: 13px; background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; overflow-x: auto; white-space: nowrap; }
+.pix { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 5px; }
+.pix button { padding: 0; min-height: 36px; font-family: var(--f-mono); font-size: 12px; }
+.pix button.on, .rel button.on { background: var(--on); color: var(--on-ink); border-color: var(--on); font-weight: 600; }
+.rel { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.rel button { display: flex; flex-direction: column; align-items: flex-start; gap: 0; text-align: left; padding: 6px 9px; min-height: 48px; }
+.rel button small { font-size: 11.5px; opacity: .85; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 480px) { .pix { grid-template-columns: repeat(5, minmax(0, 1fr)); } .rel { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.note { font-size: 13.5px; color: var(--muted); margin: 0; }
+.msg { font-size: 13.5px; padding: 8px 10px; border-radius: 7px; background: var(--ok-bg); color: var(--ok); }
+.msg.bad { background: var(--err-bg); color: var(--err); }
+.warn { border-color: var(--err); }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Pannello <span>presepe</span></h1>
+    <div class="net"><span class="dot" id="dot"></span><span id="net">collegamento…</span></div>
+  </header>
+
+  <div class="card warn" id="offline" hidden>
+    <p class="note" id="offlineMsg">Il presepe non risponde.</p>
+  </div>
+
+  <section class="stage" aria-label="Stato del ciclo">
+    <div class="row" style="justify-content:space-between">
+      <span class="phase" id="phase">—</span>
+      <span class="meta" id="meta"></span>
+    </div>
+    <div class="bar"><i id="prog"></i></div>
+    <div class="sw" id="swatches"></div>
+    <div class="meta" id="sd"></div>
+  </section>
+
+  <section class="card" id="cardCiclo" aria-label="Comandi del ciclo">
+    <h2>Ciclo</h2>
+    <div class="row">
+      <button class="primary" id="bRun" type="button">Pausa</button>
+      <button id="bNext" type="button">Fase successiva</button>
+      <button id="bTest" type="button">Entra in test</button>
+      <a class="btn" href="/config">Modifica configurazione</a>
+    </div>
+    <div class="row"><button class="danger" id="bStop" type="button">Stop: spegni tutto</button>
+      <span class="note">Per le cerimonie: spegne relè, strisce, stelle e casette finché non premi Play (sulla scheda: START tenuto 2 secondi).</span></div>
+    <p class="note">La configurazione apre il file della microSD con l'anteprima del ciclo: lì puoi salvarlo e riavviare il presepe.</p>
+  </section>
+
+  <section class="card" id="cardStop" hidden aria-label="Presepe fermo">
+    <h2>Stop</h2>
+    <p class="note">Tutto spento: relè, strisce, stelle e casette. Play fa ripartire il ciclo dall'inizio del GIORNO (sulla scheda: START).</p>
+    <div class="row"><button class="primary big" id="bPlay" type="button">Play</button></div>
+  </section>
+
+  <section class="card" id="cardColore" hidden>
+    <h2>Modalità colore</h2>
+    <p class="note">Sulla scheda è attiva la modalità colore (pulsanti e potenziometro). Per uscire tieni premuto TEST per 2 secondi.</p>
+  </section>
+
+  <section class="card" id="cardTest" hidden aria-label="Test">
+    <div class="row" style="justify-content:space-between">
+      <h2>Test</h2>
+      <button class="primary" id="bExit" type="button">Esci dal test</button>
+    </div>
+    <p class="note" id="testNote"></p>
+
+    <h3>Strisce RGB</h3>
+    <div class="seg" id="segStrip" role="group" aria-label="Striscia"></div>
+    <canvas id="picker" aria-label="Scegli il colore: tinta da sinistra a destra, saturazione dall'alto verso il basso"></canvas>
+    <div class="slider"><label for="lum">Luminosità</label><input type="range" id="lum" min="0" max="100" value="100"><span class="val" id="lumv">100 %</span></div>
+    <div class="rgbin">
+      <input type="number" id="r" min="0" max="255" aria-label="Rosso">
+      <input type="number" id="g" min="0" max="255" aria-label="Verde">
+      <input type="number" id="b" min="0" max="255" aria-label="Blu">
+      <button id="bOff" type="button">Spegni</button>
+    </div>
+    <div class="iniline" id="iniline"></div>
+    <div class="row"><button id="bCopy" type="button">Copia la riga</button><span class="note">Sostituisci % con il punto della fase in cui vuoi quel colore.</span></div>
+
+    <h3>Stelle e casette (WS2811)</h3>
+    <div class="seg two" id="segChain" role="group" aria-label="Catena"></div>
+    <div class="row">
+      <label class="note" for="pcol">Colore</label>
+      <select id="pcol">
+        <option value="70,50,27">bianco caldo</option>
+        <option value="255,255,255">bianco pieno</option>
+        <option value="70,0,0">rosso</option>
+        <option value="0,70,0">verde</option>
+        <option value="0,0,70">blu</option>
+      </select>
+      <button id="bAllOn" type="button">Tutti accesi</button>
+      <button id="bAllOff" type="button">Tutti spenti</button>
+    </div>
+    <div class="pix" id="pix"></div>
+
+    <h3>Relè</h3>
+    <div class="rel" id="rel"></div>
+
+    <div class="row"><button id="bBeep" type="button">Bip del buzzer</button></div>
+  </section>
+
+  <div class="msg" id="msg" hidden role="status"></div>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const FASI = ["GIORNO", "TRAMONTO", "CREPUSCOLO", "NOTTE", "ALBA"];
+const STRIP = [{ n: "Tramonto", k: "tramonto", i: 1 }, { n: "Cielo", k: "cielo", i: 0 }, { n: "Alba", k: "alba", i: 2 }];
+const SD = ["non letta", "assente", "senza file", "letta", "letta con errori"];
+let st = null, modo = -1, strip = 0, chain = 0;   // strip: indice del firmware (0 CIELO, 1 TRAMONTO, 2 ALBA)
+const sstate = [{ h: 0, s: 0, v: 1, rgb: [0, 0, 0] }, { h: 0, s: 0, v: 1, rgb: [0, 0, 0] }, { h: 0, s: 0, v: 1, rgb: [0, 0, 0] }];
+let pixels = [[], []];
+
+// ---------------------------------------------------------------- comandi verso il presepe (uno alla volta)
+let busy = false; const queue = new Map();   // chiave -> comando: il piu' recente vince
+function send(key, c) { queue.set(key, c); pump(); }
+async function pump() {
+  if (busy || !queue.size) return;
+  if (!st || !st.mega) { queue.clear(); say("Il presepe non risponde: comando non inviato.", true); return; }
+  const [key, c] = queue.entries().next().value; queue.delete(key);
+  busy = true;
+  try {
+    const r = await fetch("/api/cmd", { method: "POST", headers: { "Content-Type": "text/plain", "X-Presepe": "1" }, body: c });
+    const j = await r.json();
+    if (!j.ok) say("Comando non eseguito: " + (j.msg || c), true);
+  } catch (e) { say("Il presepe non risponde.", true); }
+  busy = false; pump();
+}
+let msgT = null;
+function say(t, bad) { const m = $("msg"); m.hidden = false; m.textContent = t; m.className = "msg" + (bad ? " bad" : ""); clearTimeout(msgT); msgT = setTimeout(() => { m.hidden = true; }, 4000); }
+
+// ---------------------------------------------------------------- stato (ogni secondo)
+const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+async function poll() {
+  try {
+    const r = await fetch("/api/stato", { cache: "no-store" });
+    st = await r.json(); show();
+  } catch (e) { $("dot").className = "dot"; $("net").textContent = "pagina non collegata al presepe"; }
+  setTimeout(poll, 1000);
+}
+function show() {
+  $("dot").className = "dot" + (st.mega ? " on" : "");
+  $("net").textContent = st.ap
+    ? `rete «${st.ssid}» · ${st.ip} · ${st.clienti} ${st.clienti === 1 ? "dispositivo collegato" : "dispositivi collegati"}`
+    : `${st.host}.local · ${st.ip} · segnale ${st.rssi} dBm`;
+  $("offline").hidden = st.mega;
+  if (!st.mega) { ["cardCiclo", "cardTest", "cardColore", "cardStop"].forEach(id => { $(id).hidden = true; }); modo = -1;
+    $("offlineMsg").textContent = "Il presepe non risponde: è in avvio, oppure l'ESP8266 non è collegato alla Serial3 (DIP 1-2 e selettore su RXD3/TXD3)."; return; }
+  $("phase").textContent = st.modo === 4 ? "STOP" : FASI[st.fase] || "—";
+  $("meta").textContent = st.modo === 4 ? "tutto spento · Play riparte dall'inizio del GIORNO"
+    : `${st.pctFase} % della fase · ${st.pct.toFixed(1)} % del ciclo · ${st.run ? "in corso" : "in pausa"} · ciclo ${fmt(st.durata)}`;
+  $("prog").style.width = (st.modo === 4 ? 0 : st.pct) + "%";
+  $("swatches").innerHTML = "";
+  STRIP.forEach(s => {
+    const c = st[s.k], d = document.createElement("div");
+    d.innerHTML = `<b>${s.n}</b><span class="c" style="background:rgb(${c})"></span><code>${c.join(", ")}</code>`;
+    $("swatches").appendChild(d);
+  });
+  $("sd").textContent = `microSD: ${SD[st.sd] || "?"}` + (st.err ? ` · ${st.err} righe ignorate (prima ${st.riga === 65535 ? "valori incoerenti" : "riga " + st.riga})` : "");
+  if (st.modo !== modo) {
+    if (st.modo === 2 && modo !== 2) { pixels = [[], []]; sstate.forEach(s => { s.rgb = [0, 0, 0]; }); drawPix(); syncStrip(); }
+    modo = st.modo;
+  }
+  $("cardCiclo").hidden = modo !== 0;
+  $("cardTest").hidden = !(modo === 1 || modo === 2);
+  $("cardColore").hidden = modo !== 3;
+  $("cardStop").hidden = modo !== 4;
+  if (!$("cardTest").hidden && !grad) drawPicker();
+  $("bRun").textContent = st.run ? "Pausa" : "Avvia";
+  $("testNote").textContent = modo === 2 ? "Comandi dal telefono: la scheda mostra «TEST DA WEB». START sulla scheda o «Esci dal test» riprendono il ciclo."
+    : `Test a passi dalla scheda (passo ${st.passo ? st.passo + "/34" : "Wi-Fi"}). Il primo comando qui sotto passa al controllo dal telefono con tutte le uscite spente.`;
+  if (st.nst !== pixels.n0 || st.nca !== pixels.n1) drawPix();
+  [...$("rel").children].forEach((b, i) => { const on = !!(st.rele & (1 << i)); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+  STRIP.forEach((s, j) => { const sw = $("segStrip").children[j].querySelector("i"); sw.style.background = `rgb(${st[s.k]})`; });
+}
+
+// ---------------------------------------------------------------- strisce: tinta x saturazione + luminosita'
+function hsv2rgb(h, s, v) {
+  const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return [f(5), f(3), f(1)].map(x => Math.round(x * 255));
+}
+function rgb2hsv(r, g, b) {
+  r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0; if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { h: (h * 60 + 360) % 360, s: mx ? d / mx : 0, v: mx };
+}
+const cv = $("picker"), ctx = cv.getContext("2d");
+let grad = null;
+function drawPicker() {
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (!w || !h) { grad = null; return; }           // scheda Test nascosta: si disegna quando compare
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const gh = ctx.createLinearGradient(0, 0, w, 0);
+  for (let i = 0; i <= 6; i++) gh.addColorStop(i / 6, `hsl(${i * 60},100%,50%)`);
+  ctx.fillStyle = gh; ctx.fillRect(0, 0, w, h);
+  const gv = ctx.createLinearGradient(0, 0, 0, h); gv.addColorStop(0, "rgba(255,255,255,0)"); gv.addColorStop(1, "rgba(255,255,255,1)");
+  ctx.fillStyle = gv; ctx.fillRect(0, 0, w, h);
+  grad = ctx.getImageData(0, 0, cv.width, cv.height);
+  marker();
+}
+function marker() {
+  if (!grad) return;
+  ctx.putImageData(grad, 0, 0);
+  const s = sstate[strip], w = cv.clientWidth, h = cv.clientHeight, x = s.h / 360 * w, y = (1 - s.s) * h;
+  ctx.lineWidth = 2; ctx.strokeStyle = "#000"; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.stroke();
+  ctx.strokeStyle = "#fff"; ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.stroke();
+}
+function syncStrip() {          // interfaccia <- stato della striscia scelta
+  const s = sstate[strip];
+  $("lum").value = Math.round(s.v * 100); $("lumv").textContent = Math.round(s.v * 100) + " %";
+  ["r", "g", "b"].forEach((k, i) => { $(k).value = s.rgb[i]; });
+  const k = STRIP.find(x => x.i === strip).k;
+  $("iniline").textContent = `${k} = %, ${s.rgb[0]}, ${s.rgb[1]}, ${s.rgb[2]}`;
+  [...$("segStrip").children].forEach((b, j) => b.setAttribute("aria-pressed", STRIP[j].i === strip));
+  marker();
+}
+function applyStrip() {         // stato -> presepe
+  const s = sstate[strip];
+  s.rgb = hsv2rgb(s.h, s.s, s.v);
+  syncStrip();
+  send("S" + strip, `S ${strip} ${s.rgb.join(" ")}`);
+}
+STRIP.forEach(s => {
+  const b = document.createElement("button"); b.type = "button"; b.innerHTML = `<i></i>${s.n}`;
+  b.addEventListener("click", () => { strip = s.i; syncStrip(); });
+  $("segStrip").appendChild(b);
+});
+function pick(e) {
+  const r = cv.getBoundingClientRect(), s = sstate[strip];
+  s.h = Math.min(359.9, Math.max(0, (e.clientX - r.left) / r.width * 360));
+  s.s = Math.min(1, Math.max(0, 1 - (e.clientY - r.top) / r.height));
+  if (s.v === 0) s.v = 1;
+  applyStrip();
+}
+let dragging = false;
+cv.addEventListener("pointerdown", e => { dragging = true; cv.setPointerCapture(e.pointerId); pick(e); });
+cv.addEventListener("pointermove", e => { if (dragging) pick(e); });
+cv.addEventListener("pointerup", () => { dragging = false; });
+$("lum").addEventListener("input", e => { sstate[strip].v = e.target.value / 100; applyStrip(); });
+["r", "g", "b"].forEach(k => $(k).addEventListener("change", () => {
+  const c = ["r", "g", "b"].map(x => Math.max(0, Math.min(255, Math.round(+$(x).value || 0))));
+  const s = sstate[strip]; const h = rgb2hsv(...c); s.h = h.h; s.s = h.s; s.v = h.v; s.rgb = c;
+  syncStrip(); send("S" + strip, `S ${strip} ${c.join(" ")}`);
+}));
+$("bOff").addEventListener("click", () => { sstate[strip].v = 0; applyStrip(); });
+$("bCopy").addEventListener("click", async () => {
+  const t = $("iniline").textContent;
+  try { await navigator.clipboard.writeText(t); say("Riga copiata: " + t); }
+  catch (e) { const rg = document.createRange(); rg.selectNodeContents($("iniline")); getSelection().removeAllRanges(); getSelection().addRange(rg); say("Riga selezionata: copiala con il menu del telefono."); }
+});
+
+// ---------------------------------------------------------------- pixel WS2811
+["Stelle", "Casette"].forEach((n, c) => {
+  const b = document.createElement("button"); b.type = "button"; b.textContent = n;
+  b.addEventListener("click", () => { chain = c; drawPix(); });
+  $("segChain").appendChild(b);
+});
+function drawPix() {
+  const n = st ? (chain ? st.nca : st.nst) : 0;
+  pixels.n0 = st ? st.nst : 0; pixels.n1 = st ? st.nca : 0;
+  [...$("segChain").children].forEach((b, c) => b.setAttribute("aria-pressed", c === chain));
+  const box = $("pix"); box.innerHTML = "";
+  for (let i = 0; i < n; i++) {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = i + 1;
+    const on = !!pixels[chain][i]; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on);
+    b.setAttribute("aria-label", `${chain ? "casetta" : "stella"} ${i + 1}`);
+    b.addEventListener("click", () => {
+      const v = !pixels[chain][i]; pixels[chain][i] = v; b.classList.toggle("on", v); b.setAttribute("aria-pressed", v);
+      send(`P${chain}_${i}`, `P ${chain} ${i} ${v ? 1 : 0}`);
+    });
+    box.appendChild(b);
+  }
+  if (!n) box.innerHTML = '<p class="note">Nessun pixel in questa catena ([STELLE] / [CASETTE] numero = 0).</p>';
+}
+function allPix(v) {
+  const n = chain ? st.nca : st.nst; for (let i = 0; i < n; i++) pixels[chain][i] = v;
+  drawPix(); send("PA" + chain, `PA ${chain} ${v ? 1 : 0}`);
+}
+$("bAllOn").addEventListener("click", () => allPix(true));
+$("bAllOff").addEventListener("click", () => allPix(false));
+$("pcol").addEventListener("change", e => send("PC", "PC " + e.target.value.split(",").join(" ")));
+
+// ---------------------------------------------------------------- rele', buzzer, ciclo
+function drawRel(nomi) {
+  const box = $("rel"); box.innerHTML = "";
+  for (let i = 0; i < 16; i++) {
+    const b = document.createElement("button"); b.type = "button";
+    b.innerHTML = `<span>Relè ${i + 1}</span><small></small>`;
+    b.querySelector("small").textContent = nomi[i] || `Grp_0${Math.floor(i / 4) + 1}_0${i % 4 + 1}`;
+    b.addEventListener("click", () => {
+      const v = !b.classList.contains("on"); b.classList.toggle("on", v); b.setAttribute("aria-pressed", v);
+      send("R" + i, `R ${i + 1} ${v ? 1 : 0}`);
+    });
+    box.appendChild(b);
+  }
+}
+$("bBeep").addEventListener("click", () => send("B", "B"));
+$("bExit").addEventListener("click", () => send("X", "X"));
+$("bTest").addEventListener("click", () => send("T", "T"));
+$("bRun").addEventListener("click", () => send("RUN", "RUN"));
+$("bNext").addEventListener("click", () => send("NEXT", "NEXT"));
+$("bStop").addEventListener("click", () => send("STOP", "STOP"));
+$("bPlay").addEventListener("click", () => send("STOP", "PLAY"));      // stessa chiave: vince l'ultimo
+
+(async () => {
+  setTimeout(poll, 1000);
+  try { const r = await fetch("/api/stato", { cache: "no-store" }); st = await r.json(); drawRel(st.nomi || []); show(); }
+  catch (e) { drawRel([]); }
+  drawPix(); drawPicker(); syncStrip();
+  window.addEventListener("resize", drawPicker);
+})();
+</script>
