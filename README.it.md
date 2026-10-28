@@ -19,9 +19,9 @@ Questo repository contiene il progetto Rev D completo:
 - il firmware, con i suoi test;
 - la documentazione dei collegamenti per realizzare la centralina su breadboard, senza PCB.
 
-> **Stato (2026-10-04).** Il PCB Rev D ha superato tutti i controlli automatici descritti sotto. È stato ordinato a PCBWay con montaggio chiavi in mano (vedi [manufacturing/pcbway-order-2026-10-04](manufacturing/pcbway-order-2026-10-04/README.md)). La scheda fisica **non è ancora stata provata**. Il firmware parte dalla versione già provata su breadboard, con in più la nuova configurazione da SD.
+> **Stato (2026-10-04).** Il PCB Rev D ha superato tutti i controlli automatici descritti sotto. È stato ordinato a PCBWay con montaggio chiavi in mano (vedi [manufacturing/pcbway-order-2026-10-04](hardware/rev-d/manufacturing/pcbway-order-2026-10-04/README.md)). La scheda fisica **non è ancora stata provata**. Il firmware parte dalla versione già provata su breadboard, con in più la nuova configurazione da SD.
 
-![Rev D lato superiore](previews/PSN-Presepe-Mega-RevD-gerber-render-top.png)
+![Rev D lato superiore](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-gerber-render-top.png)
 
 ## Indice
 
@@ -47,16 +47,19 @@ Questo repository contiene il progetto Rev D completo:
 ## 1. Struttura del repository
 
 ```
-build.sh                        ricostruzione + verifica di PCB e firmware con un solo comando
-build/
-  scripts/                      generatore del PCB, collegamento al router, DRC, verifiche indipendenti, esportazioni
-  data/                         netlist/pad di riferimento e sessione di sbroglio salvata (routing.ses)
-  lib/PSN_RevD.pretty/          footprint personalizzati (shield Arduino Mega, foro di attrezzaggio JLC)
-kicad/                          progetto KiCad 7: scheda, regole, schema (+PDF), libreria locale dei footprint
-manufacturing/                  Gerber, mappe di foratura, BOM, file di posizionamento, istruzioni di montaggio, stampa 1:1
-  pcbway-order-2026-10-04/      copia CONGELATA dei file inviati davvero a PCBWay (+ SHA256SUMS, note dell'ordine)
-previews/                       immagini della scheda (strati KiCad e rendering fotografico dei Gerber)
-reports/                        DRC, verifiche indipendenti di scheda e Gerber, parità schema/PCB, controllo footprint
+build.sh                        ricostruzione + verifica di tutte le revisioni del PCB e del firmware con un solo comando
+hardware/
+  rev-d/                        Rev D, la scheda ordinata a PCBWay (congelata; si ricostruisce con Gerber identici)
+    build.sh                    ricostruzione + verifica di questa sola revisione
+    build/
+      scripts/                  generatore del PCB, collegamento al router, DRC, verifiche indipendenti, esportazioni
+      data/                     netlist/pad di riferimento e sessione di sbroglio salvata (routing.ses)
+      lib/PSN_RevD.pretty/      footprint personalizzati (shield Arduino Mega, foro di attrezzaggio JLC)
+    kicad/                      progetto KiCad 7: scheda, regole, schema (+PDF), libreria locale dei footprint
+    manufacturing/              Gerber, mappe di foratura, BOM, file di posizionamento, istruzioni di montaggio, stampa 1:1
+      pcbway-order-2026-10-04/  copia CONGELATA dei file inviati davvero a PCBWay (+ SHA256SUMS, note dell'ordine)
+    previews/                   immagini della scheda (strati KiCad e rendering fotografico dei Gerber)
+    reports/                    DRC, verifiche indipendenti di scheda e Gerber, parità schema/PCB, controllo footprint
 firmware/
   PSN-Presepe/                  tutto il firmware in un solo sketch (PSN-Presepe.ino), PRESEPE.INI di esempio, HEX compilato, flasher Windows
   PSN-Presepe-WiFi/             firmware dell'ESP8266 di una scheda "Mega + WiFi R3" (pagine web, OTA), BIN compilato
@@ -69,7 +72,7 @@ demo/                           le pagine web del WiFi con una scheda simulata, 
 .github/workflows/firmware.yml  CI: test sul PC + compilazione dei due firmware
 ```
 
-Tutto il contenuto di `kicad/`, `manufacturing/` (tranne la cartella congelata dell'ordine), `previews/` e `reports/` è generato da `./build.sh`. Modifica gli script, non i file generati (vedi [sezione 13](#13-ricostruire-tutto)).
+Tutto il contenuto di `hardware/rev-d/kicad/`, `manufacturing/` (tranne la cartella congelata dell'ordine), `previews/` e `reports/` è generato da `hardware/rev-d/build.sh`. Modifica gli script, non i file generati (vedi [sezione 13](#13-ricostruire-tutto)).
 
 ## 2. Come funziona la centralina
 
@@ -109,9 +112,9 @@ Durate del ciclo di default: 1, 3 o 5 minuti, scelte col potenziometro.
 
 | Lato superiore (rame + serigrafia) | Lato inferiore (rame + serigrafia) |
 |---|---|
-| ![sopra](previews/PSN-Presepe-Mega-RevD-top.png) | ![sotto](previews/PSN-Presepe-Mega-RevD-bottom.png) |
+| ![sopra](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-top.png) | ![sotto](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-bottom.png) |
 
-Disegno di montaggio: [previews/PSN-Presepe-Mega-RevD-assembly.png](previews/PSN-Presepe-Mega-RevD-assembly.png). Schema: [kicad/PSN-Presepe-Mega-RevD-schematic.pdf](kicad/PSN-Presepe-Mega-RevD-schematic.pdf). Lo schema è generato dalla scheda e usa etichette di rete globali, quindi va letto insieme alle tabelle qui sotto.
+Disegno di montaggio: [previews/PSN-Presepe-Mega-RevD-assembly.png](hardware/rev-d/previews/PSN-Presepe-Mega-RevD-assembly.png). Schema: [kicad/PSN-Presepe-Mega-RevD-schematic.pdf](hardware/rev-d/kicad/PSN-Presepe-Mega-RevD-schematic.pdf). Lo schema è generato dalla scheda e usa etichette di rete globali, quindi va letto insieme alle tabelle qui sotto.
 
 ## 4. Connettori della scheda (piedinatura dei morsetti)
 
@@ -541,7 +544,7 @@ Non ci sono via sulle reti a tensione di rete.
 
 Le 48 reti dei contatti (COM/NO/NC × 16) collegano ciascuna un solo pin del relè al suo morsetto, quindi i 230 V non raggiungono mai il resto della scheda. Questo viene controllato in automatico.
 
-### Controlli automatici (`reports/`)
+### Controlli automatici (`hardware/rev-d/reports/`)
 
 | Controllo | Risultato |
 |---|---|
@@ -569,14 +572,14 @@ La distanza minima tra rame sulla scheda è 0,202 mm (7,95 mil).
 
    | Campo | File |
    |---|---|
-   | Gerber | `manufacturing/PSN-Presepe-Mega-RevD-gerbers.zip` |
+   | Gerber | `hardware/rev-d/manufacturing/PSN-Presepe-Mega-RevD-gerbers.zip` |
    | BOM | `…-BOM-PCBWay.csv` (codici produttore e note di montaggio) |
    | Centroid | `…-Centroid-PCBWay.csv` (comprende MCU1 sul lato inferiore) |
    | Other files | `…-Assembly-Instructions.pdf` (header Mega sul lato inferiore, fori ICSP vuoti, note sulle polarità) |
 
 4. Attendi la revisione (*audit*) e il DFM. Il costo dei componenti viene quotato solo dopo la revisione.
 
-I file e le impostazioni esatte dell'ordine del 2026-10-04 sono congelati in `manufacturing/pcbway-order-2026-10-04/`.
+I file e le impostazioni esatte dell'ordine del 2026-10-04 sono congelati in `hardware/rev-d/manufacturing/pcbway-order-2026-10-04/`.
 
 ### JLCPCB (alternativa)
 
@@ -604,14 +607,15 @@ Requisiti (versioni usate):
 | Freerouting 2.2.4 + Java 25 | | solo per rifare lo sbroglio da zero |
 
 ```sh
-./build.sh                    # tutto in ./out (PCB riprodotto da build/data/routing.ses + firmware)
-UPDATE_REPO=1 ./build.sh      # come sopra, poi aggiorna kicad/ manufacturing/ previews/ reports/ nel repo
-REROUTE=1 FREEROUTING_JAR=/percorso/freerouting-2.2.4.jar JAVA=/percorso/java ./build.sh   # sbroglio da zero
+./build.sh                    # tutto in ./out: ogni hardware/rev-* (sbroglio riprodotto da build/data/routing.ses) + firmware
+hardware/rev-d/build.sh       # una sola revisione, in hardware/rev-d/out
+UPDATE_REPO=1 hardware/rev-d/build.sh   # come sopra, poi aggiorna kicad/ manufacturing/ previews/ reports/ di quella revisione
+REROUTE=1 FREEROUTING_JAR=/percorso/freerouting-2.2.4.jar JAVA=/percorso/java hardware/rev-d/build.sh   # sbroglio da zero
 SKIP_PCB=1 ./build.sh         # solo firmware del Mega (quello dell'ESP: firmware/tools/esp_compile.sh)
-SKIP_FIRMWARE=1 ./build.sh    # solo PCB
+SKIP_FIRMWARE=1 ./build.sh    # solo PCB (REVS="rev-d" per scegliere le revisioni)
 ```
 
-Come funziona la catena del PCB (`build/scripts/pipeline.sh`):
+Come funziona la catena del PCB (`hardware/<rev>/build/scripts/pipeline.sh`):
 1. Piazza tutti i footprint a partire dalla netlist di riferimento (`build_board.py`).
 2. Scrive le classi di rete e le regole di isolamento (`make_rules.py`).
 3. Pre-sbroglia i percorsi di rete, le piste di alimentazione e le zone vietate (`route_mains.py`).
@@ -622,7 +626,7 @@ Come funziona la catena del PCB (`build/scripts/pipeline.sh`):
 
 La sessione di sbroglio salvata rende la ricostruzione deterministica: una ricostruzione pulita da questo albero produce una geometria identica ai Gerber ordinati. Freerouting invece non è deterministico, quindi rifare lo sbroglio da zero dà un tracciato diverso, ma comunque verificato.
 
-A ogni build KiCad assegna nuovi identificativi interni (`tstamp`) a tutti gli elementi della scheda, quindi in git `kicad/*.kicad_pcb` mostra grandi differenze anche quando non è cambiato nulla. Per giudicare una ricostruzione usa `reports/` (soprattutto `gerber-equivalence-vs-pcbway-order.txt`), non il diff testuale.
+A ogni build KiCad assegna nuovi identificativi interni (`tstamp`) a tutti gli elementi della scheda, quindi in git `hardware/*/kicad/*.kicad_pcb` mostra grandi differenze anche quando non è cambiato nulla. Per giudicare una ricostruzione usa `reports/` della revisione (soprattutto `gerber-equivalence-vs-pcbway-order.txt`), non il diff testuale.
 
 KiCad 8–10 aprono i file di KiCad 7, ma gli script sono scritti per l'API Python di KiCad 7.
 
