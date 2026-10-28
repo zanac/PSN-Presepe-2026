@@ -64,7 +64,7 @@ with open(os.path.join(rel, NAME + "-BOM.csv"), "w", newline="") as f:
         w.writerow([len(refs), " ".join(refs), val, lib, MPN.get(val, "")])
     w.writerow([1, "-", "Arduino Mega 2560 R3 (sits under the board)", "", "not soldered to this PCB"])
     w.writerow([6, "H1-H6", "M3 mounting hole (NPTH 3.2 mm)", "MountingHole_3.2mm_M3", "no part"])
-    w.writerow([4, "TP1-TP4", "test point +12V / +5V / +3V3 / GND (plated pad 2 mm, hole 1 mm)", "TestPoint_THTPad_D2.0mm_Drill1.0mm", "no part"])
+    w.writerow([5, "TP1-TP5", "test points +12V / +5V / +3V3 / GND x2 (plated pad 2 mm, hole 1 mm)", "TestPoint_THTPad_D2.0mm_Drill1.0mm", "no part"])
 
 # 1:1 paper-fit print (A3 landscape, scale 1)
 cli("pcb", "export", "pdf", "-o", os.path.join(rel, NAME + "-1to1-A3-top.pdf"), "--layers",

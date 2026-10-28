@@ -133,6 +133,19 @@ for n, pts in paths.items():
             t.SetStart(pcbnew.VECTOR2I(mm(a[0]), mm(a[1]))); t.SetEnd(pcbnew.VECTOR2I(mm(c[0]), mm(c[1])))
             t.SetWidth(mm(W)); t.SetLayer(layer); t.SetNet(net); t.SetLocked(True); b.Add(t)
     geoms.append(LineString(pts).buffer(W / 2))
+# Rev E: no vias above the Mega USB-B shell (a via there could touch the metal shell;
+# same box as the independent check in verify.py). Tracks are allowed. Saved in the
+# routed board too, so KiCad DRC keeps enforcing it after any later edit.
+mg = b.FindFootprintByReference("MCU1").GetPosition()
+mx, my = mg.x / 1e6, mg.y / 1e6
+z = pcbnew.ZONE(b)
+z.SetIsRuleArea(True); z.SetDoNotAllowTracks(False); z.SetDoNotAllowVias(True)
+z.SetDoNotAllowCopperPour(True); z.SetDoNotAllowPads(False); z.SetDoNotAllowFootprints(False)
+ls = pcbnew.LSET(); ls.AddLayer(pcbnew.F_Cu); ls.AddLayer(pcbnew.B_Cu); z.SetLayerSet(ls)
+ol = z.Outline(); ol.NewOutline()
+for x, y in ((mx - 7.1, my - 44.8), (mx + 16.5, my - 44.8), (mx + 16.5, my - 31.4), (mx - 7.1, my - 31.4)):
+    ol.Append(mm(x), mm(y))
+b.Add(z)
 pcbnew.SaveBoard(dst, b)
 print("MAINS paths:", len(paths), "->", dst)
 
@@ -160,17 +173,5 @@ if keep:
         for x, y in list(pg.exterior.coords)[:-1]:
             ol.Append(mm(x), mm(y))
         b.Add(z)
-    # Rev E: no vias above the Mega USB-B shell (a via there could touch the metal shell;
-    # same box as the independent check in verify.py). Tracks are allowed.
-    mg = b.FindFootprintByReference("MCU1").GetPosition()
-    mx, my = mg.x / 1e6, mg.y / 1e6
-    z = pcbnew.ZONE(b)
-    z.SetIsRuleArea(True); z.SetDoNotAllowTracks(False); z.SetDoNotAllowVias(True)
-    z.SetDoNotAllowCopperPour(True); z.SetDoNotAllowPads(False); z.SetDoNotAllowFootprints(False)
-    ls = pcbnew.LSET(); ls.AddLayer(pcbnew.F_Cu); ls.AddLayer(pcbnew.B_Cu); z.SetLayerSet(ls)
-    ol = z.Outline(); ol.NewOutline()
-    for x, y in ((mx - 7.1, my - 44.8), (mx + 16.5, my - 44.8), (mx + 16.5, my - 31.4), (mx - 7.1, my - 31.4)):
-        ol.Append(mm(x), mm(y))
-    b.Add(z)
     pcbnew.SaveBoard(keep, b)
-    print("keep-out areas:", len(polys), "+ USB no-via area ->", keep)
+    print("keep-out areas:", len(polys), "(+ USB no-via area) ->", keep)

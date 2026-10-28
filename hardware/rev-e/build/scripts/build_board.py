@@ -8,7 +8,8 @@ Rev E = Rev D plus the fixes and additions listed below (section "Rev E"):
   * minimum copper clearance 0.22 mm (Rev D: 0.20 mm rule, 0.202 mm measured;
     PCBWay asks for 8 mil = 0.2032 mm with 2 oz copper) - see make_rules.py
   * status LED D1 (green, 3 mm) with RLED on Mega D13
-  * test points TP1..TP4: +12V, +5V, +3V3, GND (bare plated pads for the meter probes)
+  * test points TP1..TP5: +12V, GND, +5V, GND, +3V3 (bare plated pads for the meter probes;
+    a GND pad between every two rails)
 
 History of Rev D (kept from the Rev D generator):
 
@@ -96,8 +97,10 @@ assert "D13" not in NET["MCU1"]
 NET["MCU1"]["D13"] = "D13_LED"
 NET["RLED"] = {"1": "D13_LED", "2": "LED_A"}
 NET["D1"] = {"1": "GND", "2": "LED_A"}                  # LED_D3.0mm: pad 1 = cathode (K), pad 2 = anode (A)
-NET["TP1"] = {"1": "+12V"}; NET["TP2"] = {"1": "+5V_MEGA"}; NET["TP3"] = {"1": "+3V3"}; NET["TP4"] = {"1": "GND"}
-VAL.update({"RLED": "1k", "D1": "LED_GREEN_3MM", "TP1": "TP_12V", "TP2": "TP_5V", "TP3": "TP_3V3", "TP4": "TP_GND"})
+NET["TP1"] = {"1": "+12V"}; NET["TP2"] = {"1": "+5V_MEGA"}; NET["TP3"] = {"1": "+3V3"}
+NET["TP4"] = {"1": "GND"}; NET["TP5"] = {"1": "GND"}
+VAL.update({"RLED": "1k", "D1": "LED_GREEN_3MM", "TP1": "TP_12V", "TP2": "TP_5V", "TP3": "TP_3V3",
+            "TP4": "TP_GND", "TP5": "TP_GND"})
 
 # ---------------------------------------------------------------- footprints
 LIB = {
@@ -174,8 +177,11 @@ PLACE.update({
     "C6": (84.0, 23.5, 0),
     "RSD1": (84.0, 26.0, 0), "RSD2": (84.0, 28.5, 0), "RSD3": (84.0, 31.0, 0), "RSD4": (84.0, 33.5, 0),
     # Rev E: test points (top-left, between H1 and the microSD block) and the status LED
-    "TP1": (31.5, 33.5, 0), "TP2": (36.5, 33.5, 0), "TP3": (41.5, 33.5, 0), "TP4": (46.5, 33.5, 0),
-    "D1": (52.5, 29.0, 0), "RLED": (60.0, 29.0, 0),
+    # order 12V, GND, 5V, GND, 3V3: a slipping probe can only short a rail to GND, never
+    # +12V onto +5V or +5V onto +3V3
+    "TP1": (31.5, 33.5, 0), "TP4": (36.5, 33.5, 0), "TP2": (41.5, 33.5, 0), "TP5": (46.5, 33.5, 0),
+    "TP3": (51.5, 33.5, 0),
+    "D1": (56.5, 29.0, 0), "RLED": (63.5, 29.0, 0),
 })
 NEW_PARTS = {}
 # MOSFET block: 3 x 3 cells, each = RG (top) + RPD (bottom) left of the TO-220
@@ -314,9 +320,9 @@ for i in range(1, 17):
 text("!  RELAY CONTACTS MAY CARRY 230 V AC  -  SELV KEEP-OUT 6 mm  !", 222, 160, 1.2)
 text("PSN-Presepe Rev E", 222, 145, 2.0)
 text("microSD", 95, 39.2, 0.9)
-for _r, _s in (("TP1", "12V"), ("TP2", "5V"), ("TP3", "3V3"), ("TP4", "GND")):   # Rev E test points
+for _r, _s in (("TP1", "12V"), ("TP4", "GND"), ("TP2", "5V"), ("TP5", "GND"), ("TP3", "3V3")):   # Rev E test points
     _x, _y = padpos(_r, "1"); text(_s, _x, _y - 2.6, 0.8)
-text("TEST POINTS", 39.0, 36.6, 0.8)
+text("TEST POINTS", 41.5, 36.6, 0.8)
 _x, _y = padpos("D1", "2"); text("LED D13", _x - 1.27, _y + 2.9, 0.8)
 text("MOSFET / HEATSINK AIRFLOW ZONE", 85.5, 127.6, 0.9)
 

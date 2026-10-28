@@ -57,7 +57,8 @@ def req(a, b):
     if (ca == "MAINS") != (cb == "MAINS"): return 6.0
     if ca == cb == "MAINS":
         return 2.0 if a.split("_")[0] == b.split("_")[0] else 5.0
-    return 0.3 if "POWER" in (ca, cb) or "RGB" in (ca, cb) else 0.22   # Rev E: >= 8 mil (0.2032 mm)
+    if "POWER" in (ca, cb) or "RGB" in (ca, cb): return 0.3
+    return 0.25 if "P5V" in (ca, cb) else 0.22   # Rev E: >= 8 mil (0.2032 mm)
 
 # ---------------------------------------------------------------- outline
 edge = GerberFile.open(f"{gd}/{base}-Edge_Cuts.gm1")

@@ -81,7 +81,7 @@ c.drawImage(ImageReader(im), 30, H - 60 - h, w, h); c.showPage()
 c.setFont("Helvetica-Bold", 22); c.drawString(40, H - 50, "PSN-Presepe Rev E - Assembly instructions")
 L = [
     f"1. Turnkey assembly, all parts per BOM ({N}-BOM-PCBWay.csv). Centroid: {N}-Centroid-PCBWay.csv.",
-    "2. TOP side: all SMD parts (13) and all through-hole parts except MCU1.",
+    f"2. TOP side: all SMD parts ({sum(1 for f in b.GetFootprints() if f.GetAttributes() & pcbnew.FP_SMD)}) and all through-hole parts except MCU1.",
     "3. MCU1 = Arduino Mega 2560 R3 shield male pin headers (2.54 mm): 1x10, 5x 1x8, 1x 2x18 = 86 pins (red on page 1).",
     "   MOUNT ON THE BOTTOM SIDE: plastic body under the board, long pins pointing DOWN (they plug into an Arduino Mega).",
     "   Solder on the TOP side. Pins must be straight and perpendicular: use an Arduino Mega board as alignment jig.",
@@ -92,7 +92,7 @@ L = [
     "6. J_SD (Hirose DM3AT-SF-PEJM5 microSD push-push): card opening faces the top board edge.",
     "7. Screw terminals (Phoenix MKDS 1,5 5.08 mm): wire entry faces the nearest board edge.",
     "8. Relay contacts may carry 230 VAC: do NOT add wires, jumpers, vias or copper. Clean flux residues, especially in the relay area.",
-    "9. Mounting holes H1-H6 and tooling holes TH1-TH3 are NPTH: leave empty. Test points TP1-TP4: bare pads, no part.",
+    "9. Mounting holes H1-H6 and tooling holes TH1-TH3 are NPTH: leave empty. Test points TP1-TP5: bare pads, no part.",
     "10. No IC programming required.",
     "11. Please send photos of the first assembled board (top and bottom) before shipping.",
 ]

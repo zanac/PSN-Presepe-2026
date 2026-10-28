@@ -1,1 +1,1 @@
-schematic pins 372, pcb pads 372, net mismatches 0, footprint mismatches 0
+schematic pins 373, pcb pads 373, net mismatches 0, footprint mismatches 0

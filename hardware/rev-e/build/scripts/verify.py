@@ -224,7 +224,7 @@ for k, n in (("RSD1", "SD_CS"), ("RSD2", "D50_SD_MISO"), ("RSD3", "SD_DAT1"), ("
 # Rev E: status LED on D13 through a resistor, LED cathode to GND; test points on the rails
 want["MCU1"]["D13"] = "D13_LED"
 want["RLED"] = {"1": "D13_LED", "2": "LED_A"}; want["D1"] = {"1": "GND", "2": "LED_A"}   # LED: 1 = K, 2 = A
-for k, n in (("TP1", "+12V"), ("TP2", "+5V_MEGA"), ("TP3", "+3V3"), ("TP4", "GND")):
+for k, n in (("TP1", "+12V"), ("TP2", "+5V_MEGA"), ("TP3", "+3V3"), ("TP4", "GND"), ("TP5", "GND")):
     want[k] = {"1": n}
 have = collections.defaultdict(dict)
 for p in pads:
@@ -318,6 +318,10 @@ sq = {p["num"]: abs(p["size"][0] - p["size"][1]) < 1e-6 and p["geom"].area > 0.9
 c1pos = pad_xy("C1")
 check(have["C1"]["1"] == "+12V" and sq.get("1") and not sq.get("2") and abs(math.dist(c1pos["1"], c1pos["2"]) - 5.0) < 0.01,
       "C1: polarised footprint, square pad 1 = +12V, round pad 2 = GND, 5.0 mm pitch")
+# test points in a row, ordered so that neighbours are always a rail and GND
+tps = sorted((pad_xy(f"TP{i}")["1"][0], have[f"TP{i}"]["1"]) for i in range(1, 6))
+check([n for _, n in tps] == ["+12V", "GND", "+5V_MEGA", "GND", "+3V3"],
+      f"test points left to right 12V/GND/5V/GND/3V3 ({[n for _, n in tps]})")
 d1 = pad_xy("D1")
 check(abs(math.dist(d1["1"], d1["2"]) - 2.54) < 0.01 and have["D1"]["1"] == "GND",
       "D1: 3 mm LED, 2.54 mm pitch, pad 1 (cathode, flat side) to GND")

@@ -1,25 +1,25 @@
 PASS no copper shorts (0 found)
 PASS all clearances met (0 violations)
-INFO min clearance    COIL <-> COIL        :  0.228 mm (required 0.22 mm)
-INFO min clearance    COIL <-> Default     :  0.260 mm (required 0.22 mm)
-INFO min clearance    COIL <-> MAINS       :  6.338 mm (required 6.0 mm)
+INFO min clearance    COIL <-> COIL        :  0.222 mm (required 0.22 mm)
+INFO min clearance    COIL <-> Default     :  0.222 mm (required 0.22 mm)
+INFO min clearance    COIL <-> MAINS       :  9.251 mm (required 6.0 mm)
 INFO min clearance    COIL <-> POWER       :  0.302 mm (required 0.3 mm)
-INFO min clearance    COIL <-> RGB         :  8.421 mm (required 0.3 mm)
+INFO min clearance    COIL <-> RGB         :  8.970 mm (required 0.3 mm)
 INFO min clearance Default <-> Default     :  0.222 mm (required 0.22 mm)
-INFO min clearance Default <-> MAINS       :  8.023 mm (required 6.0 mm)
-INFO min clearance Default <-> P3V3        :  0.223 mm (required 0.22 mm)
+INFO min clearance Default <-> MAINS       :  6.640 mm (required 6.0 mm)
+INFO min clearance Default <-> P3V3        :  0.222 mm (required 0.22 mm)
 INFO min clearance Default <-> P5V         :  0.252 mm (required 0.25 mm)
 INFO min clearance Default <-> POWER       :  0.302 mm (required 0.3 mm)
 INFO min clearance Default <-> RGB         :  0.302 mm (required 0.3 mm)
 INFO min clearance   MAINS <-> MAINS-inter :  5.230 mm (required 5.0 mm)
 INFO min clearance   MAINS <-> MAINS-intra :  2.150 mm (required 2.0 mm)
 INFO min clearance   MAINS <-> P5V         :  6.750 mm (required 6.0 mm)
-INFO min clearance   MAINS <-> POWER       :  6.674 mm (required 6.0 mm)
-INFO min clearance    P3V3 <-> P5V         :  3.000 mm (required 0.25 mm)
-INFO min clearance    P3V3 <-> POWER       :  0.303 mm (required 0.3 mm)
+INFO min clearance   MAINS <-> POWER       :  8.054 mm (required 6.0 mm)
+INFO min clearance    P3V3 <-> P5V         :  8.752 mm (required 0.25 mm)
+INFO min clearance    P3V3 <-> POWER       :  0.302 mm (required 0.3 mm)
 INFO min clearance     P5V <-> POWER       :  0.302 mm (required 0.3 mm)
-INFO min clearance     P5V <-> RGB         :  3.330 mm (required 0.3 mm)
-INFO min clearance   POWER <-> POWER       :  0.306 mm (required 0.3 mm)
+INFO min clearance     P5V <-> RGB         :  3.286 mm (required 0.3 mm)
+INFO min clearance   POWER <-> POWER       :  0.302 mm (required 0.3 mm)
 INFO min clearance   POWER <-> RGB         :  0.302 mm (required 0.3 mm)
 INFO min clearance     RGB <-> RGB         :  0.302 mm (required 0.3 mm)
 PASS minimum copper spacing 0.222 mm >= 8 mil (0.2032 mm)
@@ -28,15 +28,15 @@ PASS every net is one connected copper island (133 nets checked; split: {})
 PASS copper-to-edge >= 0.5 mm (MAINS >= 3.0 mm) (0 violations)
 INFO board outline 300.0 x 180.0 mm
 PASS track widths meet net-class minimum (0 too narrow)
-INFO widths COIL     {0.4: 49}
-INFO widths Default  {0.25: 537}
+INFO widths COIL     {0.4: 68}
+INFO widths Default  {0.25: 621}
 INFO widths MAINS    {2: 208}
-INFO widths P3V3     {0.4: 34}
-INFO widths P5V      {0.8: 27}
-INFO widths POWER    {0.5: 7, 0.601: 2, 1: 213, 1.5: 9, 3: 25}
-INFO widths RGB      {1.5: 59}
+INFO widths P3V3     {0.4: 32}
+INFO widths P5V      {0.8: 31}
+INFO widths POWER    {0.5: 7, 0.601: 6, 1: 242, 1.5: 9, 3: 29}
+INFO widths RGB      {1.5: 58}
 PASS all 48 relay-contact nets routed on both copper layers at 2 mm
-PASS 3 mm +12V/GND trunks present (25 segments)
+PASS 3 mm +12V/GND trunks present (29 segments)
 PASS no vias on MAINS nets
 PASS pad-net map == Rev B netlist + documented Rev D and Rev E changes (0 differences)
 PASS K1/JR1: coil 1=+12V 5=COIL_LOW, 2=COM 3=NO 4=NC; terminal 1=COM 2=NO 3=NC
@@ -76,10 +76,11 @@ PASS J_POT terminal carries 5V / A0 / GND (on-board pot removed)
 PASS status LED: firmware LED_STATO = 13 and Mega D13 -> RLED -> D1 anode
 PASS BZ1: pin pitch 6.50 mm = 6.5 mm (Same Sky CEM-1203(42) datasheet)
 PASS C1: polarised footprint, square pad 1 = +12V, round pad 2 = GND, 5.0 mm pitch
+PASS test points left to right 12V/GND/5V/GND/3V3 (['+12V', 'GND', '+5V_MEGA', 'GND', '+3V3'])
 PASS D1: 3 mm LED, 2.54 mm pitch, pad 1 (cathode, flat side) to GND
 PASS no through-hole component courtyard over the Arduino Mega body ([])
 PASS no vias above the Mega USB-B shell ([])
-INFO courtyard bounding-box overlaps (coarse): [('MCU1', 'J_SD')]
+INFO courtyard bounding-box overlaps (coarse): [('J_SD', 'MCU1')]
 
 
 RESULT: ALL CHECKS PASSED

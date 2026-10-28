@@ -127,8 +127,8 @@ La Rev E mantiene contorno, morsetti, posizione dei componenti e pin della Rev D
 | C1 su impronta **polarizzata** (`CP_Radial_D10.0mm_P5.00mm`: piazzola + quadrata, "+" in serigrafia) | la Rev D aveva due piazzole tonde uguali |
 | Distanza minima tra le piste **0,22 mm** (regola Rev D 0,20 mm, misurata 0,202 mm) | PCBWay chiede 8 mil (0,2032 mm) con rame da 2 oz |
 | **LED di stato** D1 (verde, 3 mm) con RLED 1 kΩ (0805) sul pin D13 della Mega, in alto a sinistra accanto alla microSD | mostra a colpo d'occhio se la centralina è in marcia, in pausa, in TEST o in STOP (vedi [Funzionamento](#funzionamento)) |
-| **Punti di misura** TP1–TP4: +12V, +5V, +3V3, GND (piazzole metallizzate da 2 mm, nessun componente) | misurare le alimentazioni con il tester senza cercare un piedino |
-| Nessuna via sopra la presa USB-B della Mega (area vietata per il router) | sulla Rev D era solo controllato dopo |
+| **Punti di misura** TP1–TP5 in fila: +12V, GND, +5V, GND, +3V3 (piazzole metallizzate da 2 mm, nessun componente) | misurare le alimentazioni con il tester senza cercare un piedino; se il puntale scivola può solo cortocircuitare un'alimentazione con GND, mai i 12 V sui 5 V |
+| Nessuna via sopra la presa USB-B della Mega (area vietata nella scheda, usata dal router e dal DRC di KiCad) | sulla Rev D era solo controllato dopo |
 
 Lo sbroglio è nuovo (Freerouting) ed è salvato in `hardware/rev-e/build/data/routing.ses`, così la ricostruzione è riproducibile. Prima di ordinare, stampa il PDF 1:1 e verifica sopra buzzer, C1 e LED veri ([Prima di ordinare una nuova revisione](#prima-di-ordinare-una-nuova-revisione)).
 
@@ -690,7 +690,7 @@ KiCad 8–10 aprono i file di KiCad 7, ma gli script sono scritti per l'API Pyth
 | B | Shield per Arduino Mega con relè, MOSFET e morsetti (versione precedente del repository). |
 | C | Correzioni per la produzione: pin NO/NC del G5Q-1 corretti, footprint DIP-18 dell'ULN2803A, resistenza in serie al buzzer, isolamenti 6 / 5 / 2 mm, piste di alimentazione da 3 mm, fori di attrezzaggio JLCPCB, suite di verifica completa. |
 | D | microSD push-push con regolatore 3,3 V e traslatore di livello; il firmware legge `PRESEPE.INI` all'avvio (con valori di default incorporati); potenziometro di bordo sostituito dal morsetto J_POT; catena CASETTE gestita nel ciclo; file per il montaggio chiavi in mano PCBWay. |
-| E | (in progettazione, non ordinata) BZ1 a passo 6,5 mm, C1 polarizzato, distanza minima 0,22 mm, LED di stato su D13, punti di misura per +12V / +5V / +3V3 / GND, nessuna via sopra la presa USB della Mega; sbroglio nuovo. Stessi contorno, morsetti e firmware della Rev D. |
+| E | (in progettazione, non ordinata) BZ1 a passo 6,5 mm, C1 polarizzato, distanza minima 0,22 mm, LED di stato su D13, punti di misura per +12V / GND / +5V / GND / +3V3, nessuna via sopra la presa USB della Mega; sbroglio nuovo. Stessi contorno, morsetti e firmware della Rev D. |
 
 ---
 

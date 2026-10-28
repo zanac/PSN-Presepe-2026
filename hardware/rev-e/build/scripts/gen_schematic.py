@@ -61,7 +61,8 @@ for ref, val, fpid, pins in parts:
         # schematic Y axis points down: label at (x - 7.62, y - py)
         labels.append(f'  (global_label "{pins[n]}" (shape bidirectional) (at {x - 7.62:.2f} {y - py:.2f} 180) (fields_autoplaced) (effects (font (size 1 1)) (justify right)) (uuid {U()}) (property "Intersheetrefs" "${{INTERSHEET_REFS}}" (at 0 0 0) (effects (font (size 1.27 1.27)) hide)))')
     hh = top + G
-    lib.append(f'''    (symbol "PSN:{ref}" (pin_names (offset 0)) (in_bom yes) (on_board yes)
+    bom = "no" if ref.startswith("TP") else "yes"          # test points: bare pads, no part
+    lib.append(f'''    (symbol "PSN:{ref}" (pin_names (offset 0)) (in_bom {bom}) (on_board yes)
       (property "Reference" "{re.sub(r'[0-9]', '', ref)}" (at 0 {hh + 1.5:.2f} 0) (effects (font (size 1.27 1.27))))
       (property "Value" "{val}" (at 0 {-hh - 1.5:.2f} 0) (effects (font (size 1.27 1.27))))
       (property "Footprint" "{fpid}" (at 0 0 0) (effects (font (size 1.27 1.27)) hide))
@@ -73,7 +74,7 @@ for ref, val, fpid, pins in parts:
       )
     )''')
     pinu = "\n".join(f'    (pin "{n}" (uuid {U()}))' for n in nums)
-    inst.append(f'''  (symbol (lib_id "PSN:{ref}") (at {x:.2f} {y:.2f} 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid {U()})
+    inst.append(f'''  (symbol (lib_id "PSN:{ref}") (at {x:.2f} {y:.2f} 0) (unit 1) (in_bom {"no" if ref.startswith("TP") else "yes"}) (on_board yes) (dnp no) (uuid {U()})
     (property "Reference" "{ref}" (at {x:.2f} {y - hh - 1.5:.2f} 0) (effects (font (size 1.27 1.27))))
     (property "Value" "{val}" (at {x:.2f} {y + hh + 1.5:.2f} 0) (effects (font (size 1 1))))
     (property "Footprint" "{fpid}" (at {x:.2f} {y:.2f} 0) (effects (font (size 1.27 1.27)) hide))

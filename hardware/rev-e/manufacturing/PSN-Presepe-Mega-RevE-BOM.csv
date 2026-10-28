@@ -23,4 +23,4 @@ Qty,References,Value / part,Footprint,Notes
 1,U4,74LVC125A,SOIC-14_3.9x8.7mm_P1.27mm,"Nexperia 74LVC125AD,118 (SOIC-14)"
 1,-,Arduino Mega 2560 R3 (sits under the board),,not soldered to this PCB
 6,H1-H6,M3 mounting hole (NPTH 3.2 mm),MountingHole_3.2mm_M3,no part
-4,TP1-TP4,"test point +12V / +5V / +3V3 / GND (plated pad 2 mm, hole 1 mm)",TestPoint_THTPad_D2.0mm_Drill1.0mm,no part
+5,TP1-TP5,"test points +12V / +5V / +3V3 / GND x2 (plated pad 2 mm, hole 1 mm)",TestPoint_THTPad_D2.0mm_Drill1.0mm,no part

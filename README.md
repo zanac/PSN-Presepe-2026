@@ -127,8 +127,8 @@ Rev E keeps the Rev D board outline, connectors, placement and pin map, so the s
 | C1 on a **polarised** footprint (`CP_Radial_D10.0mm_P5.00mm`: square + pad, "+" on the silkscreen) | Rev D had two identical round pads |
 | Minimum copper clearance **0.22 mm** (Rev D rule 0.20 mm, 0.202 mm measured) | PCBWay asks for 8 mil (0.2032 mm) with 2 oz copper |
 | **Status LED** D1 (green, 3 mm) with RLED 1 kΩ (0805) on Mega D13, top-left next to the microSD | shows at a glance whether the controller runs, is paused, in TEST or STOP (see [Operation](#operation)) |
-| **Test points** TP1–TP4: +12V, +5V, +3V3, GND (plated 2 mm pads, no part) | measure the supplies with a meter without looking for a pin |
-| No vias above the Mega USB-B socket (rule area in the router) | was only checked afterwards on Rev D |
+| **Test points** TP1–TP5 in a row: +12V, GND, +5V, GND, +3V3 (plated 2 mm pads, no part) | measure the supplies with a meter without looking for a pin; a slipping probe can only short a rail to GND, never 12 V onto 5 V |
+| No vias above the Mega USB-B socket (rule area in the board, used by the router and by KiCad DRC) | was only checked afterwards on Rev D |
 
 The routing is new (Freerouting), stored in `hardware/rev-e/build/data/routing.ses` so that the build is reproducible. Before ordering, print the 1:1 PDF and check the real buzzer, C1 and LED on it ([Before ordering a new revision](#before-ordering-a-new-revision)).
 
@@ -690,7 +690,7 @@ KiCad 8–10 open the KiCad 7 files, but the scripts were written for the KiCad 
 | B | Arduino Mega shield with relays, MOSFETs and terminals (previous repository version). |
 | C | Production fixes: G5Q-1 NO/NC pins corrected, ULN2803A DIP-18 footprint, buzzer series resistor, 6 / 5 / 2 mm isolation, 3 mm power trunks, JLCPCB tooling holes, complete verification suite. |
 | D | Push-push microSD with 3.3 V LDO and level shifter; firmware reads `PRESEPE.INI` at boot (with built-in defaults); on-board potentiometer replaced by terminal J_POT; CASETTE chain driven in the cycle; turnkey-assembly files for PCBWay. |
-| E | (in design, not ordered) BZ1 6.5 mm pitch, polarised C1, 0.22 mm minimum clearance, status LED on D13, test points for +12V / +5V / +3V3 / GND, no vias above the Mega USB socket; new routing. Same outline, connectors and firmware as Rev D. |
+| E | (in design, not ordered) BZ1 6.5 mm pitch, polarised C1, 0.22 mm minimum clearance, status LED on D13, test points for +12V / GND / +5V / GND / +3V3, no vias above the Mega USB socket; new routing. Same outline, connectors and firmware as Rev D. |
 
 ---
 
