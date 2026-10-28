@@ -100,13 +100,78 @@ canvas#tl { width: 100%; height: 150px; display: block; border-radius: 6px; curs
 .device { border-color: var(--accent); }
 a.btnlink { font-size: 14px; color: var(--accent); padding: 7px 4px; text-decoration: underline; text-underline-offset: 3px; }
 button:disabled { opacity: .55; cursor: wait; }
+/* regia: editor grafico delle fasi */
+.vtabs { display: inline-flex; align-self: flex-start; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.vtabs button { border: 0; border-radius: 0; padding: 6px 16px; }
+.vtabs button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.rtabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.rtabs button { font-family: var(--f-display); font-weight: 600; letter-spacing: .06em; font-size: .9rem; padding: 6px 10px; }
+.rtabs button.on { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.rbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.switch { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; padding: 6px 10px; border: 1px solid var(--line); border-radius: 7px; }
+.switch:has(input:checked) { border-color: var(--ok); color: var(--ok); background: var(--ok-bg); font-weight: 600; }
+.switch input { accent-color: var(--ok); margin: 0; }
+.rpos { font-family: var(--f-mono); font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.2em; }
+.lanes { display: flex; flex-direction: column; gap: 10px; background: var(--stage); color: var(--stage-ink); border-radius: 10px; padding: 10px 12px 12px; }
+.lane, .ruler { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 10px; align-items: center; }
+.ruler div { display: flex; justify-content: space-between; font-family: var(--f-mono); font-size: 10.5px; color: #8790a6; }
+.lhead { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.lhead > span { font-family: var(--f-display); font-weight: 600; text-transform: uppercase; letter-spacing: .07em; font-size: .9rem; }
+.lhead small { font-size: 11.5px; color: #8790a6; line-height: 1.2; }
+.lhead .add { align-self: flex-start; font-size: 12px; padding: 2px 8px; background: transparent; color: #f3d7a8; border-color: #4a4130; }
+.lhead .add:hover { border-color: #f3d7a8; }
+.track { position: relative; height: 36px; border-radius: 6px; border: 1px solid var(--stage-line); touch-action: none; cursor: crosshair; background: #000; }
+.track.rel { height: 32px; background: #0d1018; }
+.track .grad { position: absolute; inset: 0; border-radius: 5px; }
+.track .ph { position: absolute; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; background: #f3d7a8; pointer-events: none; box-shadow: 0 0 6px #f3d7a8; }
+.dot { position: absolute; top: 50%; width: 24px; height: 24px; margin: -12px 0 0 -12px; padding: 0; min-width: 0; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.7), 0 1px 4px rgba(0,0,0,.8); cursor: grab; z-index: 1; }
+.dot:active { cursor: grabbing; }
+.dot.lin { border-radius: 5px; }
+.dot.pred { border-style: dashed; }
+.dot.sel { border-color: var(--accent); border-width: 3px; box-shadow: 0 0 0 2px #000, 0 0 0 4px var(--accent); z-index: 3; }
+.dot.r { width: 26px; height: 22px; margin: -11px 0 0 -13px; border-radius: 5px; background: #3fbf7f; color: #04140b; font: 600 11px var(--f-mono); border-color: #c9f2dc; }
+.dot.r.off { background: #2a3040; color: #c9d0e0; border-color: #7d869b; }
+.dot.r.sel { border-color: var(--accent); }
+.ed { border: 1px solid var(--accent); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 12px; background: var(--code-bg); }
+.edhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.edhead b { font-family: var(--f-display); font-size: 1.15rem; letter-spacing: .02em; }
+.edhead .note { flex: 1 1 160px; }
+.edhead button { margin-left: auto; padding: 4px 10px; }
+.edcol { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 12px; align-items: center; }
+.sw { height: 88px; border-radius: 8px; border: 1px solid var(--line); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.chs { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ch { display: grid; grid-template-columns: 14px minmax(0, 1fr) 62px; gap: 8px; align-items: center; font: 600 12.5px var(--f-mono); }
+.ed input[type=range] { width: 100%; min-width: 0; accent-color: var(--accent); margin: 0; }
+.ed input[type=number], .ed input[type=text], .ed select { font-family: var(--f-mono); font-size: 13px; padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); width: 100%; min-width: 0; }
+.ed input[type=color] { width: 44px; height: 30px; padding: 0 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); vertical-align: middle; }
+.lbl { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 8px; }
+.lbl.full { display: flex; }
+.lbl.full input { flex: 1; }
+.rowp { display: grid; grid-template-columns: auto 34px minmax(0, 1fr) 70px 34px; gap: 8px; align-items: center; }
+.rowp button { padding: 5px 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; gap: 6px; align-items: center; padding: 4px 9px 4px 5px; font-size: 12.5px; }
+.chip i { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--line); display: inline-block; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 6px 12px; }
+.seg button.on { background: var(--ink); color: var(--panel); font-weight: 600; }
+button.danger { color: var(--err); border-color: var(--err); }
+.rlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow: auto; }
+.rlist button { width: 100%; display: grid; grid-template-columns: 54px 70px 20px minmax(0, 1fr); gap: 8px; align-items: center; text-align: left; padding: 6px 8px; font-size: 13.5px; }
+.rlist button.sel { border-color: var(--accent); background: var(--code-bg); }
+.rlist .pc { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.rlist .vv { font-family: var(--f-mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.rlist .empty { font-size: 13px; color: var(--muted); padding: 6px 2px; }
+.sq { width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--line); }
+.sq.r { background: #2a3040; } .sq.r.on { background: #3fbf7f; }
+@media (max-width: 520px) { .lane, .ruler { grid-template-columns: 82px minmax(0, 1fr); } .rlist button { grid-template-columns: 46px 62px 18px minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
 </style>
 
 <div class="wrap">
   <header>
     <h1>Simulatore <span>PRESEPE.INI</span></h1>
-    <p class="sub">Incolla o modifica il file: il palco mostra le strisce CIELO, TRAMONTO e ALBA lungo il ciclo, con stelle, casette e relè. Stesse regole del firmware (release 039).</p>
+    <p class="sub">Modifica il file dal Grafico (fase per fase, con i colori) o dal Testo: il palco mostra le strisce CIELO, TRAMONTO e ALBA lungo il ciclo, con stelle, casette e relè. Stesse regole del firmware (release 039).</p>
   </header>
 
   <section class="card device" id="device" hidden aria-label="Presepe collegato">
@@ -125,10 +190,30 @@ button:disabled { opacity: .55; cursor: wait; }
   <div class="grid">
     <section class="card" aria-label="File INI">
       <h2>File INI</h2>
+      <div class="vtabs" role="tablist" aria-label="Vista del file">
+        <button type="button" id="vGrafico" role="tab">Grafico</button><button type="button" id="vTesto" role="tab">Testo</button>
+      </div>
+      <div id="regia" class="card" style="border:0;padding:0" hidden>
+        <div class="rtabs" id="rFasi" role="tablist" aria-label="Fase da modificare"></div>
+        <div class="rbar">
+          <label class="switch" id="rLiveBox"><input type="checkbox" id="rLive"> Dal vivo sulle strisce</label>
+          <button type="button" class="primary" id="rProva">▶ Prova la fase</button>
+          <select id="rVel" aria-label="Durata della prova"><option value="10">in 10 s</option><option value="30" selected>in 30 s</option><option value="60">in 1 min</option><option value="reale">durata reale</option></select>
+          <button type="button" id="rUndo" disabled>Annulla</button>
+        </div>
+        <div class="rpos" id="rPos"></div>
+        <div id="rMsg" class="status" role="status" hidden></div>
+        <div class="lanes" id="rLanes"></div>
+        <div class="ed" id="rEd" hidden></div>
+        <ol class="rlist" id="rList" aria-label="Cambiamenti della fase"></ol>
+        <p class="note">Tocca o trascina una corsia per spostare l'anteprima. Trascina un pallino per cambiarne il %, toccalo per modificarlo (colore, curva, nota). Pallini tratteggiati: valori predefiniti del firmware, entrano nel file appena li cambi. Ogni modifica aggiorna subito il testo del file.</p>
+      </div>
+      <div id="vTestoBox" class="card" style="border:0;padding:0">
       <textarea id="ini" spellcheck="false" aria-label="Contenuto di PRESEPE.INI"></textarea>
       <div class="row">
         <button id="reset" type="button">Ripristina il file predefinito</button>
         <button id="copy" type="button">Copia il file</button>
+      </div>
       </div>
       <div id="status" class="status ok" role="status"></div>
       <ul id="errors" class="errlist"></ul>
@@ -798,7 +883,7 @@ function rebuild() {
   } else {
     st.className = "status ok"; st.textContent = `File letto senza errori. Tappe cielo / tramonto / alba: ${nt}; eventi relè: ${cfg.eventi.length}.`;
   }
-  fillSpeed(); drawTimeline(); render();
+  fillSpeed(); drawTimeline(); render(); disegnaRegia();
 }
 
 function drawTimeline() {
@@ -855,7 +940,11 @@ drawTimeline = function () { saved = null; cursorX = -1; origDraw(); };
 
 function tick(now) {
   const dt = (now - last) / 1000; last = now;
-  if (playing) { p = (p + dt / durata * 100) % 100; render(); }
+  if (prova) {
+    const x = (now - prova.t0) / prova.dur * 100;
+    vaiA(posizione(cfg, prova.fase, Math.min(x, 100)));
+    if (x >= 100) fermaProva();
+  } else if (playing) { p = (p + dt / durata * 100) % 100; render(); playhead(); }
   requestAnimationFrame(tick);
 }
 
@@ -946,6 +1035,408 @@ if (DEVICE) {
   $("dRestore").addEventListener("click", dRestore);
   dLoad();
 }
+
+// ---------------------------------------------------------------- regia: editor grafico delle fasi
+// Mostra le righe cielo / tramonto / alba / rele della fase scelta come pallini su quattro
+// corsie. Ogni modifica riscrive solo le righe di quella chiave in quella sezione del file
+// (commenti e resto del file restano com'erano), poi il file viene riletto come sempre.
+// "Dal vivo" (solo sul presepe): le strisce e i relè veri seguono l'anteprima con i comandi
+// di test S e R; spegnendolo il presepe esce dal test (X) e torna al ciclo.
+const LANE = [{ k: "tramonto", s: 1, n: "Tramonto" }, { k: "cielo", s: 0, n: "Cielo" }, { k: "alba", s: 2, n: "Alba" }, { k: "rele", n: "Relè" }];
+const PRESET = [["Spento", [0, 0, 0]], ["Tenue", [16, 16, 16]], ["Caldo", [210, 82, 18]], ["Arancio", [155, 92, 16]],
+  ["Quasi bianco", [246, 220, 208]], ["Bianco", [255, 255, 255]], ["Rosa", [200, 60, 70]], ["Blu notte", [0, 8, 40]]];
+let rFase = 0, sel = null, vista = store.get("presepe-vista") === "testo" ? "testo" : "grafico";
+const fmtP = v => String(Math.round(v * 100) / 100);
+const righe = () => ta.value.split(/\r?\n/);
+const EOL = () => ta.value.includes("\r\n") ? "\r\n" : "\n";
+function spezza(l) { const j = l.search(/[;#]/); return j < 0 ? { cod: l, nota: "" } : { cod: l.slice(0, j), nota: l.slice(j + 1).trim() }; }
+function sezione(L, fase) {
+  let h = -1, e = L.length;
+  for (let i = 0; i < L.length; i++) {
+    const s = spezza(L[i]).cod.trim(); if (s[0] !== "[") continue;
+    if (h >= 0) { e = i; break; }
+    const m = /^\[([^\]]*)\]$/.exec(s); if (m && ci(m[1].trim(), FASI[fase])) h = i;
+  }
+  return { h, e };
+}
+// righe valide della fase, con il commento e il numero di riga (le righe con errori restano dove sono)
+function voci(fase) {
+  const L = righe(), { h, e } = sezione(L, fase), out = { cielo: [], tramonto: [], alba: [], rele: [] };
+  if (h < 0) return out;
+  for (let i = h + 1; i < e; i++) {
+    const { cod, nota } = spezza(L[i]), eq = cod.indexOf("="); if (eq < 0) continue;
+    const k = cod.slice(0, eq).trim().toLowerCase(), f = fields(cod.slice(eq + 1).trim());
+    if (STRISCE.includes(k) && (f.length === 4 || f.length === 5)) {
+      const pct = floatIn(f[0], 0, 100), col = [1, 2, 3].map(j => intIn(f[j], 0, 255));
+      let curva = 0;
+      if (f.length === 5) { if (ci(f[4], "lineare")) curva = 1; else if (!ci(f[4], "morbida")) continue; }
+      if (pct === null || col.includes(null)) continue;
+      out[k].push({ pct, col, curva, nota, riga: i });
+    } else if (k === "rele" && f.length === 3) {
+      const r = releIdx(cfg, f[0]), st = bool(f[1]), pc = intIn(f[2], 0, 100);
+      if (r === null || st === null || pc === null) continue;
+      out.rele.push({ rele: r, tok: f[0], acceso: st, pct: pc, nota, riga: i });
+    }
+  }
+  Object.values(out).forEach(a => a.sort((x, y) => x.pct - y.pct));
+  return out;
+}
+// quello che il firmware usa in quella fase: le righe del file oppure i valori predefiniti
+function lista(fase, k) {
+  const v = voci(fase)[k];
+  if (k === "rele") return cfg.eventiDaFile ? v
+    : cfg.eventi.filter(e => e.fase === fase).map(e => ({ rele: e.rele, tok: String(e.rele + 1), acceso: e.acceso, pct: e.pct, nota: "", pred: true }));
+  const s = STRISCE.indexOf(k);
+  if (v.length || (cfg.tappeDaFile[s] & (1 << fase))) return v;
+  return cfg.tappe[s].filter(t => t.fase === fase).map(t => ({ pct: t.pct, col: t.col.slice(), curva: t.curva, nota: "", pred: true }));
+}
+function riga(k, it) {
+  const cod = k === "rele" ? `rele     = ${it.tok}, ${it.acceso ? "ON" : "OFF"}, ${it.pct}`
+    : `${k.padEnd(8)} = ${fmtP(it.pct).padStart(3)},${String(it.col[0]).padStart(7)},${String(it.col[1]).padStart(4)},${String(it.col[2]).padStart(4)}${it.curva ? ", lineare" : ""}`;
+  return it.nota ? (cod.length < 36 ? cod.padEnd(37) : cod + " ") + "; " + it.nota : cod;
+}
+const annulla = []; let tAnn = 0;
+function impostaTesto(t) {
+  const now = Date.now();
+  if (now - tAnn > 800) { annulla.push(ta.value); if (annulla.length > 60) annulla.shift(); }
+  tAnn = now; ta.value = t; store.set("presepe-ini", t); $("rUndo").disabled = false; rebuild();
+}
+function scrivi(fase, k, items) {
+  const L = righe(); let { h, e } = sezione(L, fase);
+  const vecchie = new Set(h < 0 ? [] : voci(fase)[k].map(v => v.riga));
+  if (h < 0) { while (L.length && !L[L.length - 1].trim()) L.pop(); L.push("", `[${FASI[fase]}]`); h = L.length - 1; e = L.length; }
+  const out = []; let pos = -1, dopo = -1;
+  L.forEach((l, i) => {
+    if (vecchie.has(i)) { if (pos < 0) pos = out.length; return; }
+    out.push(l);
+    if (i >= h && i < e && l.trim()) dopo = out.length;
+  });
+  out.splice(pos >= 0 ? pos : dopo, 0, ...items.map(it => riga(k, it)));
+  impostaTesto(out.join(EOL()));
+}
+// i relè predefiniti valgono solo finché il file non ha nessuna riga "rele": prima di cambiarne
+// uno li scrive tutti nelle loro fasi, così nessuno sparisce
+function materializzaRele() {
+  if (cfg.eventiDaFile) return;
+  const ev = cfg.eventi.slice();
+  for (let f = 0; f < 5; f++) {
+    const it = ev.filter(e => e.fase === f).map(e => ({ tok: String(e.rele + 1), acceso: e.acceso, pct: e.pct, nota: "" }));
+    if (it.length) scrivi(f, "rele", it);
+  }
+}
+function modifica(k, i, fn) {
+  if (k === "rele") materializzaRele();
+  const L = lista(rFase, k).map(x => Object.assign({}, x, x.col ? { col: x.col.slice() } : {}, { pred: false }));
+  const r = fn(L, i >= 0 ? L[i] : null);
+  if (r === false) return;
+  L.sort((a, b) => a.pct - b.pct);
+  sel = r ? { k, i: L.indexOf(r) } : null;
+  scrivi(rFase, k, L);
+  segui();
+}
+function pieno(k) {
+  if (k === "rele") return cfg.eventiDaFile && cfg.eventi.length >= MAX_EVENTI;
+  return cfg.tappe[STRISCE.indexOf(k)].length >= MAX_TAPPE;
+}
+let msgR = null;
+function rSay(t, bad, resta) {
+  const m = $("rMsg"); m.hidden = !t; m.textContent = t; m.className = "status " + (bad ? "bad" : "ok");
+  clearTimeout(msgR); if (t && !resta) msgR = setTimeout(() => { m.hidden = true; }, 4000);
+}
+function aggiungi(k) {
+  if (pieno(k)) return rSay(k === "rele" ? `Ci sono già ${MAX_EVENTI} eventi relè: il massimo.` : `Questa striscia ha già ${MAX_TAPPE} tappe nel ciclo: il massimo.`, true);
+  const a = inizio(cfg, rFase), b = fine(cfg, rFase);
+  let pf = b > a ? (p - a) / (b - a) * 100 : 50; if (!(pf >= 0 && pf <= 100)) pf = 50;
+  modifica(k, -1, L => {
+    const s = STRISCE.indexOf(k);
+    const it = k === "rele" ? { rele: 0, tok: cfg.nomi[0] || "1", acceso: 1, pct: Math.round(pf), nota: "" }
+      : { pct: Math.round(pf * 2) / 2, col: colore(cfg, s, Math.min(99.999, posizione(cfg, rFase, pf))), curva: 0, nota: "" };
+    L.push(it); return it;
+  });
+}
+const selItem = () => sel ? lista(rFase, sel.k)[sel.i] || null : null;
+function segui() { const it = selItem(); if (it) vaiA(posizione(cfg, rFase, it.pct)); }
+function vaiA(q) {
+  p = Math.min(99.999, Math.max(0, q));
+  if (playing) { playing = false; $("play").textContent = "Avvia"; }
+  render(); playhead(); liveScena(p);
+}
+let pend = null;
+function presto(f) { if (!pend) requestAnimationFrame(() => { const g = pend; pend = null; g(); }); pend = f; }
+
+// ------------------------------------------------ dal vivo
+let live = false, lbusy = false, lastRele = null; const lq = new Map();
+function lsend(key, c) { lq.set(key, c); lpump(); }
+async function lpump() {
+  if (lbusy || !lq.size) return;
+  const [key, c] = lq.entries().next().value; lq.delete(key); lbusy = true;
+  try {
+    const r = await fetch("/api/cmd", { method: "POST", headers: { "Content-Type": "text/plain", "X-Presepe": "1" }, body: c });
+    const j = await r.json();
+    if (!j.ok) { rSay("Il presepe non ha eseguito «" + c + "»: " + (j.msg || "errore"), true); if (/STOP/.test(j.msg || "")) spegniLive(false); }
+  } catch (e) { rSay("Il presepe non risponde: anteprima dal vivo sospesa.", true); spegniLive(false); }
+  lbusy = false; lpump();
+}
+function liveScena(q) {
+  if (!live) return;
+  for (let s = 0; s < 3; s++) lsend("S" + s, `S ${s} ${colore(cfg, s, q).join(" ")}`);
+  const rs = rele(cfg, q);
+  rs.forEach((on, i) => { if (!lastRele || lastRele[i] !== on) lsend("R" + i, `R ${i + 1} ${on ? 1 : 0}`); });
+  lastRele = rs;
+}
+function spegniLive(esci) {
+  live = false; $("rLive").checked = false; lq.clear();
+  if (esci) { lsend("X", "X"); rSay("Anteprima dal vivo spenta: il presepe torna al ciclo."); }
+  disegnaRegia();
+}
+$("rLive").addEventListener("change", e => {
+  if (!e.target.checked) return spegniLive(true);
+  live = true; lastRele = null;
+  rSay("Dal vivo: il presepe è in TEST e strisce e relè seguono l'anteprima. Spegnilo per tornare al ciclo.", false, true);
+  liveScena(p); disegnaRegia();
+});
+
+// ------------------------------------------------ prova della fase
+let prova = null;
+function durReale() { return Math.max(1, cfg.durate[0] * (fine(cfg, rFase) - inizio(cfg, rFase)) / 100); }
+function fermaProva() { prova = null; $("rProva").textContent = "▶ Prova la fase"; }
+$("rProva").addEventListener("click", () => {
+  if (prova) return fermaProva();
+  const v = $("rVel").value;
+  prova = { fase: rFase, t0: performance.now(), dur: (v === "reale" ? durReale() : +v) * 1000 };
+  sel = null; disegnaRegia();
+  $("rProva").textContent = "■ Ferma la prova";
+});
+$("rUndo").addEventListener("click", () => {
+  if (!annulla.length) return;
+  ta.value = annulla.pop(); store.set("presepe-ini", ta.value); tAnn = 0;
+  $("rUndo").disabled = !annulla.length; rebuild(); segui();
+});
+
+// ------------------------------------------------ disegno
+FASI.forEach((n, i) => {
+  const b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "tab"); b.textContent = n;
+  b.addEventListener("click", () => { rFase = i; sel = null; fermaProva(); disegnaRegia(); vaiA(inizio(cfg, i)); });
+  $("rFasi").appendChild(b);
+});
+let firma = "", edKey = "";
+function disegnaRegia() {
+  if (vista !== "grafico") return;
+  [...$("rFasi").children].forEach((b, i) => { b.classList.toggle("on", i === rFase); b.setAttribute("aria-selected", String(i === rFase)); });
+  const Ls = LANE.map(l => lista(rFase, l.k));
+  if (sel && !Ls[LANE.findIndex(l => l.k === sel.k)][sel.i]) sel = null;
+  const f = rFase + ":" + Ls.map(x => x.length).join(",");
+  if (f !== firma) { firma = f; costruisci(Ls); }
+  Ls.forEach((L, li) => aggiornaCorsia(li, L));
+  editor(Ls); elenco(Ls); playhead();
+  $("rVel").options[3].textContent = `durata reale (${fmt(durReale())})`;
+}
+function costruisci(Ls) {
+  const box = $("rLanes"); box.innerHTML = "";
+  const ru = document.createElement("div"); ru.className = "ruler";
+  ru.innerHTML = "<span></span><div><span>0</span><span>25</span><span>50</span><span>75</span><span>100 %</span></div>";
+  box.appendChild(ru);
+  LANE.forEach((l, li) => {
+    const row = document.createElement("div"); row.className = "lane";
+    const hd = document.createElement("div"); hd.className = "lhead";
+    hd.innerHTML = `<span>${l.n}</span><small></small>`;
+    const add = document.createElement("button"); add.type = "button"; add.className = "add";
+    add.textContent = l.k === "rele" ? "+ evento" : "+ tappa"; add.title = "aggiunge nel punto dell'anteprima";
+    add.addEventListener("click", () => aggiungi(l.k)); hd.appendChild(add);
+    const tr = document.createElement("div"); tr.className = "track" + (l.k === "rele" ? " rel" : "");
+    tr.innerHTML = '<div class="grad"></div><div class="ph"></div>';
+    Ls[li].forEach((_, i) => { const d = document.createElement("button"); d.type = "button"; d.className = "dot"; d.dataset.i = i; tr.appendChild(d); });
+    corsiaEventi(tr, l.k);
+    row.append(hd, tr); box.appendChild(row);
+  });
+}
+function corsiaEventi(tr, k) {
+  let modo = null, delta = 0, x0 = 0, mosso = false;
+  const step = k === "rele" ? 1 : 0.5;
+  const pctDa = e => { const r = tr.getBoundingClientRect(); return (e.clientX - r.left) / r.width * 100; };
+  const arrot = v => Math.min(100, Math.max(0, Math.round(v / step) * step));
+  tr.addEventListener("pointerdown", e => {
+    if (e.button > 0) return;
+    const d = e.target.closest(".dot");
+    tr.setPointerCapture(e.pointerId); x0 = e.clientX; mosso = false;
+    if (d) {
+      modo = "drag"; sel = { k, i: +d.dataset.i }; fermaProva();
+      const it = selItem(); delta = it ? pctDa(e) - it.pct : 0;
+      disegnaRegia(); segui();
+    } else { modo = "scrub"; fermaProva(); vaiA(posizione(cfg, rFase, Math.min(100, Math.max(0, pctDa(e))))); }
+  });
+  tr.addEventListener("pointermove", e => {
+    if (!modo) return;
+    if (modo === "scrub") return vaiA(posizione(cfg, rFase, Math.min(100, Math.max(0, pctDa(e)))));
+    if (!mosso && Math.abs(e.clientX - x0) < 4) return;
+    mosso = true;
+    const v = arrot(pctDa(e) - delta);
+    presto(() => { const it = selItem(); if (it && it.pct !== v) modifica(sel.k, sel.i, (L, x) => { x.pct = v; return x; }); });
+  });
+  const stop = () => { if (modo === "drag" && $("rEd").hidden === false && !mosso) $("rEd").scrollIntoView({ block: "nearest", behavior: "smooth" }); modo = null; };
+  tr.addEventListener("pointerup", stop); tr.addEventListener("pointercancel", () => { modo = null; });
+  tr.addEventListener("keydown", e => {
+    const d = e.target.closest(".dot"); if (!d) return;
+    if (e.key === "Enter" || e.key === " ") { sel = { k, i: +d.dataset.i }; disegnaRegia(); segui(); e.preventDefault(); return; }
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    sel = { k, i: +d.dataset.i }; const it = selItem(); if (!it) return;
+    modifica(k, sel.i, (L, x) => { x.pct = arrot(it.pct + (e.key === "ArrowRight" ? step : -step)); return x; });
+    const nd = tr.querySelector(`.dot[data-i="${sel.i}"]`); if (nd) nd.focus();
+    e.preventDefault();
+  });
+}
+function aggiornaCorsia(li, L) {
+  const l = LANE[li], row = $("rLanes").children[li + 1], tr = row.querySelector(".track"), small = row.querySelector("small");
+  const isSel = i => sel && sel.k === l.k && sel.i === i;
+  if (l.k !== "rele") {
+    const st = [];
+    for (let j = 0; j <= 48; j++) { const q = j / 48 * 100; st.push(`rgb(${schermo(cfg, l.s, colore(cfg, l.s, Math.min(99.999, posizione(cfg, rFase, q))))}) ${q.toFixed(2)}%`); }
+    tr.querySelector(".grad").style.background = `linear-gradient(90deg, ${st.join(",")})`;
+    small.textContent = !L.length ? "nessuna tappa" : L[0].pred ? `${L.length} predefinite` : `${L.length} in fase · ${cfg.tappe[l.s].length}/${MAX_TAPPE}`;
+    tr.querySelectorAll(".dot").forEach((d, i) => {
+      const it = L[i]; d.style.left = it.pct + "%"; d.style.background = `rgb(${schermo(cfg, l.s, it.col)})`;
+      d.className = "dot" + (it.curva ? " lin" : "") + (it.pred ? " pred" : "") + (isSel(i) ? " sel" : "");
+      d.title = `${fmtP(it.pct)} % · ${it.col.join(", ")}${it.curva ? " · lineare" : ""}${it.nota ? " · " + it.nota : ""}`;
+      d.setAttribute("aria-label", `${l.n}, tappa al ${fmtP(it.pct)} %: ${it.col.join(", ")}`);
+    });
+  } else {
+    small.textContent = !L.length ? "nessun evento" : L[0].pred ? `${L.length} predefiniti` : `${L.length} in fase · ${cfg.eventi.length}/${MAX_EVENTI}`;
+    tr.querySelectorAll(".dot").forEach((d, i) => {
+      const it = L[i]; d.style.left = it.pct + "%"; d.style.background = ""; d.textContent = it.rele + 1;
+      d.className = "dot r" + (it.acceso ? "" : " off") + (it.pred ? " pred" : "") + (isSel(i) ? " sel" : "");
+      d.title = `${cfg.nomi[it.rele] || "relè " + (it.rele + 1)} ${it.acceso ? "ON" : "OFF"} al ${it.pct} %`;
+      d.setAttribute("aria-label", d.title);
+    });
+  }
+}
+function playhead() {
+  if (vista !== "grafico") return;
+  const a = inizio(cfg, rFase), b = fine(cfg, rFase), pf = b > a ? (p - a) * 100 / (b - a) : 0, dentro = pf >= 0 && pf <= 100.001;
+  $("rLanes").querySelectorAll(".ph").forEach(ph => { ph.hidden = !dentro; ph.style.left = Math.min(100, pf) + "%"; });
+  const fa = faseDi(cfg, p);
+  $("rPos").textContent = (dentro ? `Anteprima: ${fmtP(Math.min(100, pf))} % di ${FASI[rFase]}` : `Anteprima in ${FASI[fa]}`) +
+    ` · cielo ${colore(cfg, 0, p).join(",")} · tramonto ${colore(cfg, 1, p).join(",")} · alba ${colore(cfg, 2, p).join(",")}`;
+}
+function elenco(Ls) {
+  const ol = $("rList"); ol.innerHTML = "";
+  const all = [];
+  LANE.forEach((l, li) => Ls[li].forEach((it, i) => all.push({ l, it, i })));
+  all.sort((a, b) => a.it.pct - b.it.pct);
+  if (!all.length) {
+    const li = document.createElement("li"); li.className = "empty";
+    li.textContent = "Nessun cambiamento in questa fase: ogni striscia va gradualmente dalla sua tappa precedente alla successiva.";
+    ol.appendChild(li); return;
+  }
+  const span = (c, t) => { const s = document.createElement("span"); s.className = c; s.textContent = t; return s; };
+  all.forEach(({ l, it, i }) => {
+    const li = document.createElement("li"), b = document.createElement("button"); b.type = "button";
+    if (sel && sel.k === l.k && sel.i === i) b.classList.add("sel");
+    const sq = span("sq", ""); let v;
+    if (l.k === "rele") { sq.className = "sq r" + (it.acceso ? " on" : ""); v = `relè ${it.rele + 1}${cfg.nomi[it.rele] ? " " + cfg.nomi[it.rele] : ""} ${it.acceso ? "ON" : "OFF"}`; }
+    else { sq.style.background = `rgb(${schermo(cfg, l.s, it.col)})`; v = it.col.join(", ") + (it.curva ? " · lineare" : ""); }
+    if (it.nota) v += " — " + it.nota;
+    if (it.pred) v += " (predefinita)";
+    b.append(span("pc", fmtP(it.pct) + " %"), span("", l.n), sq, span("vv", v));
+    b.addEventListener("click", () => { sel = { k: l.k, i }; fermaProva(); disegnaRegia(); segui(); $("rEd").scrollIntoView({ block: "nearest", behavior: "smooth" }); });
+    li.appendChild(b); ol.appendChild(li);
+  });
+}
+
+// ------------------------------------------------ pannello di modifica
+const hex = c => "#" + c.map(v => v.toString(16).padStart(2, "0")).join("");
+function costruisciEd(l) {
+  const ed = $("rEd"), strip = l.k !== "rele", step = strip ? 0.5 : 1;
+  ed.innerHTML = `<div class="edhead"><b id="eTit"></b><span class="note" id="eIdx"></span><button type="button" id="eX" aria-label="Chiudi">✕</button></div>` +
+    (strip ? `<div class="edcol"><div class="sw" id="eSw"></div><div class="chs">
+      <label class="ch"><span style="color:#e5484d">R</span><input type="range" id="eR" min="0" max="255"><input type="number" id="eRn" min="0" max="255" aria-label="rosso"></label>
+      <label class="ch"><span style="color:#30a46c">G</span><input type="range" id="eG" min="0" max="255"><input type="number" id="eGn" min="0" max="255" aria-label="verde"></label>
+      <label class="ch"><span style="color:#3e63dd">B</span><input type="range" id="eB" min="0" max="255"><input type="number" id="eBn" min="0" max="255" aria-label="blu"></label>
+    </div></div>
+    <div class="row"><label class="lbl">Ruota colori <input type="color" id="eCol"></label><button type="button" id="eLm">− luce</button><button type="button" id="eLp">+ luce</button></div>
+    <div class="chips" id="eChips"></div>`
+    : `<label class="lbl full">Relè <select id="eRele"></select></label>
+    <div class="row"><span class="lbl">Stato</span><div class="seg" id="eStato"><button type="button" data-v="1">ON · acceso</button><button type="button" data-v="0">OFF · spento</button></div></div>`) +
+    `<div class="rowp"><span class="lbl">Posizione</span><button type="button" id="ePm" aria-label="indietro">−</button><input type="range" id="eP" min="0" max="100" step="${step}" aria-label="posizione nella fase"><input type="number" id="ePn" min="0" max="100" step="${step}" aria-label="percentuale"><button type="button" id="ePp" aria-label="avanti">+</button></div>` +
+    (strip ? `<div class="row"><span class="lbl">Arrivo dalla tappa precedente</span><div class="seg" id="eCurva"><button type="button" data-v="0">Morbido</button><button type="button" data-v="1">Lineare</button></div></div>` : "") +
+    `<label class="lbl full">Nota <input type="text" id="eNota" maxlength="60" placeholder="commento nel file (facoltativo)"></label>
+    <div class="row"><button type="button" id="eDup">Duplica</button><button type="button" id="eDel" class="danger">Elimina</button></div>
+    <p class="note" id="eHint"></p>`;
+  const cambia = fn => modifica(sel.k, sel.i, (L, it) => { fn(it); return it; });
+  const posiz = v => { v = Math.min(100, Math.max(0, Math.round(v / step) * step)); if (!isNaN(v)) cambia(it => { it.pct = v; }); };
+  $("eX").addEventListener("click", () => { sel = null; disegnaRegia(); });
+  $("eP").addEventListener("input", e => { const v = +e.target.value; presto(() => posiz(v)); });
+  $("ePn").addEventListener("change", e => posiz(+e.target.value));
+  $("ePm").addEventListener("click", () => { const it = selItem(); if (it) posiz(it.pct - step); });
+  $("ePp").addEventListener("click", () => { const it = selItem(); if (it) posiz(it.pct + step); });
+  let tNota = null;
+  $("eNota").addEventListener("input", e => { const v = e.target.value.replace(/[\r\n]/g, " ").trim(); clearTimeout(tNota); tNota = setTimeout(() => cambia(it => { it.nota = v; }), 350); });
+  $("eDup").addEventListener("click", () => {
+    if (pieno(sel.k)) return rSay("Limite raggiunto: non si possono aggiungere altre righe.", true);
+    modifica(sel.k, sel.i, (L, it) => { const c = Object.assign({}, it, it.col ? { col: it.col.slice() } : {}, { nota: "" }); c.pct = Math.min(100, it.pct + 5); L.push(c); return c; });
+  });
+  $("eDel").addEventListener("click", () => modifica(sel.k, sel.i, (L, it) => { L.splice(L.indexOf(it), 1); return null; }));
+  if (strip) {
+    const colore_ = c => cambia(it => { it.col = c.map(v => Math.min(255, Math.max(0, Math.round(v) || 0))); });
+    ["R", "G", "B"].forEach((ch, j) => {
+      $("e" + ch).addEventListener("input", e => { const v = +e.target.value; presto(() => { const it = selItem(); if (it) { const c = it.col.slice(); c[j] = v; colore_(c); } }); });
+      $("e" + ch + "n").addEventListener("change", e => { const it = selItem(); if (it) { const c = it.col.slice(); c[j] = +e.target.value; colore_(c); } });
+    });
+    $("eCol").addEventListener("input", e => { const h = e.target.value; presto(() => colore_([1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)))); });
+    const luce = f => { const it = selItem(); if (!it) return; const m = Math.max(...it.col); colore_(m === 0 ? (f > 1 ? [16, 16, 16] : [0, 0, 0]) : it.col.map(v => v * f)); };
+    $("eLm").addEventListener("click", () => luce(1 / 1.2)); $("eLp").addEventListener("click", () => luce(1.2));
+    const usati = [];
+    cfg.tappe.flat().forEach(t => { if (!PRESET.some(x => x[1].join() === t.col.join()) && !usati.some(u => u.join() === t.col.join())) usati.push(t.col); });
+    const chips = $("eChips");
+    PRESET.concat(usati.slice(0, 6).map(c => [c.join(","), c])).forEach(([n, c]) => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "chip";
+      const i = document.createElement("i"); i.style.background = `rgb(${schermo(cfg, LANE.find(x => x.k === sel.k).s, c)})`;
+      b.append(i, document.createTextNode(n)); b.title = c.join(", ");
+      b.addEventListener("click", () => colore_(c.slice())); chips.appendChild(b);
+    });
+    $("eCurva").addEventListener("click", e => { const b = e.target.closest("button"); if (b) cambia(it => { it.curva = +b.dataset.v; }); });
+  } else {
+    const s = $("eRele");
+    for (let r = 0; r < 16; r++) { const o = document.createElement("option"); o.value = r; o.textContent = `${r + 1}${cfg.nomi[r] ? " · " + cfg.nomi[r] : ""} (Grp_0${(r >> 2) + 1}_0${(r & 3) + 1})`; s.appendChild(o); }
+    s.addEventListener("change", e => { const r = +e.target.value; cambia(it => { it.rele = r; it.tok = cfg.nomi[r] || String(r + 1); }); });
+    $("eStato").addEventListener("click", e => { const b = e.target.closest("button"); if (b) cambia(it => { it.acceso = +b.dataset.v; }); });
+  }
+}
+function editor(Ls) {
+  const ed = $("rEd");
+  if (!sel) { ed.hidden = true; return; }
+  const li = LANE.findIndex(l => l.k === sel.k), l = LANE[li], L = Ls[li], it = L[sel.i];
+  const key = rFase + ":" + l.k;
+  if (key !== edKey) { edKey = key; costruisciEd(l); }
+  ed.hidden = false;
+  const set = (id, v) => { const e = $(id); if (e && document.activeElement !== e) e.value = v; };
+  const seg = (id, v) => $(id).querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.v === v));
+  $("eTit").textContent = `${l.n} · ${FASI[rFase]}`;
+  $("eIdx").textContent = `${l.k === "rele" ? "evento" : "tappa"} ${sel.i + 1} di ${L.length}` + (it.pred ? " · valore predefinito: cambiandolo entra nel file" : "");
+  set("eP", it.pct); set("ePn", it.pct); set("eNota", it.nota || "");
+  let hint = "";
+  if (l.k !== "rele") {
+    ["R", "G", "B"].forEach((c, j) => { set("e" + c, it.col[j]); set("e" + c + "n", it.col[j]); });
+    $("eSw").style.background = `rgb(${schermo(cfg, l.s, it.col)})`; set("eCol", hex(it.col)); seg("eCurva", it.curva);
+    if (!it.pred && L.length === 1 && defaults().tappe[l.s].some(t => t.fase === rFase))
+      hint = "È l'unica tappa di questa striscia in questa fase: se la elimini tornano le tappe predefinite del firmware. ";
+    if (!live) hint += DEVICE ? "Lo schermo non rende i LED: accendi «Dal vivo» per vedere il colore sulla striscia vera." : "Lo schermo non rende i LED: sul presepe, con «Dal vivo», il colore si vede sulla striscia vera.";
+  } else {
+    set("eRele", it.rele); seg("eStato", it.acceso ? 1 : 0);
+    if (!it.pred && cfg.eventi.length === 1) hint = "È l'ultimo evento relè del file: se lo elimini tornano gli eventi predefiniti (relè 3 acceso al 30 % del TRAMONTO, spento a metà NOTTE).";
+  }
+  $("eHint").textContent = hint;
+}
+function mostraVista(v) {
+  vista = v; store.set("presepe-vista", v);
+  $("vGrafico").classList.toggle("on", v === "grafico"); $("vTesto").classList.toggle("on", v === "testo");
+  $("vGrafico").setAttribute("aria-selected", String(v === "grafico")); $("vTesto").setAttribute("aria-selected", String(v === "testo"));
+  $("regia").hidden = v !== "grafico"; $("vTestoBox").hidden = v !== "testo";
+  firma = ""; edKey = ""; disegnaRegia();
+}
+$("vGrafico").addEventListener("click", () => mostraVista("grafico"));
+$("vTesto").addEventListener("click", () => mostraVista("testo"));
+if (!DEVICE) $("rLiveBox").hidden = true;
+mostraVista(vista);
 
 rebuild();
 requestAnimationFrame(tick);
