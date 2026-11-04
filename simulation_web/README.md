@@ -14,6 +14,8 @@ Open `index.html` in any modern browser (double-click it). No server and no inst
 
 The text you type is kept in the browser's local storage, so it survives a page reload.
 
+**Grafico / Testo.** The *Grafico* view edits the phases on lanes (colour stops as dots, relay events), the *Testo* view shows the plain file; both stay in sync. See the [README, WiFi](../README.md#wifi-mega--wifi-r3-board) for how it works.
+
 **On the board.** The same page is served by a "Mega + WiFi R3" board at `http://presepe.local/config` ([README, WiFi](../README.md#wifi-mega--wifi-r3-board)). There it starts from the board's `PRESEPE.INI` and adds a card with *Salva sul presepe*, *Riavvia il presepe*, *Ricarica dal presepe* and *Ripristina il file precedente*. `firmware/tools/build_web.py` builds that version from `simulator.template.html`, so rebuild the ESP firmware after changing the template.
 
 ## How faithful it is
