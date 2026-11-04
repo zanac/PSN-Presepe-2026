@@ -1,5 +1,6 @@
 #pragma once
 #include "Arduino.h"
+#include "StreamDev.h"
 enum HTTPMethod { HTTP_GET, HTTP_POST };
 enum { BASIC_AUTH };
 struct Risposta { int code = 0; std::string type, body; std::map<std::string, std::string> headers; };
@@ -23,8 +24,8 @@ struct ESP8266WebServer {
   void send(int c, const char *t, const String &b) { r.code = c; r.type = t; r.body = b.s; r.headers = pending; pending.clear(); }
   void send(int c, const char *t, const char *b) { send(c, t, String(b)); }
   void send_P(int c, const char *t, const char *b, size_t n) { send(c, t, String(std::string(b, n))); }
-  struct Cliente { unsigned long timeout = 0; void setTimeout(unsigned long t) { timeout = t; } } cliente;
-  Cliente &client() { return cliente; }
+  unsigned long timeoutCorpo = 0;   // timeout of the source stream of the last long body
+  void send(int c, const char *t, Stream *src, size_t n) { auto *p = static_cast<StreamConstPtr *>(src); timeoutCorpo = p->getTimeout(); send(c, t, String(std::string(p->buf, n))); }
   // POST from the pages: X-Presepe and X-Len as the browser sends them (h overrides)
   Risposta chiama(const char *p, HTTPMethod m, const std::string &b, const char *u = "admin", const char *pw = "presepe2026",
                   std::map<std::string, std::string> h = {{"X-Presepe", "1"}}) {

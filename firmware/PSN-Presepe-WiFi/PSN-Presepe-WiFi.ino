@@ -30,6 +30,7 @@
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
 #include <DNSServer.h>
+#include <StreamDev.h>
 #include "pagine_web.h"
 
 #define VERSIONE "039"
@@ -233,10 +234,20 @@ bool autorizzato() {
   return true;
 }
 
-// Pagine (gzip in flash). Con una rete debole (ripetitore lontano) TCP ritrasmette con attese
-// sempre piu' lunghe: con i 5 s standard del server l'invio si interrompeva a meta' e il browser
-// riceveva una pagina incompleta (ERR_CONTENT_LENGTH_MISMATCH, script mai partito). Ora l'invio
-// aspetta fino a 20 s. In piu' ogni pagina ha un ETag legato alla compilazione: il browser
+// Corpo lungo (pagine, file INI). Il server del core 3.1.2 invia il corpo con Stream::sendSize,
+// che si ferma se per getTimeout() del flusso sorgente non riesce a scrivere niente: per
+// StreamConstPtr sono 1000 ms. Basta un pacchetto perso (TCP lo ritrasmette dopo ~1 s, poi
+// 2 s...) e la risposta resta a meta': il browser riceve meno byte di Content-Length
+// (ERR_CONTENT_LENGTH_MISMATCH) e lo script della pagina non parte. Con piu' di ~8 kB
+// (/config, il file INI) succede quasi sempre su una rete appena disturbata. Qui la sorgente
+// ha 20 s: l'invio aspetta le ritrasmissioni invece di chiudere.
+void inviaCorpo(int codice, const char *tipo, const char *dati, size_t len) {
+  StreamConstPtr sorgente(dati, len);
+  sorgente.setTimeout(20000);
+  server.send(codice, tipo, &sorgente, len);
+}
+
+// Pagine (gzip in flash). Ogni pagina ha un ETag legato alla compilazione: il browser
 // rivalida (no-cache) e, se ha gia' la pagina di questo firmware, riceve solo un 304 senza corpo.
 void inviaPagina(const uint8_t *dati, size_t len) {
   char etag[48];
@@ -245,8 +256,7 @@ void inviaPagina(const uint8_t *dati, size_t len) {
   server.sendHeader("ETag", etag);
   if (server.header("If-None-Match") == String(etag)) { server.send(304, "text/plain", ""); return; }
   server.sendHeader("Content-Encoding", "gzip");
-  server.client().setTimeout(20000);
-  server.send_P(200, "text/html; charset=utf-8", (const char *)dati, len);
+  inviaCorpo(200, "text/html; charset=utf-8", (const char *)dati, len);
 }
 
 String jsonTesto(const String &s) {
@@ -360,7 +370,7 @@ void apiLeggiFile() {
   server.sendHeader("X-File", getNome);
   server.sendHeader("Access-Control-Expose-Headers", "X-File");
   server.sendHeader("Cache-Control", "no-store");
-  server.send(200, "text/plain; charset=utf-8", getTesto);
+  inviaCorpo(200, "text/plain; charset=utf-8", getTesto.c_str(), getTesto.length());
   getTesto = "";
 }
 

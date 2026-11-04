@@ -48,7 +48,7 @@ int main() {
   CHECK(server.chiama("/", HTTP_GET, "", "admin", "sbagliata").code == 401);
   Risposta r = server.chiama("/", HTTP_GET, "");
   CHECK(r.code == 200 && r.headers["Content-Encoding"] == "gzip" && r.body.size() == PAGINA_PANNELLO_LEN);
-  CHECK(server.cliente.timeout == 20000 && !r.headers["ETag"].empty());
+  CHECK(server.timeoutCorpo == 20000 && !r.headers["ETag"].empty());
   {   // same page again with the browser's copy: 304 without body
     Risposta r2 = server.chiama("/", HTTP_GET, "", "admin", "presepe2026", {{"If-None-Match", r.headers["ETag"]}});
     CHECK(r2.code == 304 && r2.body.empty() && r2.headers["ETag"] == r.headers["ETag"]);
@@ -93,8 +93,9 @@ int main() {
   CHECK(r.body.find("\"ok\":true") != std::string::npos && !megaFermo());
 
   // 5. read the file (CRLF removed)
+  server.timeoutCorpo = 0;
   r = server.chiama("/api/ini", HTTP_GET, "");
-  CHECK(r.code == 200 && r.body == "[CICLO]\ndurata1 = 60\n" && r.headers["X-File"] == "PRESEPE.INI");
+  CHECK(r.code == 200 && r.body == "[CICLO]\ndurata1 = 60\n" && r.headers["X-File"] == "PRESEPE.INI" && server.timeoutCorpo == 20000);
 
   // 6. write: long lines, UTF-8, empty lines, CRLF, leading spaces, no final newline; 20 rounds with losses
   std::string lunga(250, 'z'), testo;
