@@ -23,6 +23,8 @@ struct ESP8266WebServer {
   void send(int c, const char *t, const String &b) { r.code = c; r.type = t; r.body = b.s; r.headers = pending; pending.clear(); }
   void send(int c, const char *t, const char *b) { send(c, t, String(b)); }
   void send_P(int c, const char *t, const char *b, size_t n) { send(c, t, String(std::string(b, n))); }
+  struct Cliente { unsigned long timeout = 0; void setTimeout(unsigned long t) { timeout = t; } } cliente;
+  Cliente &client() { return cliente; }
   // POST from the pages: X-Presepe and X-Len as the browser sends them (h overrides)
   Risposta chiama(const char *p, HTTPMethod m, const std::string &b, const char *u = "admin", const char *pw = "presepe2026",
                   std::map<std::string, std::string> h = {{"X-Presepe", "1"}}) {

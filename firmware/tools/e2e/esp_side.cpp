@@ -48,6 +48,13 @@ int main() {
   CHECK(server.chiama("/", HTTP_GET, "", "admin", "sbagliata").code == 401);
   Risposta r = server.chiama("/", HTTP_GET, "");
   CHECK(r.code == 200 && r.headers["Content-Encoding"] == "gzip" && r.body.size() == PAGINA_PANNELLO_LEN);
+  CHECK(server.cliente.timeout == 20000 && !r.headers["ETag"].empty());
+  {   // same page again with the browser's copy: 304 without body
+    Risposta r2 = server.chiama("/", HTTP_GET, "", "admin", "presepe2026", {{"If-None-Match", r.headers["ETag"]}});
+    CHECK(r2.code == 304 && r2.body.empty() && r2.headers["ETag"] == r.headers["ETag"]);
+    Risposta r3 = server.chiama("/config", HTTP_GET, "", "admin", "presepe2026", {{"If-None-Match", r.headers["ETag"]}});
+    CHECK(r3.code == 200 && r3.body.size() == PAGINA_CONFIG_LEN && r3.headers["ETag"] != r.headers["ETag"]);
+  }
 
   // 3. status JSON
   gira(1200);

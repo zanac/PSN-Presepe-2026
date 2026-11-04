@@ -233,9 +233,19 @@ bool autorizzato() {
   return true;
 }
 
+// Pagine (gzip in flash). Con una rete debole (ripetitore lontano) TCP ritrasmette con attese
+// sempre piu' lunghe: con i 5 s standard del server l'invio si interrompeva a meta' e il browser
+// riceveva una pagina incompleta (ERR_CONTENT_LENGTH_MISMATCH, script mai partito). Ora l'invio
+// aspetta fino a 20 s. In piu' ogni pagina ha un ETag legato alla compilazione: il browser
+// rivalida (no-cache) e, se ha gia' la pagina di questo firmware, riceve solo un 304 senza corpo.
 void inviaPagina(const uint8_t *dati, size_t len) {
-  server.sendHeader("Content-Encoding", "gzip");
+  char etag[48];
+  snprintf(etag, sizeof(etag), "\"%s %s %u\"", __DATE__, __TIME__, (unsigned)len);
   server.sendHeader("Cache-Control", "no-cache");
+  server.sendHeader("ETag", etag);
+  if (server.header("If-None-Match") == String(etag)) { server.send(304, "text/plain", ""); return; }
+  server.sendHeader("Content-Encoding", "gzip");
+  server.client().setTimeout(20000);
   server.send_P(200, "text/html; charset=utf-8", (const char *)dati, len);
 }
 
@@ -415,7 +425,7 @@ void setup() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();            // nessuna rete ricordata: si collega solo con i dati del Mega
   idComando = (uint16_t)(ESP.random() | 1);   // diverso a ogni avvio dell'ESP
-  server.collectHeaders("X-Presepe", "X-Len");    // intestazioni lette da daPagina() e apiScriviFile()
+  server.collectHeaders("X-Presepe", "X-Len", "If-None-Match");   // lette da daPagina(), apiScriviFile(), inviaPagina()
 
   server.on("/", HTTP_GET, []() { if (autorizzato()) inviaPagina(PAGINA_PANNELLO, PAGINA_PANNELLO_LEN); });
   server.on("/config", HTTP_GET, []() { if (autorizzato()) inviaPagina(PAGINA_CONFIG, PAGINA_CONFIG_LEN); });
