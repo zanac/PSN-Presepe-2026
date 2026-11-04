@@ -1,6 +1,6 @@
-# PSN-Presepe
+<p align="center"><a href="README.md">🇬🇧 English</a> &nbsp;·&nbsp; <b>🇮🇹 Italiano</b></p>
 
-*[English](README.md) · Italiano*
+# PSN-Presepe
 
 Centralina per Arduino Mega 2560 per un presepe modulare a 12 V.
 

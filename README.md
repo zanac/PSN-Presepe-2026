@@ -1,6 +1,6 @@
-# PSN-Presepe
+<p align="center"><b>🇬🇧 English</b> &nbsp;·&nbsp; <a href="README.it.md">🇮🇹 Italiano</a></p>
 
-*English · [Italiano](README.it.md)*
+# PSN-Presepe
 
 Arduino Mega 2560 controller for a modular 12 V nativity scene (*presepe*).
 
