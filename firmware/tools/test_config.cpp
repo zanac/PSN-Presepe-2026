@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
     CHECK(c.tappeDaFile[CFG_S_TRAMONTO] == (1 << CFG_TRAMONTO) && c.tappeDaFile[CFG_S_ALBA] == (1 << CFG_ALBA));
   }
 
-  // 3. custom values, CRLF, case, names, Grp_ syntax, forcing, wrap-around casette
+  // 3. custom values, CRLF, case, names, Grp_ syntax, forcing, both star chains
   {
     const char *t =
       "[ciclo]\r\nDURATA1 = 30\r\ndurata2=120 ; two minutes\r\ndurata3 = 600\r\npot_min=10\r\npot_max = 680\r\n"
@@ -47,8 +47,8 @@ int main(int argc, char **argv) {
       "[giorno]\nrele = Mulino, on, 10\n[NOTTE]\nrele = Grp_04_04, ON, 0\n[Alba]\nRELE = 16, spento, 100\n"
       "[COLORI]\nlum_alba = 50\ngamma = off\n"
       "[TRAMONTO]\ntramonto = 10, 200, 80, 20\nTRAMONTO = 60.5, 0, 0, 255, LINEARE\n"
-      "[STELLE]\nnumero = 80\nattive = 30\ncolore = 100,100,100\n"
-      "[CASETTE]\nnumero = 12\naccendi = NOTTE, 90\nspegni = GIORNO, 10\nfuoco = 0\n"
+      "[STELLE_01]\nnumero = 80\nattive = 30\ncolore = 100,100,100\n"
+      "[stelle_02]\nnumero = 12\nattive = 5\nlum_min = 10\nlum_max = 40\nlivello_notte = 100\nscintillio_min = 1000\nscintillio_max = 2000\ncolore = 50,60,70\n"
       "[SISTEMA]\nbuzzer = 0\ndebug_ms = 0\nfastboot = no\n";
     PresepeConfig c; cfgDefault(c); cfgParseBuffer(c, t);
     CHECK(c.errori == 0);
@@ -66,8 +66,10 @@ int main(int argc, char **argv) {
     CHECK(c.tappe[CFG_S_TRAMONTO][0].col.r == 200 && c.tappe[CFG_S_TRAMONTO][0].curva == CURVA_MORBIDA);
     CHECK(std::fabs(c.tappe[CFG_S_TRAMONTO][1].pct - 60.5f) < 1e-4 && c.tappe[CFG_S_TRAMONTO][1].curva == CURVA_LINEARE);
     CHECK(c.numTappe[CFG_S_CIELO] == d.numTappe[CFG_S_CIELO] && c.tappeDaFile[CFG_S_CIELO] == 0);   // untouched strips keep defaults
-    CHECK(c.numStelle == 80 && c.stelleAttive == 30 && c.coloreStelle.g == 100);
-    CHECK(c.numCasette == 12 && c.accendiFase == CFG_NOTTE && c.accendiPct == 90 && c.spegniFase == CFG_GIORNO && c.fuoco == 0);
+    CHECK(c.stelle[0].numero == 80 && c.stelle[0].attive == 30 && c.stelle[0].colore.g == 100 && c.stelle[0].lumMin == d.stelle[0].lumMin);
+    CHECK(c.stelle[1].numero == 12 && c.stelle[1].attive == 5 && c.stelle[1].lumMin == 10 && c.stelle[1].lumMax == 40 && c.stelle[1].livelloNotte == 100);
+    CHECK(c.stelle[1].scintillioMinMs == 1000 && c.stelle[1].scintillioMaxMs == 2000 && c.stelle[1].colore.r == 50 && c.stelle[1].colore.b == 70);
+    CHECK(c.stelle[0].livelloNotte == d.stelle[0].livelloNotte && c.stelle[0].scintillioMinMs == d.stelle[0].scintillioMinMs);   // chains are independent
     CHECK(c.buzzer == 0 && c.debugMs == 0 && c.fastboot == 0 && d.fastboot == 1);
     CHECK(c.lumCielo == 100);   // untouched keys keep defaults
   }
@@ -105,12 +107,21 @@ int main(int argc, char **argv) {
   // 5. non-increasing phases revert all four; inconsistent ranges revert
   {
     PresepeConfig c; cfgDefault(c);
-    cfgParseBuffer(c, "[FASI]\ntramonto=60\ncrepuscolo=50\n[CICLO]\npot_min=500\npot_max=510\n[STELLE]\nnumero=10\nattive=40\nlum_min=90\nlum_max=20\n");
+    cfgParseBuffer(c, "[FASI]\ntramonto=60\ncrepuscolo=50\n[CICLO]\npot_min=500\npot_max=510\n[STELLE_02]\nnumero=10\nattive=40\nlum_min=90\nlum_max=20\n");
     CHECK(c.pTramonto == d.pTramonto && c.pCrepuscolo == d.pCrepuscolo);
     CHECK(c.potMin == d.potMin && c.potMax == d.potMax);
-    CHECK(c.stelleAttive == 10);                       // clamped to the pixel count
-    CHECK(c.lumStelleMin == d.lumStelleMin && c.lumStelleMax == d.lumStelleMax);
+    CHECK(c.stelle[1].attive == 10);                   // clamped to the pixel count
+    CHECK(c.stelle[1].lumMin == d.stelle[1].lumMin && c.stelle[1].lumMax == d.stelle[1].lumMax);
+    CHECK(c.stelle[0].attive == d.stelle[0].attive);   // the other chain is untouched
     CHECK(c.errori == 3 && c.primaRigaErrata == 0xFFFF);
+  }
+
+  // 5b. the old sections [STELLE] and [CASETTE] no longer exist: header and keys are errors
+  {
+    PresepeConfig c; cfgDefault(c);
+    cfgParseBuffer(c, "[STELLE]\nnumero = 10\n[CASETTE]\nnumero = 5\nfuoco = 20\n[STELLE_01]\nnumero = 30\n");
+    CHECK(c.errori == 5 && c.primaRigaErrata == 1);
+    CHECK(c.stelle[0].numero == 30 && c.stelle[1].numero == d.stelle[1].numero);
   }
 
   // 6. event table capacity (64) and over-long line

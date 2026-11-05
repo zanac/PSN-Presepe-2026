@@ -10,17 +10,18 @@
     - Parametri della scenografia letti all'avvio da microSD (/PRESEPE.INI, oppure
       /PRESEPE.TXT se manca il primo):
       durate del ciclo, fasi, schedulazione rele', nomi rele', colori,
-      stelle, casette, buzzer/OLED/autotest. Senza SD -> valori di default.
+      stelle (due catene), buzzer/OLED/autotest. Senza SD -> valori di default.
     - microSD su SPI: D50 MISO, D51 MOSI, D52 SCK, D53 CS, D49 rilevamento scheda.
     - Potenziometro esterno su morsetto J_POT (5V / A0 / GND).
-    - CASETTE (WS2811 su D8) ora si accendono nel ciclo secondo [CASETTE].
+    - Due catene di stelle WS2811 uguali: STELLE_01 su D5 e STELLE_02 su D8, ognuna
+      con la sua sezione [STELLE_01] / [STELLE_02] (per due zone del cielo).
 
   USCITE (PCB Rev D)
     D2/D3/D4    = CIELO RGB R/G/B      -> MOSFET Q1-Q3 -> morsetto J_CIELO (12V comune, R-, G-, B-)
     D7/D11/D12  = TRAMONTO RGB R/G/B   -> MOSFET Q4-Q6 -> morsetto J_TRAMONTO
     D44/D45/D46 = ALBA RGB R/G/B       -> MOSFET Q7-Q9 -> morsetto J_ALBA
-    D5          = DATA WS2811 STELLE   -> morsetto J_STELLE (12V / GND / DATA)
-    D8          = DATA WS2811 CASETTE  -> morsetto J_CASETTE (12V / GND / DATA)
+    D5          = DATA WS2811 STELLE_01 -> morsetto J_STELLE (Rev D) / J_STELLE_01 (Rev E) (12V / GND / DATA)
+    D8          = DATA WS2811 STELLE_02 -> morsetto J_CASETTE (Rev D) / J_STELLE_02 (Rev E) (12V / GND / DATA)
     D6          = buzzer passivo (220 ohm in serie, BZ1 sulla scheda)
     D25..D40    = rele' 1..16 tramite ULN2803A U1/U2 -> morsetti JR1..JR16 (COM/NO/NC)
 
@@ -59,8 +60,8 @@
 const uint8_t PIN_CIELO_R = 2;
 const uint8_t PIN_CIELO_G = 3;
 const uint8_t PIN_CIELO_B = 4;
-const uint8_t PIN_STELLE_DATA = 5;
-const uint8_t PIN_CASETTE_DATA = 8; // seconda catena WS2811 CASETTE
+const uint8_t PIN_STELLE_01_DATA = 5;   // catena WS2811 STELLE_01
+const uint8_t PIN_STELLE_02_DATA = 8;   // catena WS2811 STELLE_02 (stesso funzionamento)
 const uint8_t PIN_BUZZER = 6; // piezo passivo opzionale: se assente il firmware funziona normalmente
 
 // Strisce RGB laterali da 1 m, dedicate agli effetti direzionali.
@@ -71,12 +72,10 @@ const uint8_t PIN_TRAMONTO_B = 12;
 const uint8_t PIN_ALBA_R = 44;
 const uint8_t PIN_ALBA_G = 45;
 const uint8_t PIN_ALBA_B = 46;
-#define NUM_STELLE (cfg.numStelle)        // da [STELLE] numero (max CFG_MAX_STELLE)
-#define NUM_CASETTE (cfg.numCasette)      // da [CASETTE] numero (max CFG_MAX_CASETTE)
-#define STELLE_ATTIVE (cfg.stelleAttive)  // da [STELLE] attive
-#define STELLE_TREMOLANTI STELLE_ATTIVE     // tutte le stelle attive scintillano
-Adafruit_NeoPixel stelle(50, PIN_STELLE_DATA, NEO_GRB + NEO_KHZ800);   // lunghezza aggiornata da cfg nel setup
-Adafruit_NeoPixel casette(50, PIN_CASETTE_DATA, NEO_GRB + NEO_KHZ800); // lunghezza aggiornata da cfg nel setup
+// Due catene di stelle identiche: indice 0 = STELLE_01, 1 = STELLE_02 (sezioni [STELLE_01] e [STELLE_02]).
+Adafruit_NeoPixel stelle01(50, PIN_STELLE_01_DATA, NEO_GRB + NEO_KHZ800);   // lunghezza aggiornata da cfg nel setup
+Adafruit_NeoPixel stelle02(50, PIN_STELLE_02_DATA, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel *const catena[2] = { &stelle01, &stelle02 };
 
 const uint8_t PIN_START = 22;
 const uint8_t PIN_NEXT  = 23;
@@ -157,8 +156,8 @@ enum EventoTasto : uint8_t { TASTO_NULLA = 0, TASTO_BREVE, TASTO_LUNGO };
 // =============================================================================
 #include <stdint.h>
 
-#define CFG_MAX_STELLE   100   // pixel WS2811 massimi per catena STELLE
-#define CFG_MAX_CASETTE  100   // pixel WS2811 massimi per catena CASETTE
+#define CFG_MAX_STELLE   100   // pixel WS2811 massimi per catena di stelle
+#define CFG_NUM_CATENE     2   // catene di stelle: [STELLE_01] e [STELLE_02]
 #define CFG_MAX_EVENTI    64   // righe "evento" della schedulazione rele'
 #define CFG_NOME_LEN      13   // 12 caratteri + terminatore (nome rele' su OLED)
 #define CFG_MAX_TAPPE     20   // tappe di colore massime per striscia RGB (CIELO / TRAMONTO / ALBA)
@@ -206,6 +205,14 @@ enum CfgSdStato : uint8_t {
   SD_OK_ERRORI        // file letto, alcune righe ignorate (vedi primaRigaErrata)
 };
 
+// Una catena di stelle ([STELLE_01] o [STELLE_02]): stessi parametri per entrambe.
+struct CfgStelle {
+  uint16_t numero;                        // pixel della catena (0 = non usata)
+  uint8_t  attive, lumMin, lumMax, livelloNotte;
+  uint16_t scintillioMinMs, scintillioMaxMs;
+  CfgRGB   colore;                        // tinta in % per canale (100,72,38 = bianco caldo)
+};
+
 struct PresepeConfig {
   // [CICLO]
   uint32_t durataMs[3];      // 3 scaglioni selezionati dal potenziometro
@@ -226,17 +233,8 @@ struct PresepeConfig {
   // [COLORI]
   uint8_t  lumCielo, lumTramonto, lumAlba; // limite luminosita' 0..100 %
   uint8_t  gamma, pwmInvertito;
-  // [STELLE]
-  uint16_t numStelle;
-  uint8_t  stelleAttive, lumStelleMin, lumStelleMax, livelloNotte;
-  uint16_t scintillioMinMs, scintillioMaxMs;
-  CfgRGB   coloreStelle;                  // tinta in % per canale (100,72,38 = bianco caldo)
-  // [CASETTE]
-  uint16_t numCasette;
-  CfgRGB   coloreCasette;
-  uint8_t  accendiFase, accendiPct, spegniFase, spegniPct;
-  uint8_t  fuoco;                         // tremolio 0..100 (0 = luce fissa)
-  uint16_t dissolvenzaMs;                 // tempo di accensione/spegnimento morbido
+  // [STELLE_01] [STELLE_02]
+  CfgStelle stelle[CFG_NUM_CATENE];
   // [SISTEMA]
   uint8_t  buzzer, melodiaAvvio, autotestAvvio, oled;
   uint8_t  fastboot;                      // 1 = avvio rapido: niente schermata SD, autotest e melodia (lo splash di 3 s resta)
@@ -403,13 +401,12 @@ void cfgDefault(PresepeConfig &c) {
   // [COLORI]
   c.lumCielo = 100; c.lumTramonto = 100; c.lumAlba = 100;
   c.gamma = 1; c.pwmInvertito = 0;
-  // [STELLE]
-  c.numStelle = 50; c.stelleAttive = 20; c.lumStelleMin = 22; c.lumStelleMax = 75; c.livelloNotte = 235;
-  c.scintillioMinMs = 6400; c.scintillioMaxMs = 12200; c.coloreStelle = rgb(100, 72, 38);
-  // [CASETTE] - luce calda dalla meta' del TRAMONTO a meta' ALBA, lieve tremolio.
-  c.numCasette = 50; c.coloreCasette = rgb(90, 55, 20);
-  c.accendiFase = CFG_TRAMONTO; c.accendiPct = 50; c.spegniFase = CFG_ALBA; c.spegniPct = 50;
-  c.fuoco = 20; c.dissolvenzaMs = 3000;
+  // [STELLE_01] [STELLE_02] - stessi valori predefiniti per le due catene.
+  for (uint8_t k = 0; k < CFG_NUM_CATENE; k++) {
+    CfgStelle &s = c.stelle[k];
+    s.numero = 50; s.attive = 20; s.lumMin = 22; s.lumMax = 75; s.livelloNotte = 235;
+    s.scintillioMinMs = 6400; s.scintillioMaxMs = 12200; s.colore = rgb(100, 72, 38);
+  }
   // [SISTEMA]
   c.buzzer = 1; c.melodiaAvvio = 1; c.autotestAvvio = 1; c.oled = 1;
   c.fastboot = 1;   // dalla release 038 l'avvio rapido e' il predefinito
@@ -611,35 +608,19 @@ static bool sezFase(PresepeConfig &c, uint8_t fase, const char *k, char *v) {
   }
   return false;
 }
-static bool sezStelle(PresepeConfig &c, const char *k, char *v) {
+static bool sezStelle(CfgStelle &s, const char *k, char *v) {   // [STELLE_01] e [STELLE_02]
   long n;
-  if (ugualeCI(k, "numero")) { if (!leggiLong(v, n, 0, CFG_MAX_STELLE)) return false; c.numStelle = (uint16_t)n; return true; }
-  if (ugualeCI(k, "attive")) { if (!leggiLong(v, n, 0, CFG_MAX_STELLE)) return false; c.stelleAttive = (uint8_t)n; return true; }
-  if (ugualeCI(k, "lum_min")) { if (!leggiLong(v, n, 0, 255)) return false; c.lumStelleMin = (uint8_t)n; return true; }
-  if (ugualeCI(k, "lum_max")) { if (!leggiLong(v, n, 0, 255)) return false; c.lumStelleMax = (uint8_t)n; return true; }
-  if (ugualeCI(k, "livello_notte")) { if (!leggiLong(v, n, 0, 255)) return false; c.livelloNotte = (uint8_t)n; return true; }
-  if (ugualeCI(k, "scintillio_min")) { if (!leggiLong(v, n, 500, 60000)) return false; c.scintillioMinMs = (uint16_t)n; return true; }
-  if (ugualeCI(k, "scintillio_max")) { if (!leggiLong(v, n, 500, 60000)) return false; c.scintillioMaxMs = (uint16_t)n; return true; }
+  if (ugualeCI(k, "numero")) { if (!leggiLong(v, n, 0, CFG_MAX_STELLE)) return false; s.numero = (uint16_t)n; return true; }
+  if (ugualeCI(k, "attive")) { if (!leggiLong(v, n, 0, CFG_MAX_STELLE)) return false; s.attive = (uint8_t)n; return true; }
+  if (ugualeCI(k, "lum_min")) { if (!leggiLong(v, n, 0, 255)) return false; s.lumMin = (uint8_t)n; return true; }
+  if (ugualeCI(k, "lum_max")) { if (!leggiLong(v, n, 0, 255)) return false; s.lumMax = (uint8_t)n; return true; }
+  if (ugualeCI(k, "livello_notte")) { if (!leggiLong(v, n, 0, 255)) return false; s.livelloNotte = (uint8_t)n; return true; }
+  if (ugualeCI(k, "scintillio_min")) { if (!leggiLong(v, n, 500, 60000)) return false; s.scintillioMinMs = (uint16_t)n; return true; }
+  if (ugualeCI(k, "scintillio_max")) { if (!leggiLong(v, n, 500, 60000)) return false; s.scintillioMaxMs = (uint16_t)n; return true; }
   if (ugualeCI(k, "colore")) {
     CfgRGB x; if (!leggiRGB(v, x) || x.r > 100 || x.g > 100 || x.b > 100) return false;
-    c.coloreStelle = x; return true;
+    s.colore = x; return true;
   }
-  return false;
-}
-static bool posizione(char *v, uint8_t &fase, uint8_t &pct) {   // "FASE, %"
-  char *f[3]; if (campi(v, f, 3) != 2) return false;
-  long n; uint8_t fa;
-  if (!leggiFase(f[0], fa) || !leggiLong(f[1], n, 0, 100)) return false;
-  fase = fa; pct = (uint8_t)n; return true;
-}
-static bool sezCasette(PresepeConfig &c, const char *k, char *v) {
-  long n;
-  if (ugualeCI(k, "numero")) { if (!leggiLong(v, n, 0, CFG_MAX_CASETTE)) return false; c.numCasette = (uint16_t)n; return true; }
-  if (ugualeCI(k, "colore")) return leggiRGB(v, c.coloreCasette);
-  if (ugualeCI(k, "accendi")) return posizione(v, c.accendiFase, c.accendiPct);
-  if (ugualeCI(k, "spegni")) return posizione(v, c.spegniFase, c.spegniPct);
-  if (ugualeCI(k, "fuoco")) { if (!leggiLong(v, n, 0, 100)) return false; c.fuoco = (uint8_t)n; return true; }
-  if (ugualeCI(k, "dissolvenza_ms")) { if (!leggiLong(v, n, 0, 60000)) return false; c.dissolvenzaMs = (uint16_t)n; return true; }
   return false;
 }
 static bool sezSistema(PresepeConfig &c, const char *k, char *v) {
@@ -747,7 +728,7 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
     if (!(ugualeCI(n, "CICLO") || ugualeCI(n, "FASI") || ugualeCI(n, "RELE") || ugualeCI(n, "COLORI") ||
           ugualeCI(n, "GIORNO") || ugualeCI(n, "TRAMONTO") || ugualeCI(n, "CREPUSCOLO") ||
           ugualeCI(n, "NOTTE") || ugualeCI(n, "ALBA") ||
-          ugualeCI(n, "STELLE") || ugualeCI(n, "CASETTE") || ugualeCI(n, "SISTEMA") ||
+          ugualeCI(n, "STELLE_01") || ugualeCI(n, "STELLE_02") || ugualeCI(n, "SISTEMA") ||
           ugualeCI(n, "WIFI") || ugualeCI(n, "ACCESS_POINT") || ugualeCI(n, "AUTENTICAZIONE"))) { errore(c, numeroRiga); sezione[0] = 0; }
     return;
   }
@@ -760,8 +741,8 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
   else if (ugualeCI(sezione, "FASI")) ok = sezFasi(c, k, v);
   else if (ugualeCI(sezione, "RELE")) ok = sezRele(c, k, v);
   else if (ugualeCI(sezione, "COLORI")) ok = sezColori(c, k, v);
-  else if (ugualeCI(sezione, "STELLE")) ok = sezStelle(c, k, v);
-  else if (ugualeCI(sezione, "CASETTE")) ok = sezCasette(c, k, v);
+  else if (ugualeCI(sezione, "STELLE_01")) ok = sezStelle(c.stelle[0], k, v);
+  else if (ugualeCI(sezione, "STELLE_02")) ok = sezStelle(c.stelle[1], k, v);
   else if (ugualeCI(sezione, "SISTEMA")) ok = sezSistema(c, k, v);
   else if (ugualeCI(sezione, "WIFI")) ok = sezWifi(c, k, v);
   else if (ugualeCI(sezione, "ACCESS_POINT")) ok = sezAccessPoint(c, k, v);
@@ -782,9 +763,12 @@ void cfgValida(PresepeConfig &c) {
     errore(c, 0xFFFF);
   }
   if (c.potMax - c.potMin < 30) { c.potMin = 0; c.potMax = 1023; errore(c, 0xFFFF); }
-  if (c.lumStelleMin > c.lumStelleMax) { c.lumStelleMin = 22; c.lumStelleMax = 75; errore(c, 0xFFFF); }
-  if (c.scintillioMinMs > c.scintillioMaxMs) { c.scintillioMinMs = 6400; c.scintillioMaxMs = 12200; errore(c, 0xFFFF); }
-  if (c.stelleAttive > c.numStelle) c.stelleAttive = (uint8_t)c.numStelle;
+  for (uint8_t k = 0; k < CFG_NUM_CATENE; k++) {
+    CfgStelle &s = c.stelle[k];
+    if (s.lumMin > s.lumMax) { s.lumMin = 22; s.lumMax = 75; errore(c, 0xFFFF); }
+    if (s.scintillioMinMs > s.scintillioMaxMs) { s.scintillioMinMs = 6400; s.scintillioMaxMs = 12200; errore(c, 0xFFFF); }
+    if (s.attive > s.numero) s.attive = (uint8_t)s.numero;
+  }
 }
 
 void cfgParseBuffer(PresepeConfig &c, const char *testo) {
@@ -928,11 +912,12 @@ uint8_t scalaLum(uint8_t v, uint8_t pct);
 void setCielo(uint8_t r, uint8_t g, uint8_t b);
 void setTramonto(uint8_t r, uint8_t g, uint8_t b);
 void setAlba(uint8_t r, uint8_t g, uint8_t b);
-void generaCieloStellato();
-void mostraStelle(float livello);
+void generaCieloStellato(uint8_t k);
+void mostraStelle(uint8_t k, float livello);
 void stelleFlush();
 void aggiornaLedStato();
-void setStelle(uint8_t value);
+void setStelle(uint8_t k, uint8_t value);
+void riempiCatena(uint8_t k, uint8_t r, uint8_t g, uint8_t b);
 void tuttoSpento();
 unsigned long durataDaRaw(int raw);
 unsigned long durataCiclo();
@@ -948,9 +933,6 @@ float fineFase(Fase f);
 uint8_t indiceFase(Fase f);
 void scriviRele(uint8_t indice, bool acceso);
 void aggiornaReleSchedulati(float p);
-float posizioneCiclo(uint8_t fase, uint8_t pct);
-bool casetteAccese(float p);
-void aggiornaCasette(float p);
 float percentualeFase(float p, Fase f);
 void oledCentro(const __FlashStringHelper *s, int y, uint8_t size = 1);
 void mostraOledTest();
@@ -998,7 +980,7 @@ void setup();
 #define NUM_EVENTI_RELE (cfg.numEventi)
 
 bool running = true;
-bool fermo = false;          // STOP: tutto spento (rele', strisce, stelle, casette) fino a PLAY
+bool fermo = false;          // STOP: tutto spento (rele', strisce, stelle) fino a PLAY
 bool testInCorso = false;
 bool testMostraIP = false;   // [WIFI] abilitato: primo passo del test = indirizzo IP
 bool testWeb = false;        // test comandato dalla pagina web (strisce, pixel, rele' uno a uno)
@@ -1160,82 +1142,83 @@ void setAlba(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 // ============================================================
-// STELLE WS2811
+// STELLE WS2811 - due catene identiche, STELLE_01 (D5) e STELLE_02 (D8)
 // ============================================================
-// Effetto naturale: ogni notte viene generato un cielo diverso.
-// Ogni notte vengono scelte casualmente 20 stelle su 50, con luminosita'
-// massime differenti. Compaiono nel crepuscolo, restano attive di notte e
-// scompaiono durante l'alba. Tutte le 20 hanno variazioni asincrone individuali.
+// Effetto naturale: ogni notte viene generato un cielo diverso, per ogni catena.
+// Ogni notte vengono scelte casualmente "attive" stelle su "numero", con
+// luminosita' massime differenti. Compaiono nel crepuscolo, restano accese di
+// notte e scompaiono durante l'alba. Tutte le attive hanno variazioni asincrone.
+// Parametri in [STELLE_01] e [STELLE_02] (cfg.stelle[0] e cfg.stelle[1]).
 
-uint8_t stellaLum[CFG_MAX_STELLE];
-uint8_t stellaOrdine[CFG_MAX_STELLE];
-bool stellaTwinkle[CFG_MAX_STELLE];
+struct StatoStelle {
+  uint8_t lum[CFG_MAX_STELLE];
+  uint8_t ordine[CFG_MAX_STELLE];
+  bool twinkle[CFG_MAX_STELLE];
+  bool inSospeso;                 // pixel cambiati ma non ancora inviati (vedi stelleFlush)
+  unsigned long ultimoShowUs;
+};
+StatoStelle statoStelle[CFG_NUM_CATENE];
 bool cieloGenerato = false;
 Fase ultimaFaseStelle = GIORNO;
 
-void generaCieloStellato() {
-  // Ogni notte scegliamo casualmente solo 20 delle 50 stelle fisiche.
-  // Le altre 30 restano completamente spente.
-  for (uint16_t i = 0; i < NUM_STELLE; i++) {
-    stellaLum[i] = random(cfg.lumStelleMin, cfg.lumStelleMax + 1); // [STELLE] lum_min..lum_max (tenue)
-    stellaOrdine[i] = i;
-    stellaTwinkle[i] = false;
+void generaCieloStellato(uint8_t k) {
+  const CfgStelle &cs = cfg.stelle[k];
+  StatoStelle &st = statoStelle[k];
+  // Ogni notte scegliamo casualmente solo "attive" delle "numero" stelle fisiche.
+  // Le altre restano completamente spente.
+  for (uint16_t i = 0; i < cs.numero; i++) {
+    st.lum[i] = random(cs.lumMin, cs.lumMax + 1); // lum_min..lum_max (tenue)
+    st.ordine[i] = i;
+    st.twinkle[i] = false;
   }
 
-  // Fisher-Yates su tutti i 50 pixel: i primi 20 saranno quelli attivi.
-  for (int i = NUM_STELLE - 1; i > 0; i--) {
+  // Fisher-Yates su tutti i pixel: i primi "attive" saranno quelli accesi.
+  for (int i = cs.numero - 1; i > 0; i--) {
     int j = random(i + 1);
-    uint8_t tmp = stellaOrdine[i];
-    stellaOrdine[i] = stellaOrdine[j];
-    stellaOrdine[j] = tmp;
+    uint8_t tmp = st.ordine[i];
+    st.ordine[i] = st.ordine[j];
+    st.ordine[j] = tmp;
   }
 
-  // Tutte le 20 stelle attive ricevono il comportamento variabile.
-  // Il piccolo shuffle assegna il flag alle stelle gia' selezionate casualmente;
-  // STELLE_TREMOLANTI coincide attualmente con STELLE_ATTIVE, quindi sono tutte.
-  uint8_t candidati[CFG_MAX_STELLE];
-  for (uint8_t i = 0; i < STELLE_ATTIVE; i++) candidati[i] = i;
-  for (int i = STELLE_ATTIVE - 1; i > 0; i--) {
-    int j = random(i + 1);
-    uint8_t tmp = candidati[i];
-    candidati[i] = candidati[j];
-    candidati[j] = tmp;
-  }
-  for (uint8_t n = 0; n < STELLE_TREMOLANTI; n++)
-    stellaTwinkle[stellaOrdine[candidati[n]]] = true;
+  // Tutte le stelle attive scintillano.
+  for (uint8_t n = 0; n < cs.attive; n++) st.twinkle[st.ordine[n]] = true;
+}
 
+void generaTuttiICieli() {
+  for (uint8_t k = 0; k < CFG_NUM_CATENE; k++) generaCieloStellato(k);
   cieloGenerato = true;
 }
 
-bool stelleInSospeso = false;   // pixel delle stelle cambiati ma non ancora inviati (vedi stelleFlush)
-void mostraStelle(float livello) {
+void mostraStelle(uint8_t k, float livello) {
+  const CfgStelle &cs = cfg.stelle[k];
+  StatoStelle &st = statoStelle[k];
+  Adafruit_NeoPixel &np = *catena[k];
   livello = constrain(livello, 0.0f, 1.0f);
-  stelle.clear();
+  np.clear();
 
-  // Durante il crepuscolo entrano progressivamente le 20 stelle scelte;
-  // durante l'alba scompaiono progressivamente. Mai piu' di 20 accese.
-  uint8_t visibili = (uint8_t)(livello * STELLE_ATTIVE + 0.5f);
-  if (visibili > STELLE_ATTIVE) visibili = STELLE_ATTIVE;
+  // Durante il crepuscolo entrano progressivamente le stelle scelte;
+  // durante l'alba scompaiono progressivamente. Mai piu' di "attive" accese.
+  uint8_t visibili = (uint8_t)(livello * cs.attive + 0.5f);
+  if (visibili > cs.attive) visibili = cs.attive;
 
   for (uint8_t pos = 0; pos < visibili; pos++) {
-    uint8_t i = stellaOrdine[pos];
-    float locale = livello * STELLE_ATTIVE - pos;
+    uint8_t i = st.ordine[pos];
+    float locale = livello * cs.attive - pos;
     locale = constrain(locale, 0.0f, 1.0f);
 
-    uint16_t v = (uint16_t)(stellaLum[i] * locale);
+    uint16_t v = (uint16_t)(st.lum[i] * locale);
 
     // Ogni stella attiva segue autonomamente un ciclo di luminosita':
     // livello pieno -> dissolvenza a zero -> pausa spenta -> riaccensione.
-    // Durate e offset differenti evitano che le 20 stelle si muovano insieme.
-    if (stellaTwinkle[i] && v > 5) {
-      // Durata pseudo-casuale e stabile per ogni pixel: circa 6,4-12,2 s.
-      // Rev037: raddoppiata per rendere accensione/spegnimento piu' lento dal vero.
-      // Anche l'offset e' diverso per ogni stella, cosi' partono vicine ma non insieme
-      // e col tempo si sfasano sempre di piu'.
-      // [STELLE] scintillio_min..scintillio_max (default 6400..12200 ms, 30 gradini).
-      const unsigned long passo = ((unsigned long)cfg.scintillioMaxMs - cfg.scintillioMinMs) / 29UL;
-      const unsigned long periodo = cfg.scintillioMinMs + ((unsigned long)(i * 37U) % 30UL) * passo;
-      const unsigned long offset = ((unsigned long)(i * 173U) % 900UL);
+    // Durate e offset differenti evitano che le stelle si muovano insieme;
+    // la seconda catena usa altri numeri (j = i + 100), cosi' non ripete la prima.
+    if (st.twinkle[i] && v > 5) {
+      // Durata pseudo-casuale e stabile per ogni pixel, fra scintillio_min e
+      // scintillio_max (default 6400..12200 ms, 30 gradini).
+      const unsigned long j = i + 100UL * k;
+      const unsigned long passo = ((unsigned long)cs.scintillioMaxMs - cs.scintillioMinMs) / 29UL;
+      const unsigned long periodo = cs.scintillioMinMs + ((j * 37UL) % 30UL) * passo;
+      const unsigned long offset = ((j * 173UL) % 900UL);
       const unsigned long faseMs = (millis() + offset) % periodo;
       const unsigned long pTw = (faseMs * 100UL) / periodo;
       uint8_t fattore = 100;
@@ -1260,46 +1243,60 @@ void mostraStelle(float livello) {
       }
     }
 
-    // Bianco caldo tenue.
-    // [STELLE] colore = tinta in % per canale (default 100,72,38 = bianco caldo).
-    stelle.setPixelColor(i, stelle.Color(
-      (uint8_t)((v * cfg.coloreStelle.r) / 100U),
-      (uint8_t)((v * cfg.coloreStelle.g) / 100U),
-      (uint8_t)((v * cfg.coloreStelle.b) / 100U)
+    // colore = tinta in % per canale (default 100,72,38 = bianco caldo).
+    np.setPixelColor(i, np.Color(
+      (uint8_t)((v * cs.colore.r) / 100U),
+      (uint8_t)((v * cs.colore.g) / 100U),
+      (uint8_t)((v * cs.colore.b) / 100U)
     ));
   }
-  stelleInSospeso = true;
+  st.inSospeso = true;
   stelleFlush();
 }
 
 // NeoPixel disabilita gli interrupt durante la trasmissione.
-// Limitiamo il refresh a 50 Hz per non alterare millis()/Timer0.
+// Limitiamo il refresh a 50 Hz per catena per non alterare millis()/Timer0.
 // Mentre arrivano byte dall'ESP8266 (Serial3) niente show(): gli interrupt
 // spenti dalla trasmissione WS2811 farebbero perdere caratteri. Un aggiornamento
 // rimandato resta in sospeso e lo manda loop() appena possibile (serve quando la
 // scena non viene piu' ricalcolata: STOP, test da web).
+// Al massimo una catena per chiamata (a turno): gli interrupt restano spenti per
+// una sola trasmissione alla volta (~3 ms con 100 pixel), non per due di fila.
 void stelleFlush() {
-  static unsigned long ultimoShowStelleUs = 0;
-  unsigned long adessoUs = micros();
-  if (stelleInSospeso && (unsigned long)(adessoUs - ultimoShowStelleUs) >= 20000UL && !lnkQuiet()) {
-    stelle.show();
-    ultimoShowStelleUs = adessoUs;
-    stelleInSospeso = false;
+  static uint8_t turno = 0;
+  for (uint8_t n = 0; n < CFG_NUM_CATENE; n++) {
+    uint8_t k = (uint8_t)((turno + n) % CFG_NUM_CATENE);
+    StatoStelle &st = statoStelle[k];
+    unsigned long adessoUs = micros();
+    if (st.inSospeso && (unsigned long)(adessoUs - st.ultimoShowUs) >= 20000UL && !lnkQuiet()) {
+      catena[k]->show();
+      st.ultimoShowUs = adessoUs;
+      st.inSospeso = false;
+      turno = (uint8_t)(k + 1);
+      return;
+    }
   }
 }
 
-void setStelle(uint8_t value) {
-  if (!cieloGenerato) generaCieloStellato();
-  mostraStelle(value / 255.0f);
+void setStelle(uint8_t k, uint8_t value) {
+  if (!cieloGenerato) generaTuttiICieli();
+  mostraStelle(k, value / 255.0f);
+}
+
+// Tutti i pixel di una catena dello stesso colore (test, autotest).
+void riempiCatena(uint8_t k, uint8_t r, uint8_t g, uint8_t b) {
+  Adafruit_NeoPixel &np = *catena[k];
+  np.clear();
+  for (uint16_t i = 0; i < cfg.stelle[k].numero; i++) np.setPixelColor(i, np.Color(r, g, b));
+  np.show();
 }
 
 void tuttoSpento() {
   setCielo(0, 0, 0);
   setTramonto(0, 0, 0);
   setAlba(0, 0, 0);
-  setStelle(0);
-  casette.clear();
-  casette.show();
+  setStelle(0, 0);
+  setStelle(1, 0);
 }
 
 // ============================================================
@@ -1462,59 +1459,6 @@ void aggiornaReleSchedulati(float p) {
 }
 
 // ============================================================
-// CASETTE WS2811 (seconda catena su D8) - parametri [CASETTE]
-// ============================================================
-// Accese tra "accendi = FASE, %" e "spegni = FASE, %" (anche a cavallo di fine
-// ciclo), con dissolvenza morbida e tremolio tipo fuoco opzionale per pixel.
-uint8_t casettaFuoco[CFG_MAX_CASETTE];
-uint8_t casettaTarget[CFG_MAX_CASETTE];
-float casetteLivello = 0.0f;
-unsigned long casetteUltimoMs = 0;
-
-float posizioneCiclo(uint8_t fase, uint8_t pct) {
-  float a = inizioFase((Fase)fase), b = fineFase((Fase)fase);
-  return a + (b - a) * pct / 100.0f;
-}
-
-bool casetteAccese(float p) {
-  float a = posizioneCiclo(cfg.accendiFase, cfg.accendiPct);
-  float b = posizioneCiclo(cfg.spegniFase, cfg.spegniPct);
-  if (a == b) return false;
-  return (a < b) ? (p >= a && p < b) : (p >= a || p < b);
-}
-
-void aggiornaCasette(float p) {
-  if (NUM_CASETTE == 0) return;
-  if (lnkQuiet()) return;           // ricezione dall'ESP8266 in corso (vedi mostraStelle)
-  unsigned long now = millis();
-  unsigned long dt = now - casetteUltimoMs;
-  if (dt < 20) return;              // max 50 Hz: NeoPixel sospende gli interrupt
-  casetteUltimoMs = now;
-  if (dt > 200) dt = 200;
-
-  float obiettivo = casetteAccese(p) ? 1.0f : 0.0f;
-  float passo = cfg.dissolvenzaMs ? (float)dt / (float)cfg.dissolvenzaMs : 1.0f;
-  if (casetteLivello < obiettivo) casetteLivello = min(obiettivo, casetteLivello + passo);
-  else if (casetteLivello > obiettivo) casetteLivello = max(obiettivo, casetteLivello - passo);
-
-  for (uint16_t i = 0; i < NUM_CASETTE; i++) {
-    uint8_t f = 255;
-    if (cfg.fuoco) {
-      if (random(6) == 0)
-        casettaTarget[i] = 255 - (uint8_t)random(0, (long)cfg.fuoco * 255L / 100L + 1L);
-      int16_t d = (int16_t)casettaTarget[i] - (int16_t)casettaFuoco[i];
-      casettaFuoco[i] = (uint8_t)(casettaFuoco[i] + d / 3);
-      f = casettaFuoco[i];
-    }
-    float k = casetteLivello * f / 255.0f;
-    casette.setPixelColor(i, casette.Color((uint8_t)(cfg.coloreCasette.r * k),
-                                           (uint8_t)(cfg.coloreCasette.g * k),
-                                           (uint8_t)(cfg.coloreCasette.b * k)));
-  }
-  casette.show();
-}
-
-// ============================================================
 // OLED
 // ============================================================
 
@@ -1582,14 +1526,14 @@ void mostraOledTest() {
       case 6: display.print(F("ALBA ROSSO")); break;
       case 7: display.print(F("ALBA VERDE")); break;
       case 8: display.print(F("ALBA BLU")); break;
-      case 9: display.print(F("STELLE ROSSE")); break;
-      case 10: display.print(F("STELLE VERDI")); break;
-      case 11: display.print(F("STELLE BLU")); break;
-      case 12: display.print(F("STELLE WS2811")); break;
-      case 13: display.print(F("CASETTE ROSSE")); break;
-      case 14: display.print(F("CASETTE VERDI")); break;
-      case 15: display.print(F("CASETTE BLU")); break;
-      case 16: display.print(F("CASETTE WS2811")); break;
+      case 9: display.print(F("STELLE_01 ROSSE")); break;
+      case 10: display.print(F("STELLE_01 VERDI")); break;
+      case 11: display.print(F("STELLE_01 BLU")); break;
+      case 12: display.print(F("STELLE_01 TUTTE")); break;
+      case 13: display.print(F("STELLE_02 ROSSE")); break;
+      case 14: display.print(F("STELLE_02 VERDI")); break;
+      case 15: display.print(F("STELLE_02 BLU")); break;
+      case 16: display.print(F("STELLE_02 TUTTE")); break;
       case 17: display.print(F("TUTTO INSIEME")); break;
     }
   } else {
@@ -1813,10 +1757,10 @@ void stampaConfig() {
     if (cfg.nome[cfg.eventi[i].rele][0]) { Serial.print(F(" (")); Serial.print(cfg.nome[cfg.eventi[i].rele]); Serial.print(')'); }
     Serial.println(cfg.eventi[i].acceso ? F(" ON") : F(" OFF"));
   }
-  Serial.print(F("Stelle: ")); Serial.print(cfg.numStelle); Serial.print(F(" pixel, attive ")); Serial.println(cfg.stelleAttive);
-  Serial.print(F("Casette: ")); Serial.print(cfg.numCasette); Serial.print(F(" pixel, accese da "));
-  Serial.print(cfgNomeFase(cfg.accendiFase)); Serial.print(' '); Serial.print(cfg.accendiPct); Serial.print(F("% a "));
-  Serial.print(cfgNomeFase(cfg.spegniFase)); Serial.print(' '); Serial.print(cfg.spegniPct); Serial.println('%');
+  for (uint8_t k = 0; k < CFG_NUM_CATENE; k++) {
+    Serial.print(F("STELLE_0")); Serial.print(k + 1); Serial.print(F(": ")); Serial.print(cfg.stelle[k].numero);
+    Serial.print(F(" pixel, attive ")); Serial.println(cfg.stelle[k].attive);
+  }
   if (cfg.wifiAbilitato == 3) {
     Serial.print(F("WiFi: automatico, rete di casa \"")); Serial.print(cfg.wifiSsid);
     Serial.print(F("\"; se non si collega entro ")); Serial.print(cfg.apAttesa); Serial.println(F(" s apre l'access point"));
@@ -1873,7 +1817,7 @@ void aggiornaScena(float p) {
 
   // Genera una nuova disposizione a ogni ingresso nel crepuscolo.
   if (fase == CREPUSCOLO && ultimaFaseStelle != CREPUSCOLO) {
-    generaCieloStellato();
+    generaTuttiICieli();
   }
   ultimaFaseStelle = fase;
 
@@ -1884,31 +1828,35 @@ void aggiornaScena(float p) {
   CfgRGB tram  = cfgColoreTappe(cfg, CFG_S_TRAMONTO, p);
   CfgRGB alba  = cfgColoreTappe(cfg, CFG_S_ALBA, p);
 
-  // Stelle: compaiono nel CREPUSCOLO (lineare), piene di NOTTE,
-  // si dissolvono durante tutta l'ALBA (curva morbida).
-  uint8_t livelloStelle = 0;
-  switch (fase) {
-    case CREPUSCOLO:
-      livelloStelle = interpola8(0, cfg.livelloNotte, progresso(p, P_CREPU, P_NOTTE));
-      break;
-    case NOTTE:
-      livelloStelle = cfg.livelloNotte;
-      break;
-    case ALBA: {
-      float t = progresso(p, P_ALBA, 100.0f);
-      float tStelle = t * t * (3.0f - 2.0f * t);
-      livelloStelle = interpola8(cfg.livelloNotte, 0, tStelle);
-      break;
+  // Stelle (le due catene allo stesso modo, ognuna col suo livello_notte):
+  // compaiono nel CREPUSCOLO (lineare), piene di NOTTE, si dissolvono durante
+  // tutta l'ALBA (curva morbida).
+  uint8_t livelloStelle[CFG_NUM_CATENE];
+  for (uint8_t k = 0; k < CFG_NUM_CATENE; k++) {
+    uint8_t notte = cfg.stelle[k].livelloNotte;
+    switch (fase) {
+      case CREPUSCOLO:
+        livelloStelle[k] = interpola8(0, notte, progresso(p, P_CREPU, P_NOTTE));
+        break;
+      case NOTTE:
+        livelloStelle[k] = notte;
+        break;
+      case ALBA: {
+        float t = progresso(p, P_ALBA, 100.0f);
+        float tStelle = t * t * (3.0f - 2.0f * t);
+        livelloStelle[k] = interpola8(notte, 0, tStelle);
+        break;
+      }
+      default:
+        livelloStelle[k] = 0;
+        break;
     }
-    default:
-      livelloStelle = 0;
-      break;
   }
 
   setCielo(cielo.r, cielo.g, cielo.b);
   setTramonto(tram.r, tram.g, tram.b);
   setAlba(alba.r, alba.g, alba.b);
-  setStelle(livelloStelle);
+  for (uint8_t k = 0; k < CFG_NUM_CATENE; k++) setStelle(k, livelloStelle[k]);
 }
 
 // ============================================================
@@ -1961,8 +1909,6 @@ void toggleStartStop() {
     oledPopup = OLED_NESSUNO;
     float p = percentualeCiclo(durataCiclo());
     aggiornaScena(p);
-    casetteLivello = 0.0f;           // le casette ripartono con la dissolvenza
-    aggiornaCasette(p);
     aggiornaReleSchedulati(p);
     aggiornaOled(durataCiclo(), p);
     return;
@@ -2029,7 +1975,6 @@ void fermaPresepe() {
   oledPopup = OLED_NESSUNO;
   tuttoSpento();
   spegniRele();
-  casetteLivello = 0.0f;
   buzzerBeep();
   Serial.println(F("STOP: tutto spento (START breve = PLAY)"));
   mostraOledStop();
@@ -2042,7 +1987,6 @@ void avviaPresepe() {
   running = true;
   cycleStartMs = millis();
   cieloGenerato = false; ultimaFaseStelle = GIORNO;
-  casetteLivello = 0.0f;
   buzzerBeep();
   Serial.println(F("PLAY: ciclo dall'inizio del GIORNO"));
   oledMostraPopup(OLED_PLAY);
@@ -2131,76 +2075,20 @@ void applicaTestCorrente() {
       setAlba(0, 0, 255);
       Serial.println(F("TEST 9/34 - ALBA BLU"));
       break;
-    case 9:
-      // Verifica il canale rosso di tutti i 50 pixel WS2811.
-      stelle.clear();
-      for (uint16_t i = 0; i < NUM_STELLE; i++)
-        stelle.setPixelColor(i, stelle.Color(70, 0, 0));
-      stelle.show();
-      Serial.println(F("TEST 10/34 - STELLE ROSSE"));
-      break;
-    case 10:
-      // Verifica il canale verde di tutti i 50 pixel WS2811.
-      stelle.clear();
-      for (uint16_t i = 0; i < NUM_STELLE; i++)
-        stelle.setPixelColor(i, stelle.Color(0, 70, 0));
-      stelle.show();
-      Serial.println(F("TEST 11/34 - STELLE VERDI"));
-      break;
-    case 11:
-      // Verifica il canale blu di tutti i 50 pixel WS2811.
-      stelle.clear();
-      for (uint16_t i = 0; i < NUM_STELLE; i++)
-        stelle.setPixelColor(i, stelle.Color(0, 0, 70));
-      stelle.show();
-      Serial.println(F("TEST 12/34 - STELLE BLU"));
-      break;
-    case 12:
-      // Test scenografico esistente: tutte le 50 stelle in bianco caldo tenue.
-      stelle.clear();
-      for (uint16_t i = 0; i < NUM_STELLE; i++)
-        stelle.setPixelColor(i, stelle.Color(70, 50, 27));
-      stelle.show();
-      Serial.println(F("TEST 13/34 - TUTTE LE STELLE"));
-      break;
-    case 13:
-      casette.clear();
-      for (uint16_t i = 0; i < NUM_CASETTE; i++)
-        casette.setPixelColor(i, casette.Color(70, 0, 0));
-      casette.show();
-      Serial.println(F("TEST 14/34 - CASETTE ROSSE"));
-      break;
-    case 14:
-      casette.clear();
-      for (uint16_t i = 0; i < NUM_CASETTE; i++)
-        casette.setPixelColor(i, casette.Color(0, 70, 0));
-      casette.show();
-      Serial.println(F("TEST 15/34 - CASETTE VERDI"));
-      break;
-    case 15:
-      casette.clear();
-      for (uint16_t i = 0; i < NUM_CASETTE; i++)
-        casette.setPixelColor(i, casette.Color(0, 0, 70));
-      casette.show();
-      Serial.println(F("TEST 16/34 - CASETTE BLU"));
-      break;
-    case 16:
-      casette.clear();
-      for (uint16_t i = 0; i < NUM_CASETTE; i++)
-        casette.setPixelColor(i, casette.Color(70, 50, 27));
-      casette.show();
-      Serial.println(F("TEST 17/34 - TUTTE LE CASETTE"));
-      break;
+    case 9:  riempiCatena(0, 70, 0, 0);   Serial.println(F("TEST 10/34 - STELLE_01 ROSSE")); break;
+    case 10: riempiCatena(0, 0, 70, 0);   Serial.println(F("TEST 11/34 - STELLE_01 VERDI")); break;
+    case 11: riempiCatena(0, 0, 0, 70);   Serial.println(F("TEST 12/34 - STELLE_01 BLU")); break;
+    case 12: riempiCatena(0, 70, 50, 27); Serial.println(F("TEST 13/34 - STELLE_01 TUTTE")); break;
+    case 13: riempiCatena(1, 70, 0, 0);   Serial.println(F("TEST 14/34 - STELLE_02 ROSSE")); break;
+    case 14: riempiCatena(1, 0, 70, 0);   Serial.println(F("TEST 15/34 - STELLE_02 VERDI")); break;
+    case 15: riempiCatena(1, 0, 0, 70);   Serial.println(F("TEST 16/34 - STELLE_02 BLU")); break;
+    case 16: riempiCatena(1, 70, 50, 27); Serial.println(F("TEST 17/34 - STELLE_02 TUTTE")); break;
     case 17:
       setCielo(120, 90, 70);
       setTramonto(180, 50, 8);
       setAlba(180, 95, 30);
-      stelle.clear();
-      for (uint16_t i = 0; i < NUM_STELLE; i++)
-        stelle.setPixelColor(i, stelle.Color(45, 32, 17));
-      stelle.show();
-      for (uint16_t i = 0; i < NUM_CASETTE; i++) casette.setPixelColor(i, casette.Color(45, 32, 17));
-      casette.show();
+      riempiCatena(0, 45, 32, 17);
+      riempiCatena(1, 45, 32, 17);
       Serial.println(F("TEST 18/34 - TUTTO INSIEME"));
       break;
   }
@@ -2391,23 +2279,15 @@ void eseguiSequenzaBoot() {
   attesaBoot(F("TRAMONTO"), 2);
   setTramonto(0, 0, 0);
 
-  // 4/5 - tutte le 50 stelle: ultimo quarto della melodia.
-  stelle.clear();
-  for (uint16_t i = 0; i < NUM_STELLE; i++)
-    stelle.setPixelColor(i, stelle.Color(255, 255, 255));
-  stelle.show();
-  attesaBoot(F("STELLE"), 3);
-  stelle.clear();
-  stelle.show();
+  // 4/5 - catena STELLE_01 (D5) tutta accesa.
+  riempiCatena(0, 255, 255, 255);
+  attesaBoot(F("STELLE_01"), 3);
+  riempiCatena(0, 0, 0, 0);
 
-  // 5/5 - seconda catena WS2811 CASETTE su D8.
-  casette.clear();
-  for (uint16_t i = 0; i < NUM_CASETTE; i++)
-    casette.setPixelColor(i, casette.Color(255, 255, 255));
-  casette.show();
-  attesaBoot(F("CASETTE"), 4);
-  casette.clear();
-  casette.show();
+  // 5/5 - catena STELLE_02 (D8) tutta accesa.
+  riempiCatena(1, 255, 255, 255);
+  attesaBoot(F("STELLE_02"), 4);
+  riempiCatena(1, 0, 0, 0);
 
   // I cinque passi coprono l'intera melodia: luce, progress bar e musica
   // terminano insieme prima di PRONTO.
@@ -2416,8 +2296,6 @@ void eseguiSequenzaBoot() {
   bootNotaCorrente = -1;
 
   // Fine autotest: tutto spento prima dell'avvio del normale ciclo GIORNO.
-  stelle.clear();
-  stelle.show();
   tuttoSpento();
   spegniRele();
   mostraOledBoot(F("PRONTO"), BOOT_STEP_COUNT, 0);
@@ -2699,7 +2577,7 @@ bool lnkScrittura = false;
 uint16_t lnkSeq = 0xFFFF;            // ultimo pezzo scritto (le ritrasmissioni non si ripetono)
 uint32_t lnkByte = 0;
 unsigned long lnkScritturaMs = 0;
-// pixel del test da web: bit per pixel, STELLE (0) e CASETTE (1)
+// pixel del test da web: bit per pixel, STELLE_01 (0) e STELLE_02 (1)
 uint8_t webPixel[2][(CFG_MAX_STELLE + 7) / 8];
 // ultimo comando numerato eseguito e il suo esito (vedi lnkEsito)
 uint16_t lnkIdFatto = 0;
@@ -2813,8 +2691,8 @@ void lnkInviaStato() {
   LNK_SERIAL.print(cfg.sdStato); LNK_SERIAL.print(' ');
   LNK_SERIAL.print(cfg.errori); LNK_SERIAL.print(' ');
   LNK_SERIAL.print(cfg.primaRigaErrata); LNK_SERIAL.print(' ');
-  LNK_SERIAL.print(cfg.numStelle); LNK_SERIAL.print(' ');
-  LNK_SERIAL.print(cfg.numCasette); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print(cfg.stelle[0].numero); LNK_SERIAL.print(' ');
+  LNK_SERIAL.print(cfg.stelle[1].numero); LNK_SERIAL.print(' ');
   LNK_SERIAL.print(releStato); LNK_SERIAL.print(' ');
   const uint8_t v[9] = { rgbCieloR, rgbCieloG, rgbCieloB, rgbTramontoR, rgbTramontoG, rgbTramontoB,
                          rgbAlbaR, rgbAlbaG, rgbAlbaB };
@@ -2920,12 +2798,12 @@ void lnkInviaFile() {
 }
 
 
-void webPixelMostra(uint8_t catena) {
-  Adafruit_NeoPixel &np = catena ? casette : stelle;
-  uint16_t n = catena ? NUM_CASETTE : NUM_STELLE;
+void webPixelMostra(uint8_t k) {
+  Adafruit_NeoPixel &np = *catena[k];
+  uint16_t n = cfg.stelle[k].numero;
   np.clear();
   for (uint16_t i = 0; i < n; i++)
-    if (webPixel[catena][i >> 3] & (1 << (i & 7)))
+    if (webPixel[k][i >> 3] & (1 << (i & 7)))
       np.setPixelColor(i, np.Color(webPixelColore.r, webPixelColore.g, webPixelColore.b));
   np.show();
 }
@@ -2967,10 +2845,10 @@ void lnkComando(char *riga) {
     if (a == 0) setCielo(b, c, d); else if (a == 1) setTramonto(b, c, d); else setAlba(b, c, d);
     lnkOk(); return;
   }
-  if (!strcmp(cmd, "P") || !strcmp(cmd, "PA")) {   // P catena pixel 0/1  |  PA catena 0/1
+  if (!strcmp(cmd, "P") || !strcmp(cmd, "PA")) {   // P catena pixel 0/1  |  PA catena 0/1  (0 STELLE_01, 1 STELLE_02)
     bool tutti = cmd[1] == 'A';
     if (!lnkNumero(s, a, 0, 1)) { lnkErr(F("arg")); return; }
-    uint16_t n = a ? NUM_CASETTE : NUM_STELLE;
+    uint16_t n = cfg.stelle[a].numero;
     if (!tutti && (!lnkNumero(s, b, 0, (long)n - 1))) { lnkErr(F("arg")); return; }
     if (!lnkNumero(s, c, 0, 1)) { lnkErr(F("arg")); return; }
     if (!lnkPerTest()) return;
@@ -3261,10 +3139,10 @@ const char INI_PREDEFINITO[] PROGMEM =
   "\n"
   "[CREPUSCOLO]\n"
   "; Nessuna tappa: cielo, tramonto e alba restano spente (l'ultima tappa di ognuna\n"
-  "; e' 0,0,0 e la successiva anche). Compaiono le stelle (vedi [STELLE]).\n"
+  "; e' 0,0,0 e la successiva anche). Compaiono le stelle (vedi [STELLE_01] e [STELLE_02]).\n"
   "\n"
   "[NOTTE]\n"
-  "; Nessuna tappa: le strisce restano spente; stelle accese (vedi [STELLE]).\n"
+  "; Nessuna tappa: le strisce restano spente; stelle accese (vedi [STELLE_01] e [STELLE_02]).\n"
   "rele     = 3, OFF, 50                ; Grp_01_03 spento a meta' notte\n"
   "\n"
   "[ALBA]\n"
@@ -3293,8 +3171,12 @@ const char INI_PREDEFINITO[] PROGMEM =
   "; con la scheda Rev D lascia 0.\n"
   "pwm_invertito = 0\n"
   "\n"
-  "[STELLE]\n"
-  "numero  = 50          ; pixel WS2811 della catena STELLE (massimo 100)\n"
+  "[STELLE_01]\n"
+  "; Catena WS2811 STELLE_01: uscita D5, morsetto STELLE sulla scheda Rev D, STELLE_01 sulla Rev E.\n"
+  "; Le catene STELLE_01 e STELLE_02 funzionano allo stesso modo, ognuna con i suoi\n"
+  "; valori: per esempio due zone del cielo.\n"
+  "; Le stelle compaiono nel CREPUSCOLO, sono piene di NOTTE e svaniscono nell'ALBA.\n"
+  "numero  = 50          ; pixel WS2811 della catena STELLE_01 (massimo 100, 0 = non usata)\n"
   "attive  = 20          ; quante stelle si accendono ogni notte, scelte a caso\n"
   "lum_min = 22          ; luminosita' minima e massima di ogni stella (0..255, tienile tenui)\n"
   "lum_max = 75\n"
@@ -3306,13 +3188,22 @@ const char INI_PREDEFINITO[] PROGMEM =
   "; Tinta delle stelle in % per canale R, G, B (100 = pieno): 100,72,38 = bianco caldo.\n"
   "colore = 100,72,38\n"
   "\n"
-  "[CASETTE]\n"
-  "numero  = 50              ; pixel WS2811 della catena CASETTE (massimo 100, 0 = non usata)\n"
-  "colore  = 90,55,20        ; colore delle finestre, R, G, B (0..255): luce calda\n"
-  "accendi = TRAMONTO, 50    ; si accendono al 50 % del TRAMONTO\n"
-  "spegni  = ALBA, 50        ; si spengono al 50 % dell'ALBA (puo' scavalcare la fine del ciclo)\n"
-  "fuoco   = 20              ; tremolio di ogni casa, 0..100 (0 = luce fissa, 100 = fuoco vivace)\n"
-  "dissolvenza_ms = 3000     ; durata dell'accensione e dello spegnimento morbidi, in ms\n"
+  "[STELLE_02]\n"
+  "; Catena WS2811 STELLE_02: uscita D8, morsetto CASETTE sulla scheda Rev D, STELLE_02 sulla Rev E.\n"
+  "; Le catene STELLE_01 e STELLE_02 funzionano allo stesso modo, ognuna con i suoi\n"
+  "; valori: per esempio due zone del cielo.\n"
+  "; Le stelle compaiono nel CREPUSCOLO, sono piene di NOTTE e svaniscono nell'ALBA.\n"
+  "numero  = 50          ; pixel WS2811 della catena STELLE_02 (massimo 100, 0 = non usata)\n"
+  "attive  = 20          ; quante stelle si accendono ogni notte, scelte a caso\n"
+  "lum_min = 22          ; luminosita' minima e massima di ogni stella (0..255, tienile tenui)\n"
+  "lum_max = 75\n"
+  "livello_notte = 235   ; luminosita' complessiva delle stelle a notte piena (0..255)\n"
+  "; Scintillio: ogni stella si spegne e si riaccende piano con un proprio periodo,\n"
+  "; scelto fra questi due valori (in millisecondi). Valori alti = scintillio lento.\n"
+  "scintillio_min = 6400\n"
+  "scintillio_max = 12200\n"
+  "; Tinta delle stelle in % per canale R, G, B (100 = pieno): 100,72,38 = bianco caldo.\n"
+  "colore = 100,72,38\n"
   "\n"
   "[SISTEMA]\n"
   "; Avvio rapido. 1 = dopo la schermata iniziale \"by Vanni\" (3 s, sempre presente:\n"
@@ -3424,7 +3315,6 @@ void riavviaSoftware() {
   modalitaColore = false;
   oledPopup = OLED_NESSUNO;
   cieloGenerato = false; ultimaFaseStelle = GIORNO;
-  casetteLivello = 0.0f;
   ultimoPotOled = -1; potBeepRiferimento = -1; potBeepInAttesa = false; potPopupInAttesa = false;
   lastStartRead = stableStart = HIGH; lastNextRead = stableNext = HIGH; lastTestRead = stableTest = HIGH;
   setup();
@@ -3451,9 +3341,7 @@ void setup() {
     cfgDefault(cfg); cfgCaricaDaSD(PIN_SD_CS, PIN_SD_CD);
   }
   lnkInizio();                 // [WIFI] abilitato: invia SSID e password all'ESP8266 (non blocca)
-  stelle.updateLength(cfg.numStelle);
-  casette.updateLength(cfg.numCasette);
-  for (uint16_t i = 0; i < CFG_MAX_CASETTE; i++) { casettaFuoco[i] = 255; casettaTarget[i] = 255; }
+  for (uint8_t k = 0; k < CFG_NUM_CATENE; k++) catena[k]->updateLength(cfg.stelle[k].numero);
 
   // Prima mettiamo tutte le uscite in uno stato definito: durante lo splash
   // OLED nessun ingresso MOSFET/rele deve restare flottante.
@@ -3470,12 +3358,11 @@ void setup() {
   pinMode(LED_STATO, OUTPUT);
   digitalWrite(LED_STATO, HIGH);   // acceso fisso durante l'avvio
   noTone(PIN_BUZZER);
-  stelle.begin();
-  stelle.clear();
-  stelle.show();
-  casette.begin();
-  casette.clear();
-  casette.show();
+  for (uint8_t k = 0; k < CFG_NUM_CATENE; k++) {
+    catena[k]->begin();
+    catena[k]->clear();
+    catena[k]->show();
+  }
 
   pinMode(PIN_START, INPUT_PULLUP);
   pinMode(PIN_NEXT,  INPUT_PULLUP);
@@ -3502,7 +3389,7 @@ void setup() {
   mostraStatoSD();
   randomSeed(analogRead(A15) ^ micros());
 
-  // Autotest di accensione: ALBA -> GIORNO -> TRAMONTO -> STELLE -> CASETTE.
+  // Autotest di accensione: ALBA -> GIORNO -> TRAMONTO -> STELLE_01 -> STELLE_02.
   // Cinque passi sincronizzati con la melodia; OLED mostra la progress bar complessiva.
   // [SISTEMA] autotest_avvio = 0 lo salta; fastboot = 1 lo salta sempre (e con lui la melodia).
   // In modalita' colore l'autotest non serve.
@@ -3527,8 +3414,8 @@ void setup() {
   Serial.println(F("D2  = RGB Rosso"));
   Serial.println(F("D3  = RGB Verde"));
   Serial.println(F("D4  = RGB Blu"));
-  Serial.println(F("D5  = DATA WS2811 (50 stelle)"));
-  Serial.println(F("D8 = DATA WS2811 CASETTE"));
+  Serial.println(F("D5  = DATA WS2811 STELLE_01"));
+  Serial.println(F("D8  = DATA WS2811 STELLE_02"));
   Serial.println(F("D6  = BUZZER passivo opzionale"));
   Serial.println(F("D7/D11/D12 = RGB SINISTRA / TRAMONTO"));
   Serial.println(F("D44/D45/D46 = RGB DESTRA / ALBA"));
@@ -3656,7 +3543,6 @@ void loop() {
     durata = durataCiclo();
     p = percentualeCiclo(durata);
     aggiornaScena(p);
-    aggiornaCasette(p);
     aggiornaReleSchedulati(p);
     aggiornaOled(durata, p);
 

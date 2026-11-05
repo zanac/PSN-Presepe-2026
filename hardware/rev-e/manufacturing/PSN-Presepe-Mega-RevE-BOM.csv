@@ -7,7 +7,7 @@ Qty,References,Value / part,Footprint,Notes
 2,C6 C7,100nF,C_0805_2012Metric,MLCC 0805 X7R
 1,D1,LED_GREEN_3MM,LED_D3.0mm,"3 mm green LED, diffused (status LED on D13)"
 4,J1 J_NEXT J_START J_TEST,"Phoenix MKDS 1,5/2-5,08 (or equivalent 5.08 mm screw terminal rated >= 250 V AC / >= 10 A)","TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal",
-19,JR1 JR10 JR11 JR12 JR13 JR14 JR15 JR16 JR2 JR3 JR4 JR5 JR6 JR7 JR8 JR9 J_CASETTE J_POT J_STELLE,"Phoenix MKDS 1,5/3-5,08 (or equivalent 5.08 mm screw terminal rated >= 250 V AC / >= 10 A)","TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal",
+19,JR1 JR10 JR11 JR12 JR13 JR14 JR15 JR16 JR2 JR3 JR4 JR5 JR6 JR7 JR8 JR9 J_POT J_STELLE_01 J_STELLE_02,"Phoenix MKDS 1,5/3-5,08 (or equivalent 5.08 mm screw terminal rated >= 250 V AC / >= 10 A)","TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal",
 4,J_ALBA J_CIELO J_OLED J_TRAMONTO,"Phoenix MKDS 1,5/4-5,08 (or equivalent 5.08 mm screw terminal rated >= 250 V AC / >= 10 A)","TerminalBlock_Phoenix_MKDS-1,5-4-5.08_1x04_P5.08mm_Horizontal",
 1,J_SD,DM3AT-SF-PEJM5,microSD_HC_Hirose_DM3AT-SF-PEJM5,Hirose push-push microSD with card detect
 16,K1 K10 K11 K12 K13 K14 K15 K16 K2 K3 K4 K5 K6 K7 K8 K9,G5Q-1_DC12,Relay_SPDT_Omron-G5Q-1,Omron G5Q-1 DC12 (contact rating 10 A 250 VAC; verify suffix)

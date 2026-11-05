@@ -7,7 +7,7 @@ Arduino Mega 2560 controller for a modular 12 V nativity scene (*presepe*).
 It runs a day/night cycle: **GIORNO → TRAMONTO → CREPUSCOLO → NOTTE → ALBA** (day → sunset → dusk → night → dawn). The cycle drives:
 
 - three analog 12 V RGB strips: main sky, sunset side and dawn side;
-- two addressable WS2811 chains: twinkling stars and house windows;
+- two addressable WS2811 chains of twinkling stars, STELLE_01 and STELLE_02 (for example two zones of the sky);
 - 16 relays for motors, pumps and lamps.
 
 Every scenography parameter can be changed from a `PRESEPE.INI` file on a microSD card, read at power-on.
@@ -91,8 +91,8 @@ Everything in `hardware/rev-d/kicad/`, `manufacturing/` (except the frozen order
 | **CIELO** (sky) | 12 V common-anode RGB strip, 3 PWM MOSFET channels | Warm day light, full white at mid-day, fades to dark at night, warm dawn glow |
 | **TRAMONTO** (sunset, left) | 12 V RGB strip, 3 PWM channels | Orange/red swell during sunset only, completely off otherwise |
 | **ALBA** (dawn, right) | 12 V RGB strip, 3 PWM channels | Lighter warm swell during dawn only |
-| **STELLE** (stars) | 12 V WS2811 chain (default 50 pixels) | Random stars appear at dusk, twinkle individually at night, fade at dawn |
-| **CASETTE** (houses) | 12 V WS2811 chain (default 50 pixels) | Warm window light from mid-sunset to mid-dawn, gentle per-house flicker |
+| **STELLE_01** (stars) | 12 V WS2811 chain on D5 (default 50 pixels) | Random stars appear at dusk, twinkle individually at night, fade at dawn |
+| **STELLE_02** (stars) | 12 V WS2811 chain on D8 (default 50 pixels) | Same behaviour as STELLE_01, with its own settings: a second zone of the sky |
 | **Relays 1–16** | Omron G5Q-1, potential-free COM/NO/NC contacts | Switched on/off at programmable points of each phase |
 | **Controls** | START/STOP, NEXT, TEST buttons, speed potentiometer | Pause/resume, jump to next phase, output test, choose 1 of 3 cycle lengths |
 | **OLED** | 0.96" SSD1306 128×64 I2C | Phase, progress, cycle length, SD status, test steps (optional) |
@@ -138,6 +138,7 @@ Rev E keeps the Rev D board outline, connectors, placement and pin map, so the s
 | **Status LED** D1 (green, 3 mm) with RLED 1 kΩ (0805) on Mega D13, top-left next to the microSD | shows at a glance whether the controller runs, is paused, in TEST or STOP (see [Operation](#operation)) |
 | **Test points** TP1–TP5 in a row: +12V, GND, +5V, GND, +3V3 (plated 2 mm pads, no part) | measure the supplies with a meter without looking for a pin; a slipping probe can only short a rail to GND, never 12 V onto 5 V |
 | No vias above the Mega USB-B socket (rule area in the board, used by the router and by KiCad DRC) | was only checked afterwards on Rev D |
+| Star terminals named **J_STELLE_01** / **J_STELLE_02** (silkscreen STELLE_01 / STELLE_02, nets `D5_STELLE_01_DATA` / `D8_STELLE_02_DATA`) | the firmware drives two identical star chains; Rev D still says STELLE / CASETTE |
 
 The routing is new (Freerouting), stored in `hardware/rev-e/build/data/routing.ses` so that the build is reproducible. Before ordering, print the 1:1 PDF and check the real buzzer, C1 and LED on it ([Before ordering a new revision](#before-ordering-a-new-revision)).
 
@@ -158,8 +159,8 @@ Pin 1 is the square pad. The function of each pin is also printed on the silkscr
 | **J_CIELO** | +12 V | R− | G− | B− | Sky RGB strip (common anode) |
 | **J_TRAMONTO** | +12 V | R− | G− | B− | Sunset RGB strip |
 | **J_ALBA** | +12 V | R− | G− | B− | Dawn RGB strip |
-| **J_STELLE** | +12 V | GND | DATA (D5) | | WS2811 stars |
-| **J_CASETTE** | +12 V | GND | DATA (D8) | | WS2811 houses |
+| **J_STELLE** (Rev D) / **J_STELLE_01** (Rev E) | +12 V | GND | DATA (D5) | | WS2811 chain STELLE_01 |
+| **J_CASETTE** (Rev D) / **J_STELLE_02** (Rev E) | +12 V | GND | DATA (D8) | | WS2811 chain STELLE_02 (the Rev D silkscreen still says CASETTE) |
 
 ### Top and right edges (relay area)
 
@@ -176,10 +177,10 @@ JR1–JR8 run along the top edge and JR9–JR16 down the right edge. Relay *n* i
 | Mega pin | Function | Notes |
 |---|---|---|
 | D2, D3, D4 | CIELO R, G, B (PWM) | Q1–Q3. D4 uses Timer0, so it is 8-bit PWM only |
-| D5 | STELLE WS2811 data | |
+| D5 | STELLE_01 WS2811 data | |
 | D6 | Buzzer | through RBZ1 220 Ω |
 | D7, D11, D12 | TRAMONTO R, G, B (PWM) | Q4–Q6, 16-bit timers |
-| D8 | CASETTE WS2811 data | |
+| D8 | STELLE_02 WS2811 data | |
 | D20 / D21 | I2C SDA / SCL | OLED address 0x3C |
 | D22, D23, D24 | START, NEXT, TEST | `INPUT_PULLUP`; a button shorts the pin to GND |
 | D25 … D40 | Relays 1 … 16 | HIGH = relay on (through the ULN2803A) |
@@ -226,17 +227,19 @@ J_CIELO pin 4 (B−)    ──► strip B
 
 Do not connect a strip's R/G/B to +12 V or GND directly.
 
-### WS2811 chains (STELLE / CASETTE)
+### WS2811 chains (STELLE_01 / STELLE_02)
 
 ```
-J_STELLE pin 1 (+12 V) ──► chain +12V
-J_STELLE pin 2 (GND)   ──► chain GND
-J_STELLE pin 3 (DATA)  ──[330 Ω, recommended, at the chain input]──► chain DIN
+J_STELLE_01 pin 1 (+12 V) ──► chain +12V
+J_STELLE_01 pin 2 (GND)   ──► chain GND
+J_STELLE_01 pin 3 (DATA)  ──[330 Ω, recommended, at the chain input]──► chain DIN
 ```
+
+J_STELLE_02 is wired the same way. On the Rev D board the two terminals are labelled STELLE and CASETTE.
 
 The board has no series resistor on DATA. Put a 330–470 Ω resistor in the data wire, close to the first pixel. This matters most with long wires.
 
-For long chains, also feed +12 V at the far end of the chain. Set the number of pixels in `[STELLE] numero` and `[CASETTE] numero`. The maximum is 100 per chain.
+For long chains, also feed +12 V at the far end of the chain. Set the number of pixels in `[STELLE_01] numero` and `[STELLE_02] numero`. The maximum is 100 per chain; 0 leaves a chain unused.
 
 ### Relays (potential-free contacts)
 
@@ -302,7 +305,7 @@ With off-the-shelf 4- or 8-channel relay modules, connect IN1…IN16 to D25…D4
 ### 8.3 WS2811 chains
 
 ```
-Mega D5 ──[330 Ω]──► STELLE DIN        Mega D8 ──[330 Ω]──► CASETTE DIN
+Mega D5 ──[330 Ω]──► STELLE_01 DIN     Mega D8 ──[330 Ω]──► STELLE_02 DIN
 12 V supply + / 0 V ──► chain +12V / GND, with 0 V common with Arduino GND
 ```
 
@@ -442,9 +445,9 @@ The DIP switches sit under the shield once the board is mounted: do C1–C3 with
 
 | Button | Action |
 |---|---|
-| **START/STOP** | Short press (acts on release): pause or resume; resumes exactly where it stopped. In TEST mode it exits TEST. **Held 2 s: STOP** — everything off (relays, including those forced with `forzaN = on`, strips, stars, houses); the OLED shows `STOP`, NEXT and TEST are ignored. A short press in STOP is **PLAY**: the cycle starts again from the beginning of GIORNO. Meant for ceremonies. |
+| **START/STOP** | Short press (acts on release): pause or resume; resumes exactly where it stopped. In TEST mode it exits TEST. **Held 2 s: STOP** — everything off (relays, including those forced with `forzaN = on`, strips, both star chains); the OLED shows `STOP`, NEXT and TEST are ignored. A short press in STOP is **PLAY**: the cycle starts again from the beginning of GIORNO. Meant for ceremonies. |
 | **NEXT** | Jump to the start of the next phase. |
-| **TEST** | Enter TEST mode, then step through 34 tests (with `[WIFI] abilitato` 1, 2 or 3 the first step shows the WiFi state: the IP address and `<nome>.local`, in access-point mode also the network name; `non collegato` with 1, `cerco la rete...` with 3 while it is still trying, `ESP non risponde` in access-point mode when the ESP8266 does not answer): each colour of each strip, star and house colours, everything together, then relays 1–16 one at a time, with their names if defined. The cycle time is frozen while in TEST. |
+| **TEST** | Enter TEST mode, then step through 34 tests (with `[WIFI] abilitato` 1, 2 or 3 the first step shows the WiFi state: the IP address and `<nome>.local`, in access-point mode also the network name; `non collegato` with 1, `cerco la rete...` with 3 while it is still trying, `ESP non risponde` in access-point mode when the ESP8266 does not answer): each colour of each strip, the colours of STELLE_01 and of STELLE_02, everything together, then relays 1–16 one at a time, with their names if defined. The cycle time is frozen while in TEST. |
 | **Potentiometer** | Selects one of the three cycle lengths; the change is applied once the knob settles. |
 
 **Serial monitor** (115200 baud): prints the whole active configuration at boot, including every relay event, followed by a periodic status line (`debug_ms`).
@@ -462,7 +465,7 @@ The DIP switches sit under the shield once the board is mounted: do C1–C3 with
 
 ### Colour mode (finding the R, G, B values for the tappe)
 
-Press **TEST during the 3 s splash** ("by Vanni", bottom line `TEST = modo colore`) to enter the colour mode instead of the normal cycle; holding it from power-on works too. Relays, stars and houses stay off.
+Press **TEST during the 3 s splash** ("by Vanni", bottom line `TEST = modo colore`) to enter the colour mode instead of the normal cycle; holding it from power-on works too. Relays and stars stay off.
 
 1. **Choose the strip.** The proposed strip lights up **white**, the others stay off. **NEXT** steps ALBA → CIELO → TRAMONTO → ALBA…; **START** confirms.
 2. **Adjust.** Short **START / NEXT / TEST** select the **R / G / B** channel, and the potentiometer sets it from 0 to 255.
@@ -474,9 +477,9 @@ Press **TEST during the 3 s splash** ("by Vanni", bottom line `TEST = modo color
 
 ### Simulation
 
-The firmware runs unchanged in the Wokwi simulator, with the Rev D wiring: RGB bars, stars, houses, relays as LEDs, OLED, buttons, potentiometer and a microSD card. Paste `PSN-Presepe.ino` into Wokwi's `sketch.ino` as it is. Wokwi does not accept `.ini` files, so the configuration goes in a project file named `PRESEPE.TXT`; the firmware reads it when `PRESEPE.INI` is missing. See [simulation/README.md](simulation/README.md).
+The firmware runs unchanged in the Wokwi simulator, with the Rev D wiring: RGB bars, both star chains, relays as LEDs, OLED, buttons, potentiometer and a microSD card. Paste `PSN-Presepe.ino` into Wokwi's `sketch.ino` as it is. Wokwi does not accept `.ini` files, so the configuration goes in a project file named `PRESEPE.TXT`; the firmware reads it when `PRESEPE.INI` is missing. See [simulation/README.md](simulation/README.md).
 
-To try `PRESEPE.INI` values without any hardware, open [`simulation_web/index.html`](simulation_web/index.html) in a browser: paste the file and watch the CIELO, TRAMONTO and ALBA strips, stars, houses and relays over the cycle. See [simulation_web/README.md](simulation_web/README.md).
+To try `PRESEPE.INI` values without any hardware, open [`simulation_web/index.html`](simulation_web/index.html) in a browser: paste the file and watch the CIELO, TRAMONTO and ALBA strips, the two star chains and the relays over the cycle. See [simulation_web/README.md](simulation_web/README.md).
 
 ### WiFi (Mega + WiFi R3 board)
 
@@ -488,7 +491,7 @@ With `abilitato = 1` the ESP8266 joins the WPA/WPA2 network named in `[WIFI]`; w
 
 - **`http://presepe.local/`** (or `http://<IP>/`): the control panel. It shows the phase, the position in the cycle and the strip colours, and has *Pausa / Avvia*, *Fase successiva*, *Entra in test*, *Modifica configurazione* and *Stop: spegni tutto* (the same STOP as START held 2 s; the page then shows only a *Play* button, and test commands are refused until Play). In test (entered from the page, or with TEST on the board) it shows:
   - the three strips: choose TRAMONTO / CIELO / ALBA, pick a colour on the gradient and set the brightness with the slider, or type R, G, B (*Spegni* switches the strip off); the strip follows at once, and the colour is shown as a ready-to-copy `cielo = %, R, G, B` line;
-  - the stars or houses, one button per pixel (`numero` of the file), to switch each one on or off, plus *Tutti accesi / Tutti spenti*;
+  - the star chains (*Stelle 01* / *Stelle 02*), one button per pixel (`numero` of the file), to switch each one on or off, plus *Tutti accesi / Tutti spenti*;
   - the 16 relays with their names, ON/OFF each;
   - *Bip del buzzer* and *Esci dal test* (the cycle continues, running or paused as it was before the test).
 - **`http://presepe.local/config`**: `PRESEPE.INI` as it is on the card, in the same editor as the [web simulator](simulation_web/README.md), with live preview of the cycle and the parser's error list. *Salva sul presepe* writes the file (the previous one is kept as `PRESEPE.BAK`, *Ripristina il file precedente* swaps them back); *Riavvia il presepe* restarts the Mega, which re-reads the card. The editor asks for confirmation before saving a file with errors or with WiFi switched off. The file is first sent whole to `PRESEPE.NEW`; if the transfer breaks off, the old file stays. If the power fails while `PRESEPE.NEW` is being copied over the old file, the copy is completed at the next power-on (mark file `PRESEPE.CMT`). The editor sends at most 24000 characters.
@@ -531,7 +534,7 @@ Later ESP updates can go over WiFi (Arduino IDE → *Port* → network port `pre
 
 **Security.** The pages use HTTP Basic authentication over plain HTTP: the password travels unencrypted on the home network. In access-point mode change the network password too: anyone who knows it can reach the login page. Use the board only on a trusted network, and do not reuse an important password. The serial monitor warns when the default password is still in use.
 
-**Troubleshooting:** access point not listed on the phone → `nascosta = 1`, or a 5 GHz-only device; try another `canale` if the connection drops. `non collegato` → check SSID and password (8–63 characters, 2.4 GHz network; the ESP8266 does not see 5 GHz). Page does not open by name → some Android phones do not resolve `.local`, use the IP. To check the link between Mega and ESP8266 independently of the network, set `abilitato = 2` for a moment: if the TEST screen shows `ESP non risponde` instead of an address, look at DIP 1, 2, the RXD3 selector, or the ESP firmware (not flashed).
+**Troubleshooting:** access point not listed on the phone → `nascosta = 1`, or a 5 GHz-only device; try another `canale` if the connection drops. `non collegato` → check SSID and password (8–63 characters, 2.4 GHz network; the ESP8266 does not see 5 GHz). Page does not open by name → some Android phones do not resolve `.local`, use the IP. Pages slow or stuck while loading → the panel shows `risposta … ms` next to the signal: a few tens of ms is normal; hundreds of ms or more with a weak `segnale` (below about −75 dBm) point to the network (move the board or the repeater closer). The ESP8266 keeps its radio always on (no power saving) and the pages do not wait for Google Fonts, so they also open on a network without Internet. To check the link between Mega and ESP8266 independently of the network, set `abilitato = 2` for a moment: if the TEST screen shows `ESP non risponde` instead of an address, look at DIP 1, 2, the RXD3 selector, or the ESP firmware (not flashed).
 
 ## 10. SD-card configuration (PRESEPE.INI)
 
@@ -546,12 +549,13 @@ The card is read at power-on, and again after *Riavvia il presepe* on the web pa
 | `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 characters, no commas; define them before the events that use them), `forza1..16 = auto / on / off` |
 | `[GIORNO]`, `[TRAMONTO]`, `[CREPUSCOLO]`, `[NOTTE]`, `[ALBA]` | what happens in that phase: `cielo` / `tramonto` / `alba = %, R, G, B [, morbida / lineare]` (strip colours, up to 20 tappe per strip) and `rele = RELAY, ON/OFF, %` (up to 64 events in all), see below |
 | `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
-| `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tint %) |
-| `[CASETTE]` | `numero` (≤ 100, 0 = off), `colore`, `accendi = PHASE, %`, `spegni = PHASE, %` (may wrap past the end of the cycle), `fuoco` (0–100), `dissolvenza_ms` |
+| `[STELLE_01]`, `[STELLE_02]` | one section per star chain, the same keys and defaults for both: `numero` (≤ 100, 0 = unused), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tint %). The old `[STELLE]` and `[CASETTE]` sections are no longer read (counted as errors) |
 | `[SISTEMA]` | `fastboot` (default 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (both only with `fastboot = 0`), `oled`, `debug_ms` |
 | `[WIFI]` | `abilitato` (default 0; 1 = home network, 2 or `ap` = access point, 3 or `auto` = home network, access point if it does not connect), `ssid` (≤ 32 characters), `password` (empty = open network, otherwise 8–63 characters, WPA/WPA2), `nome` (network name, up to 24 letters, digits and `-`, not starting with `-`; default `presepe` → `http://presepe.local`) |
 | `[ACCESS_POINT]` | network created with `abilitato = 2` (or 3 without the home network): `ssid` (default `Presepe`), `password` (default `presepe2026`), `canale` (1–13, default 6), `nascosta` (0/1), `max_client` (1–8, default 4), `ip` (default `192.168.4.1`), `portale` (0/1), `attesa` (s, 10–600, default 60, only for 3); see [WiFi](#wifi-mega--wifi-r3-board) |
 | `[AUTENTICAZIONE]` | `utente` and `password` (1–32 characters each) asked by the web page (default `admin` / `presepe2026`; also the OTA password of the ESP8266) |
+
+**Files written for an older firmware:** rename `[STELLE]` to `[STELLE_01]`, and replace `[CASETTE]` (with `accendi`, `spegni`, `fuoco`, `dissolvenza_ms`) by a `[STELLE_02]` section with the same keys as `[STELLE_01]`. The simplest way is to start from the new example file: a microSD without `PRESEPE.INI` gets it written at power-on.
 
 The text values of `[WIFI]`, `[ACCESS_POINT]` and `[AUTENTICAZIONE]` may be written between double quotes, so that they can contain `;`, `#` or leading and trailing spaces: `password = "la;mia#password"`. The quotes are not part of the value. Elsewhere (for example relay names) quotes are ordinary characters. Lines are at most 126 characters.
 
@@ -750,7 +754,7 @@ KiCad 8–10 open the KiCad 7 files, but the scripts were written for the KiCad 
 | B | Arduino Mega shield with relays, MOSFETs and terminals (previous repository version). |
 | C | Production fixes: G5Q-1 NO/NC pins corrected, ULN2803A DIP-18 footprint, buzzer series resistor, 6 / 5 / 2 mm isolation, 3 mm power trunks, JLCPCB tooling holes, complete verification suite. |
 | D | Push-push microSD with 3.3 V LDO and level shifter; firmware reads `PRESEPE.INI` at boot (with built-in defaults); on-board potentiometer replaced by terminal J_POT; CASETTE chain driven in the cycle; turnkey-assembly files for PCBWay. |
-| E | (in design, not ordered) BZ1 6.5 mm pitch, polarised C1, 0.22 mm minimum clearance, status LED on D13, test points for +12V / GND / +5V / GND / +3V3, no vias above the Mega USB socket; new routing. Same outline, connectors and firmware as Rev D. |
+| E | (in design, not ordered) BZ1 6.5 mm pitch, polarised C1, 0.22 mm minimum clearance, status LED on D13, test points for +12V / GND / +5V / GND / +3V3, no vias above the Mega USB socket, star terminals J_STELLE_01 / J_STELLE_02; new routing. Same outline, connectors and firmware as Rev D. |
 
 ---
 

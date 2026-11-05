@@ -1,7 +1,9 @@
 <title>Simulatore PRESEPE.INI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<!-- font caricati senza bloccare la pagina: senza Internet (access point, rete chiusa) il browser
+     non aspetta Google e usa subito i font di sistema -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
 <style>
 /* Layout: banco di prova a due colonne — a sinistra il file INI, a destra il palco con le tre strisce e la linea del ciclo */
 :root {
@@ -161,7 +163,7 @@ button.danger { color: var(--err); border-color: var(--err); }
 <div class="wrap">
   <header>
     <h1>Simulatore <span>PRESEPE.INI</span></h1>
-    <p class="sub">Modifica il file dal Grafico (fase per fase, con i colori) o dal Testo: il palco mostra le strisce CIELO, TRAMONTO e ALBA lungo il ciclo, con stelle, casette e relè. Stesse regole del firmware (release 039).</p>
+    <p class="sub">Modifica il file dal Grafico (fase per fase, con i colori) o dal Testo: il palco mostra le strisce CIELO, TRAMONTO e ALBA lungo il ciclo, con le due catene di stelle (STELLE_01 e STELLE_02) e i relè. Stesse regole del firmware (release 039).</p>
   </header>
 
   <section class="card device" id="device" hidden aria-label="Presepe collegato">
@@ -222,8 +224,8 @@ button.danger { color: var(--err); border-color: var(--err); }
         </div>
         <div class="tlwrap"><canvas id="tl" aria-label="Linea del ciclo: clicca o trascina per spostarti"></canvas></div>
         <div class="extras">
-          <span>Stelle <span class="meter"><i id="stars"></i></span> <span id="starsv"></span></span>
-          <span>Casette <span class="pill" id="houses">spente</span></span>
+          <span>Stelle 01 <span class="meter"><i id="stars0"></i></span> <span id="starsv0"></span></span>
+          <span>Stelle 02 <span class="meter"><i id="stars1"></i></span> <span id="starsv1"></span></span>
         </div>
         <div class="relays" id="relays"></div>
       </div>
@@ -234,7 +236,7 @@ button.danger { color: var(--err); border-color: var(--err); }
         <button id="prev" type="button">Fase precedente</button>
         <button id="next" type="button">Fase successiva</button>
       </div>
-      <p class="note">Sulla linea del ciclo: una fascia per striscia (dall'alto Tramonto, Cielo, Alba) e in basso il livello delle stelle; i trattini bianchi sono le tappe. Lo schermo non riproduce esattamente i LED: le strisce reali sono più sature e i valori bassi rendono diversamente. Usalo per forma e tempi, poi rifinisci i colori sulla striscia vera o con la modalità colore.</p>
+      <p class="note">Sulla linea del ciclo: una fascia per striscia (dall'alto Tramonto, Cielo, Alba) e in basso il livello delle due catene di stelle (01 sopra, 02 sotto); i trattini bianchi sono le tappe. Lo schermo non riproduce esattamente i LED: le strisce reali sono più sature e i valori bassi rendono diversamente. Usalo per forma e tempi, poi rifinisci i colori sulla striscia vera o con la modalità colore.</p>
     </section>
   </div>
 </div>
@@ -262,8 +264,8 @@ function defaults() {
     ],
     tappeDaFile: [0, 0, 0],
     lum: [100, 100, 100], gamma: 1,
-    livelloNotte: 235, numStelle: 50, stelleAttive: 20,
-    accendi: [1, 50], spegni: [4, 50], numCasette: 50, coloreCasette: [90, 55, 20],
+    // [STELLE_01] [STELLE_02]: stessi valori predefiniti
+    stelle: [0, 1].map(() => ({ numero: 50, attive: 20, lum_min: 22, lum_max: 75, livello_notte: 235, scintillio_min: 6400, scintillio_max: 12200, colore: [100, 72, 38] })),
   };
 }
 
@@ -298,7 +300,7 @@ function testo(v, cap, minimo) {
 
 function parse(text) {
   const c = defaults(); const errors = []; let sez = "";
-  const chk = { pot_min: 0, pot_max: 1023, lum_min: 22, lum_max: 75, scintillio_min: 6400, scintillio_max: 12200 };
+  const chk = { pot_min: 0, pot_max: 1023 };
   const err = (n, line, msg) => errors.push({ n, line: line.trim(), msg });
   text.split(/\n/).forEach((raw, i) => {
     const n = i + 1; let line = raw.replace(/\r$/, "");
@@ -314,7 +316,7 @@ function parse(text) {
     if (s[0] === "[") {
       const m = /^\[([^\]]*)\]$/.exec(s); if (!m) { sez = ""; return err(n, s, "sezione scritta male"); }
       const name = m[1].trim();
-      const known = ["CICLO","FASI","RELE","COLORI","STELLE","CASETTE","SISTEMA","WIFI","ACCESS_POINT","AUTENTICAZIONE", ...FASI];
+      const known = ["CICLO","FASI","RELE","COLORI","STELLE_01","STELLE_02","SISTEMA","WIFI","ACCESS_POINT","AUTENTICAZIONE", ...FASI];
       if (name.length > 15 || !known.some(k => ci(k, name))) { sez = ""; return err(n, s, "sezione sconosciuta"); }
       sez = name.toUpperCase(); return;
     }
@@ -339,16 +341,11 @@ function parse(text) {
       if (li >= 0) { const x = intIn(v, 0, 100); if (x !== null) { c.lum[li] = x; ok = true; } }
       else if (kl === "gamma") { const b = bool(v); if (b !== null) { c.gamma = b; ok = true; } }
       else if (kl === "pwm_invertito") ok = bool(v) !== null;
-    } else if (sez === "STELLE") {
+    } else if (sez === "STELLE_01" || sez === "STELLE_02") {   // due catene identiche
+      const S = c.stelle[sez === "STELLE_01" ? 0 : 1];
       const lim = { numero: [0,100], attive: [0,100], lum_min: [0,255], lum_max: [0,255], livello_notte: [0,255], scintillio_min: [500,60000], scintillio_max: [500,60000] }[kl];
-      if (lim) { const x = intIn(v, lim[0], lim[1]); if (x !== null) { ok = true; chk[kl] = x; if (kl === "livello_notte") c.livelloNotte = x; if (kl === "numero") c.numStelle = x; if (kl === "attive") c.stelleAttive = x; } }
-      else if (kl === "colore") ok = rgb(v, 100) !== null;
-    } else if (sez === "CASETTE") {
-      if (kl === "numero") { const x = intIn(v, 0, 100); if (x !== null) { c.numCasette = x; ok = true; } }
-      else if (kl === "colore") { const x = rgb(v); if (x) { c.coloreCasette = x; ok = true; } }
-      else if (kl === "accendi" || kl === "spegni") { const f = fields(v); if (f.length === 2) { const fa = faseIdx(f[0]), p = intIn(f[1], 0, 100); if (fa !== null && p !== null) { c[kl] = [fa, p]; ok = true; } } }
-      else if (kl === "fuoco") ok = intIn(v, 0, 100) !== null;
-      else if (kl === "dissolvenza_ms") ok = intIn(v, 0, 60000) !== null;
+      if (lim) { const x = intIn(v, lim[0], lim[1]); if (x !== null) { ok = true; S[kl] = x; } }
+      else if (kl === "colore") { const x = rgb(v, 100); if (x) { S.colore = x; ok = true; } }
     } else if (sez === "SISTEMA") {
       if (["buzzer","melodia_avvio","autotest_avvio","fastboot","oled"].includes(kl)) ok = bool(v) !== null;
       else if (kl === "beep_hz") ok = intIn(v, 100, 8000) !== null;
@@ -408,9 +405,12 @@ function parse(text) {
   const f = c.fasi;
   if (!(f[0] < f[1] && f[1] < f[2] && f[2] < f[3])) { c.fasi = [40, 50, 55, 85]; errors.push({ n: 0, line: "[FASI]", msg: "le fasi non sono crescenti: uso i valori predefiniti" }); }
   if (chk.pot_max - chk.pot_min < 30) errors.push({ n: 0, line: "[CICLO]", msg: "pot_max - pot_min minore di 30: uso 0 e 1023" });
-  if (chk.lum_min > chk.lum_max) errors.push({ n: 0, line: "[STELLE]", msg: "lum_min maggiore di lum_max: uso i valori predefiniti" });
-  if (chk.scintillio_min > chk.scintillio_max) errors.push({ n: 0, line: "[STELLE]", msg: "scintillio_min maggiore di scintillio_max: uso i valori predefiniti" });
-  if (c.stelleAttive > c.numStelle) c.stelleAttive = c.numStelle;
+  c.stelle.forEach((S, k) => {
+    const sez = `[STELLE_0${k + 1}]`;
+    if (S.lum_min > S.lum_max) { S.lum_min = 22; S.lum_max = 75; errors.push({ n: 0, line: sez, msg: "lum_min maggiore di lum_max: uso i valori predefiniti" }); }
+    if (S.scintillio_min > S.scintillio_max) { S.scintillio_min = 6400; S.scintillio_max = 12200; errors.push({ n: 0, line: sez, msg: "scintillio_min maggiore di scintillio_max: uso i valori predefiniti" }); }
+    if (S.attive > S.numero) S.attive = S.numero;
+  });
   return { c, errors };
 }
 
@@ -431,18 +431,17 @@ function colore(c, s, p) {
   if (T[succ].curva === 0) x = x * x * (3 - 2 * x);
   return [0, 1, 2].map(k => interp8(T[prec].col[k], T[succ].col[k], x));
 }
-function stelle(c, p) {
-  const fa = faseDi(c, p), prog = (a, b) => b <= a ? 0 : Math.min(1, Math.max(0, (p - a) / (b - a)));
-  if (fa === 2) return interp8(0, c.livelloNotte, prog(c.fasi[1], c.fasi[2]));
-  if (fa === 3) return c.livelloNotte;
-  if (fa === 4) { const t = prog(c.fasi[3], 100); return interp8(c.livelloNotte, 0, t * t * (3 - 2 * t)); }
+// livello della catena k (0 = STELLE_01, 1 = STELLE_02): crepuscolo lineare, notte piena, alba morbida
+function stelle(c, k, p) {
+  const fa = faseDi(c, p), notte = c.stelle[k].livello_notte, prog = (a, b) => b <= a ? 0 : Math.min(1, Math.max(0, (p - a) / (b - a)));
+  if (!c.stelle[k].numero || !c.stelle[k].attive) return 0;
+  if (fa === 2) return interp8(0, notte, prog(c.fasi[1], c.fasi[2]));
+  if (fa === 3) return notte;
+  if (fa === 4) { const t = prog(c.fasi[3], 100); return interp8(notte, 0, t * t * (3 - 2 * t)); }
   return 0;
 }
-function casette(c, p) {
-  if (!c.numCasette) return false;
-  const a = posizione(c, c.accendi[0], c.accendi[1]), b = posizione(c, c.spegni[0], c.spegni[1]);
-  if (a === b) return false; return a < b ? (p >= a && p < b) : (p >= a || p < b);
-}
+// colore a schermo di una catena al livello l (tinta in % per canale, come il firmware)
+const tintaStelle = (c, k, l) => c.stelle[k].colore.map(x => Math.round(l * x / 100));
 function rele(c, p) {
   const fa = faseDi(c, p), a = inizio(c, fa), b = fine(c, fa);
   const pf = b > a ? Math.min(100, Math.max(0, (p - a) * 100 / (b - a))) : 0;
@@ -510,8 +509,9 @@ function drawTimeline() {
     ctx.fillStyle = "#ffffff";
     cfg.tappe[s].forEach(t => { const x = posizione(cfg, t.fase, t.pct) / 100 * w; ctx.fillRect(Math.min(w - 2, Math.max(0, x - 1)), y + rowH - 6, 2, 6); });
   });
-  const ys = top + 3 * (rowH + gap), sh = 12;
-  for (let x = 0; x < w; x++) { const l = stelle(cfg, (x + 0.5) / w * 100); ctx.fillStyle = `rgb(${l},${l},${Math.min(255, l + 20)})`; ctx.fillRect(x, ys, 1, sh); }
+  const ys = top + 3 * (rowH + gap), sh = 5;
+  for (let k = 0; k < 2; k++)
+    for (let x = 0; x < w; x++) { const l = stelle(cfg, k, (x + 0.5) / w * 100); ctx.fillStyle = `rgb(${tintaStelle(cfg, k, l)})`; ctx.fillRect(x, ys + k * (sh + 2), 1, sh); }
   ctx.font = "600 11px 'Barlow Semi Condensed', sans-serif"; ctx.textBaseline = "top";
   [0, ...cfg.fasi].forEach((a, i) => {
     const x = a / 100 * w; ctx.fillStyle = "rgba(201,208,224,0.55)"; ctx.fillRect(x, 0, 1, h);
@@ -532,8 +532,11 @@ function render() {
     el.querySelector(".halo").style.background = `radial-gradient(ellipse 70% 60% at 50% 50%, rgba(${col},0.55), rgba(${col},0.08) 70%, transparent)`;
     el.querySelector(".rgb").textContent = `${val[0]}, ${val[1]}, ${val[2]}`;
   });
-  const lv = stelle(cfg, p); $("stars").style.width = (lv / 255 * 100) + "%"; $("starsv").textContent = lv;
-  const h = casette(cfg, p), hp = $("houses"); hp.textContent = h ? "accese" : "spente"; hp.classList.toggle("on", h);
+  for (let k = 0; k < 2; k++) {
+    const lv = stelle(cfg, k, p), bar = $("stars" + k);
+    bar.style.width = (lv / 255 * 100) + "%"; bar.style.background = `rgb(${tintaStelle(cfg, k, 255)})`;
+    $("starsv" + k).textContent = cfg.stelle[k].numero ? lv : "non usata";
+  }
   const rs = rele(cfg, p); [...$("relays").children].forEach((d, i) => { d.classList.toggle("on", rs[i]); d.title = cfg.nomi[i] || `relè ${i + 1}`; });
   drawCursor();
 }

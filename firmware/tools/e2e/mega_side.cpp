@@ -68,9 +68,8 @@ struct Adafruit_NeoPixel {
   uint32_t px[100] = {};
   void clear() { std::memset(px, 0, sizeof px); } void setPixelColor(uint16_t i, uint32_t c) { if (i < 100) px[i] = c; } void show() {}
   static uint32_t Color(uint8_t r, uint8_t g, uint8_t b) { return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b; }
-} stelle, casette;
-#define NUM_STELLE (cfg.numStelle)
-#define NUM_CASETTE (cfg.numCasette)
+} stelle01, stelle02;
+Adafruit_NeoPixel *const catena[2] = { &stelle01, &stelle02 };
 enum Fase { GIORNO, TRAMONTO, CREPUSCOLO, NOTTE, ALBA };
 char wifiIp[16] = "none";
 bool wifiAp = false;

@@ -38,7 +38,7 @@ for j in range(8):
     paths[f"R{k}_COM"] = [(x + 10.16, y0), (x + 10.16, y0 + J), (COL_T - 1.76, y0 + J), (COL_T, y0 + 2.54)]
 
 # ---- high-current power trunks (3 mm), drawn on one layer each:
-#  +12V  F.Cu  J1.1 -> strip terminals (CIELO/TRAMONTO/ALBA/STELLE/CASETTE pin 1)
+#  +12V  F.Cu  J1.1 -> strip terminals (CIELO/TRAMONTO/ALBA/STELLE_01/STELLE_02 pin 1)
 #  GND   B.Cu  J1.2 -> WS2811 GND pins and the three MOSFET source columns
 YB = 197.5
 power = {  # net -> (layer, list of polylines)   (Rev D: strip terminals shifted +12.5 mm, J_POT added)

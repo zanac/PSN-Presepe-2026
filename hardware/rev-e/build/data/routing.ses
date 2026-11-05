@@ -120,9 +120,9 @@
       (place C2 1333000 -860000 front 0)
     )
     (component "TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal::2"
-      (place "J_STELLE" 1925000 -1940000 front 0)
+      (place "J_STELLE_01" 1925000 -1940000 front 0)
       (place "J_POT" 1030000 -1940000 front 0)
-      (place "J_CASETTE" 2105000 -1940000 front 0)
+      (place "J_STELLE_02" 2105000 -1940000 front 0)
     )
     (component "microSD_HC_Hirose_DM3AT-SF-PEJM5"
       (place "J_SD" 950000 -290000 front 180)
@@ -1288,7 +1288,7 @@
           )
         )
       )
-      (net "D8_CASETTE_DATA"
+      (net "D8_STELLE_02_DATA"
         (wire
           (path F.Cu 2500
             1435182 -574290
@@ -1894,7 +1894,7 @@
           )
         )
       )
-      (net "D5_STELLE_DATA"
+      (net "D5_STELLE_01_DATA"
         (wire
           (path F.Cu 2500
             800105 -412000

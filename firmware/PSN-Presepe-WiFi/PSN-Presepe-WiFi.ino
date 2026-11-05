@@ -105,6 +105,7 @@ void avviaAccessPoint() {
   WiFi.setAutoReconnect(false);
   WiFi.disconnect();
   WiFi.mode(WIFI_AP);
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);
   WiFi.hostname(cfgHost);
   WiFi.softAPConfig(ip, ip, IPAddress(255, 255, 255, 0));
   WiFi.softAP(cfgApSsid.c_str(), cfgApPwd.length() ? cfgApPwd.c_str() : nullptr, canale, nascosta, maxClient);
@@ -128,6 +129,7 @@ void applicaConfig() {
     staInizioMs = millis();
     WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
+    WiFi.setSleepMode(WIFI_NONE_SLEEP);   // niente risparmio energetico: risposte subito, non al beacon successivo
     WiFi.hostname(cfgHost);
     WiFi.setAutoReconnect(true);
     WiFi.begin(cfgSsid.c_str(), cfgWpwd.length() ? cfgWpwd.c_str() : nullptr);
@@ -312,7 +314,7 @@ void apiStato() {
   j += ",\"modo\":" + String(s[0]) + ",\"run\":" + String(s[1]) + ",\"fase\":" + String(s[2]);
   j += ",\"pctFase\":" + String(s[3]) + ",\"pct\":" + String(s[4] / 10.0, 1) + ",\"durata\":" + String(s[5]);
   j += ",\"sd\":" + String(s[6]) + ",\"err\":" + String(s[7]) + ",\"riga\":" + String(s[8]);
-  j += ",\"nst\":" + String(s[9]) + ",\"nca\":" + String(s[10]) + ",\"rele\":" + String(s[11]);
+  j += ",\"ns1\":" + String(s[9]) + ",\"ns2\":" + String(s[10]) + ",\"rele\":" + String(s[11]);   // pixel di STELLE_01 e STELLE_02
   j += ",\"cielo\":[" + String(s[12]) + "," + String(s[13]) + "," + String(s[14]) + "]";
   j += ",\"tramonto\":[" + String(s[15]) + "," + String(s[16]) + "," + String(s[17]) + "]";
   j += ",\"alba\":[" + String(s[18]) + "," + String(s[19]) + "," + String(s[20]) + "]";
@@ -478,11 +480,13 @@ void loop() {
   }
   if (servizi) { MDNS.update(); ArduinoOTA.handle(); }
 
-  // Indirizzo al Mega: a ogni cambio, e comunque ogni minuto.
+  // Indirizzo al Mega: a ogni cambio, e comunque ogni 5 minuti (il Mega che riparte rimanda la
+  // configurazione e l'IP riparte da capo, vedi applicaConfig). Ogni invio blocca l'ESP finche' il
+  // Mega non risponde: non serve ripeterlo spesso.
   if (configOk) {
     String ip = indirizzo();
     if (modoAp) ip += " AP";                              // il Mega mostra "access point" sul display
-    if ((ip != ipInviato && millis() - ipMs > 3000) || millis() - ipMs > 60000) {
+    if ((ip != ipInviato && millis() - ipMs > 3000) || millis() - ipMs > 300000UL) {
       ipMs = millis();
       if (comando("IP " + ip, 600, 2).startsWith("@OK")) ipInviato = ip;
     }

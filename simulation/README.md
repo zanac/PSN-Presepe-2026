@@ -1,6 +1,6 @@
 # Wokwi simulation — PSN-Presepe Rev D
 
-The simulation runs the **real firmware** on a simulated Arduino Mega. The wiring follows the Rev D PCB, including the microSD card (configuration in `PRESEPE.TXT`) and the CASETTE chain.
+The simulation runs the **real firmware** on a simulated Arduino Mega. The wiring follows the Rev D PCB, including the microSD card (configuration in `PRESEPE.TXT`) and both star chains.
 
 Online project: <https://wokwi.com/projects/476977183363259393>
 
@@ -39,8 +39,8 @@ Rename the file to check the defaults: the firmware then finds no configuration 
 | CIELO RGB strip via MOSFETs | custom `chip-rgb-strip` bar | D2 / D3 / D4 |
 | TRAMONTO RGB strip | custom `chip-rgb-strip` bar | D7 / D11 / D12 |
 | ALBA RGB strip | custom `chip-rgb-strip` bar | D44 / D45 / D46 |
-| STELLE, 12 V WS2811, 50 pixels | 50 × `wokwi-neopixel` (5 V, simulator only) | D5 |
-| CASETTE, 12 V WS2811, 50 pixels | `wokwi-led-strip`, 50 pixels | D8 |
+| STELLE_01, 12 V WS2811, 50 pixels | 50 × `wokwi-neopixel` (5 V, simulator only) | D5 |
+| STELLE_02, 12 V WS2811, 50 pixels (second sky zone) | `wokwi-led-strip` `stelle_02`, 50 pixels | D8 |
 | Passive buzzer | `wokwi-buzzer` | D6 |
 | OLED SSD1306 128×64, I2C 0x3C | `wokwi-ssd1306` | D20 / D21 |
 | START/STOP, NEXT, TEST buttons | 3 push buttons to GND | D22 / D23 / D24 |

@@ -7,7 +7,7 @@ CEM-1203(42),BZ1,Buzzer_12x9.5RM6.5,,1,"Same Sky CEM-1203(42) passive magnetic t
 100nF,"C6,C7",C_0805_2012Metric,,2,"MLCC 100 nF >= 16 V X7R, 0805"
 LED green 3mm,D1,LED_D3.0mm,,1,"LED 3 mm (T-1) green, diffused, 2.54 mm lead spacing, ~2 V / 20 mA max (runs at ~3 mA)"
 Screw terminal 2P 5.08mm,"J1,J_NEXT,J_START,J_TEST","TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal",,4,"Screw terminal 2-pole 5.08 mm, horizontal wire entry, >= 250 V / >= 10 A (e.g. Phoenix 1715721, KEFA KF128-5.08-2P)"
-Screw terminal 3P 5.08mm,"JR1,JR2,JR3,JR4,JR5,JR6,JR7,JR8,JR9,JR10,JR11,JR12,JR13,JR14,JR15,JR16,J_CASETTE,J_POT,J_STELLE","TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal",,19,"Screw terminal 3-pole 5.08 mm, horizontal wire entry, >= 250 V / >= 10 A (e.g. Phoenix 1715734, KEFA KF128-5.08-3P)"
+Screw terminal 3P 5.08mm,"JR1,JR2,JR3,JR4,JR5,JR6,JR7,JR8,JR9,JR10,JR11,JR12,JR13,JR14,JR15,JR16,J_POT,J_STELLE_01,J_STELLE_02","TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal",,19,"Screw terminal 3-pole 5.08 mm, horizontal wire entry, >= 250 V / >= 10 A (e.g. Phoenix 1715734, KEFA KF128-5.08-3P)"
 Screw terminal 4P 5.08mm,"J_ALBA,J_CIELO,J_OLED,J_TRAMONTO","TerminalBlock_Phoenix_MKDS-1,5-4-5.08_1x04_P5.08mm_Horizontal",,4,"Screw terminal 4-pole 5.08 mm, horizontal wire entry, >= 250 V / >= 10 A (e.g. Phoenix 1715747, KEFA KF128-5.08-4P)"
 DM3AT-SF-PEJM5,J_SD,microSD_HC_Hirose_DM3AT-SF-PEJM5,C114218,1,Hirose DM3AT-SF-PEJM5 microSD push-push with card detect (verified LCSC C114218)
 G5Q-1 DC12,"K1,K2,K3,K4,K5,K6,K7,K8,K9,K10,K11,K12,K13,K14,K15,K16",Relay_SPDT_Omron-G5Q-1,C397244,16,"Omron G5Q-1 DC12, SPDT 10 A 250 VAC, 12 V coil (verified LCSC C397244)"

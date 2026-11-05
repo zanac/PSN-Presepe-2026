@@ -8,8 +8,8 @@ Open `index.html` in any modern browser (double-click it). No server and no inst
 
 - **Left:** the INI text. Edit or paste a file; the simulation updates as you type. Parse errors are listed under the text, one per bad line, by the same rules the firmware uses (the firmware itself only reports how many there are and the first bad line). *Ripristina il file predefinito* reloads the repo's `PRESEPE.INI`; *Copia il file* copies the text, ready for the microSD.
 - **Right:** three panels, TRAMONTO (left), CIELO (centre), ALBA (right), with their current RGB values; the name of the current phase and the position in the cycle.
-- **Cycle line:** one band per strip (top to bottom: TRAMONTO, CIELO, ALBA), the tappe as white ticks, the star level at the bottom. Click or drag on it to jump to any point of the cycle.
-- **Under the line:** star level, CASETTE on/off, the 16 relays.
+- **Cycle line:** one band per strip (top to bottom: TRAMONTO, CIELO, ALBA), the tappe as white ticks, the level of the two star chains at the bottom (STELLE_01 above, STELLE_02 below, in their tint). Click or drag on it to jump to any point of the cycle.
+- **Under the line:** the level of STELLE_01 and STELLE_02, the 16 relays.
 - **Transport:** play/pause, cycle duration (`durata1`–`durata3` from the file, plus two fast speeds), previous/next phase.
 
 The text you type is kept in the browser's local storage, so it survives a page reload.
@@ -20,7 +20,7 @@ The text you type is kept in the browser's local storage, so it survives a page 
 
 ## How faithful it is
 
-The JavaScript re-implements the firmware's pure-logic part (the CONFIG block of `PSN-Presepe.ino`, release 039): the parser and its error rules (including the final checks: phase order, potentiometer range, star brightness and twinkle limits), the defaults, phase positions, the tappe engine (`morbida` smoothstep and `lineare`, truncating interpolation, wrap-around across the cycle end), stars, casette window and relay schedule.
+The JavaScript re-implements the firmware's pure-logic part (the CONFIG block of `PSN-Presepe.ino`, release 039): the parser and its error rules (including the final checks: phase order, potentiometer range, star brightness and twinkle limits of `[STELLE_01]` and `[STELLE_02]`), the defaults, phase positions, the tappe engine (`morbida` smoothstep and `lineare`, truncating interpolation, wrap-around across the cycle end), the level of the two star chains and the relay schedule. The twinkling of single stars is not drawn.
 
 It is a model, not the firmware: when the firmware logic changes, update `simulator.template.html` too.
 

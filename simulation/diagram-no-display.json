@@ -595,7 +595,7 @@
     },
     {
       "type": "wokwi-led-strip",
-      "id": "casette",
+      "id": "stelle_02",
       "top": -110,
       "left": 490,
       "attrs": {
@@ -1827,18 +1827,18 @@
     ],
     [
       "mega:8",
-      "casette:DIN",
+      "stelle_02:DIN",
       "green",
       []
     ],
     [
-      "casette:VDD",
+      "stelle_02:VDD",
       "mega:5V",
       "red",
       []
     ],
     [
-      "casette:VSS",
+      "stelle_02:VSS",
       "mega:GND.1",
       "black",
       []
@@ -1881,11 +1881,11 @@
     ]
   ],
   "attrs": {
-    "layout-note": "OLED left of stars; controls right of stars; RGB strips directly below stars, contiguous and aligned: ALBA - CIELO - TRAMONTO; Rev D: CASETTE WS2811 chain (D8) below the RGB strips, microSD (SPI D50-D53) left of the OLED",
+    "layout-note": "OLED left of stars; controls right of stars; RGB strips directly below stars, contiguous and aligned: ALBA - CIELO - TRAMONTO; STELLE_02 WS2811 chain (D8, second sky zone) below the RGB strips, microSD (SPI D50-D53) left of the OLED",
     "layout-revision": "2026-09-25-rgb-strips-wide-v1",
     "relay-label-standard": "Grp_GG_RR: GG=relay board group 01-04, RR=relay channel 01-04",
     "test-variant": "NO DISPLAY - test optional OLED handling",
     "rev": "D"
   },
-  "layoutRevision": "2026-10-04-revd-sd-casette-v1"
+  "layoutRevision": "2026-11-05-stelle-01-02-v1"
 }

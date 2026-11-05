@@ -91,9 +91,8 @@ struct Adafruit_NeoPixel {
   void setPixelColor(uint16_t i, uint32_t c) { if (i < 100) px[i] = c; }
   void show() { shows++; }
   static uint32_t Color(uint8_t r, uint8_t g, uint8_t b) { return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b; }
-} stelle, casette;
-#define NUM_STELLE (cfg.numStelle)
-#define NUM_CASETTE (cfg.numCasette)
+} stelle01, stelle02;
+Adafruit_NeoPixel *const catena[2] = { &stelle01, &stelle02 };
 
 // ------------------------------------------------------------------ rest of the sketch
 enum Fase { GIORNO, TRAMONTO, CREPUSCOLO, NOTTE, ALBA };
@@ -113,7 +112,7 @@ void setTramonto(uint8_t r, uint8_t g, uint8_t b) { rgbTramontoR = r; rgbTramont
 void setAlba(uint8_t r, uint8_t g, uint8_t b) { rgbAlbaR = r; rgbAlbaG = g; rgbAlbaB = b; }
 void scriviRele(uint8_t i, bool on) { if (on) releStato |= (uint16_t)(1U << i); else releStato &= (uint16_t)~(1U << i); }
 void spegniRele() { for (uint8_t i = 0; i < 16; i++) scriviRele(i, false); }
-void tuttoSpento() { setCielo(0, 0, 0); setTramonto(0, 0, 0); setAlba(0, 0, 0); stelle.clear(); casette.clear(); }
+void tuttoSpento() { setCielo(0, 0, 0); setTramonto(0, 0, 0); setAlba(0, 0, 0); stelle01.clear(); stelle02.clear(); }
 void buzzerBeep(bool = true) { beeps++; }
 void faseAvanti() { avanti++; }
 void mostraOledTest() { oledTest++; }
@@ -234,11 +233,11 @@ int main() {
   CHECK(ok(cmd("@R 3 1")) && releStato == 4);
   CHECK(ok(cmd("@R 16 1")) && releStato == 0x8004 && cmd("@R 17 1")[0] == "@ERR arg");
   CHECK(ok(cmd("@R 3 0")) && releStato == 0x8000);
-  CHECK(ok(cmd("@P 0 5 1")) && stelle.px[5] == Adafruit_NeoPixel::Color(70, 50, 27) && stelle.px[4] == 0);
+  CHECK(ok(cmd("@P 0 5 1")) && stelle01.px[5] == Adafruit_NeoPixel::Color(70, 50, 27) && stelle01.px[4] == 0);
   CHECK(cmd("@P 0 50 1")[0] == "@ERR arg");                               // 50 stars: 0..49
-  CHECK(ok(cmd("@PA 1 1")) && casette.px[0] != 0 && casette.px[49] != 0 && casette.px[50] == 0);
-  CHECK(ok(cmd("@PC 1 2 3")) && stelle.px[5] == Adafruit_NeoPixel::Color(1, 2, 3) && casette.px[7] == Adafruit_NeoPixel::Color(1, 2, 3));
-  CHECK(ok(cmd("@P 1 7 0")) && casette.px[7] == 0 && casette.px[8] != 0);
+  CHECK(ok(cmd("@PA 1 1")) && stelle02.px[0] != 0 && stelle02.px[49] != 0 && stelle02.px[50] == 0);
+  CHECK(ok(cmd("@PC 1 2 3")) && stelle01.px[5] == Adafruit_NeoPixel::Color(1, 2, 3) && stelle02.px[7] == Adafruit_NeoPixel::Color(1, 2, 3));
+  CHECK(ok(cmd("@P 1 7 0")) && stelle02.px[7] == 0 && stelle02.px[8] != 0);
   int b0 = beeps; CHECK(ok(cmd("@B")) && beeps == b0 + 1);
   CHECK(cmd("@RUN")[0] == "@ERR test" && cmd("@NEXT")[0] == "@ERR test");
   T += 1000; Serial3.out.clear(); lnkTick();
@@ -246,7 +245,7 @@ int main() {
   CHECK(ok(cmd("@X")) && !testInCorso && !testWeb && releStato == 0);
   CHECK(ok(cmd("@X")));                                                    // harmless outside the test
   // a relay command from the normal cycle enters the web test by itself, with all outputs off
-  CHECK(ok(cmd("@R 1 1")) && testWeb && releStato == 1 && stelle.px[5] == 0);
+  CHECK(ok(cmd("@R 1 1")) && testWeb && releStato == 1 && stelle01.px[5] == 0);
   CHECK(ok(cmd("@X")));
   CHECK(ok(cmd("@RUN")) && !running && ok(cmd("@RUN")) && running);
   int a0 = avanti; CHECK(ok(cmd("@NEXT")) && avanti == a0 + 1);

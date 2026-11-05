@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
     PresepeConfig a, d; cfgDefault(a); cfgDefault(d);
     std::string buf = w; cfgParseBuffer(a, &buf[0]);
     CHECK(a.errori == 0);
-    CHECK(std::memcmp(&a.durataMs, &d.durataMs, sizeof d.durataMs) == 0 && a.numStelle == d.numStelle && a.numEventi == d.numEventi);
+    CHECK(std::memcmp(&a.durataMs, &d.durataMs, sizeof d.durataMs) == 0 && a.stelle[0].numero == d.stelle[0].numero && a.stelle[1].numero == d.stelle[1].numero && a.numEventi == d.numEventi);
   }
   // 2. a file is already there (PRESEPE.INI or PRESEPE.TXT): nothing written
   CHECK(!iniCreaPredefinito() && disk["PRESEPE.INI"] == w);

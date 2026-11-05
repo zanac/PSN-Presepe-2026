@@ -11,11 +11,12 @@ struct IPAddress {
   String toString() const { char t[16]; std::snprintf(t, sizeof t, "%d.%d.%d.%d", b[0], b[1], b[2], b[3]); return String(t); }
 };
 struct IPAddressMock { std::string a; String toString() const { return String(a); } };
+enum { WIFI_NONE_SLEEP = 0 };
 struct WiFiMock {
   int st = WL_IDLE_STATUS; std::string ip = "0.0.0.0", ssid, pass, host; int begins = 0, modo = 0;
   // access point
   int aps = 0, apCanale = 0, apNascosta = 0, apMax = 0, stazioni = 0; std::string apSsid, apPass; IPAddress apIp;
-  void persistent(bool) {} void mode(int m) { modo = m; } void disconnect() {} void setAutoReconnect(bool) {}
+  void persistent(bool) {} void mode(int m) { modo = m; } void disconnect() {} void setAutoReconnect(bool) {} void setSleepMode(int) {}
   void hostname(const String &h) { host = h.s; }
   void begin(const char *s, const char *p) { ssid = s; pass = p ? p : "(open)"; begins++; }
   int status() { return st; }

@@ -105,10 +105,10 @@
   "3": "ALBA_G_NEG",
   "4": "ALBA_B_NEG"
  },
- "J_CASETTE": {
+ "J_STELLE_02": {
   "1": "+12V",
   "2": "GND",
-  "3": "D8_CASETTE_DATA"
+  "3": "D8_STELLE_02_DATA"
  },
  "J_CIELO": {
   "1": "+12V",
@@ -130,10 +130,10 @@
   "1": "D22_START",
   "2": "GND"
  },
- "J_STELLE": {
+ "J_STELLE_01": {
   "1": "+12V",
   "2": "GND",
-  "3": "D5_STELLE_DATA"
+  "3": "D5_STELLE_01_DATA"
  },
  "J_TEST": {
   "1": "D24_TEST",
@@ -292,10 +292,10 @@
   "D44": "D44_ALBA_R",
   "D45": "D45_ALBA_G",
   "D46": "D46_ALBA_B",
-  "D5": "D5_STELLE_DATA",
+  "D5": "D5_STELLE_01_DATA",
   "D6": "D6_BUZZER",
   "D7": "D7_TRAM_R",
-  "D8": "D8_CASETTE_DATA",
+  "D8": "D8_STELLE_02_DATA",
   "GND1": "GND",
   "GND2": "GND",
   "GND3": "GND",

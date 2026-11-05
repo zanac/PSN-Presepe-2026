@@ -39,7 +39,7 @@
       versione: "demo", ip: "192.168.1.50", ssid: "Casa", host: "presepe", rssi: -58,
       mega, eta: mega ? 200 : 999999, modo, run: run ? 1 : 0, fase: fa,
       pctFase: Math.round(b > a ? (p - a) * 100 / (b - a) : 0), pct: Math.round(p * 10) / 10, durata: durata(),
-      sd: errori ? 4 : 3, err: errori, riga: prima, nst: cfg.numStelle, nca: cfg.numCasette,
+      sd: errori ? 4 : 3, err: errori, riga: prima, ns1: cfg.stelle[0].numero, ns2: cfg.stelle[1].numero,
       rele: modo === 4 ? 0 : ciclo ? releCiclo : test.rele, cielo: col(0), tramonto: col(1), alba: col(2), passo: 0,
       nomi: cfg.nomi.slice(),
     };

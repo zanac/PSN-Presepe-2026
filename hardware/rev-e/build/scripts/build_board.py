@@ -168,7 +168,7 @@ PLACE.update({
     "BZ1": (26.0, 160.0, 0), "RBZ1": (25.0, 172.0, 0),
     # Rev D bottom-edge terminals: J_POT right after TEST, strip terminals shifted +12.5 mm
     "J_POT": (103.0, 194.0, 0), "J_CIELO": (120.5, 194.0, 0), "J_TRAMONTO": (144.5, 194.0, 0),
-    "J_ALBA": (168.5, 194.0, 0), "J_STELLE": (192.5, 194.0, 0), "J_CASETTE": (210.5, 194.0, 0),
+    "J_ALBA": (168.5, 194.0, 0), "J_STELLE_01": (192.5, 194.0, 0), "J_STELLE_02": (210.5, 194.0, 0),
     # Rev D microSD block (top edge, above the Mega, far from the relay contacts).
     # Card inserts from the y = 20 edge (socket rotated 180 deg, front flush with the edge).
     "J_SD": (95.0, 29.0, 180),
@@ -292,12 +292,12 @@ LABELS = {
     "J1": ["12V", "GND"], "J_OLED": ["5V", "GND", "SDA", "SCL"],
     "J_START": ["START", "GND"], "J_NEXT": ["NEXT", "GND"], "J_TEST": ["TEST", "GND"],
     "J_CIELO": ["12V", "R", "G", "B"], "J_TRAMONTO": ["12V", "R", "G", "B"],
-    "J_ALBA": ["12V", "R", "G", "B"], "J_STELLE": ["12V", "GND", "DATA"],
-    "J_CASETTE": ["12V", "GND", "DATA"], "J_POT": ["5V", "A0", "GND"],
+    "J_ALBA": ["12V", "R", "G", "B"], "J_STELLE_01": ["12V", "GND", "DATA"],
+    "J_STELLE_02": ["12V", "GND", "DATA"], "J_POT": ["5V", "A0", "GND"],
 }
 TITLE = {"J1": "POWER 12V", "J_OLED": "OLED", "J_START": "START", "J_NEXT": "NEXT",
          "J_TEST": "TEST", "J_CIELO": "CIELO", "J_TRAMONTO": "TRAMONTO", "J_ALBA": "ALBA",
-         "J_STELLE": "STELLE", "J_CASETTE": "CASETTE", "J_POT": "POT 10k"}
+         "J_STELLE_01": "STELLE_01", "J_STELLE_02": "STELLE_02", "J_POT": "POT 10k"}
 for ref, labs in LABELS.items():
     for k, s in enumerate(labs, 1):
         x, y = padpos(ref, str(k)); text(s, x, y - 7.3, 0.9)

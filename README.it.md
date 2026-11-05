@@ -7,7 +7,7 @@ Centralina per Arduino Mega 2560 per un presepe modulare a 12 V.
 Gestisce un ciclo giorno/notte: **GIORNO → TRAMONTO → CREPUSCOLO → NOTTE → ALBA**. Il ciclo comanda:
 
 - tre strisce RGB analogiche a 12 V: cielo principale, lato tramonto e lato alba;
-- due catene WS2811 indirizzabili: stelle che scintillano e finestre delle casette;
+- due catene WS2811 indirizzabili di stelle che scintillano, STELLE_01 e STELLE_02 (per esempio due zone del cielo);
 - 16 relè per motorini, pompe e lampade.
 
 Tutti i parametri della scenografia si possono cambiare con il file `PRESEPE.INI` su una microSD, letto all'accensione.
@@ -91,8 +91,8 @@ Tutto il contenuto di `hardware/rev-d/kicad/`, `manufacturing/` (tranne la carte
 | **CIELO** | striscia RGB 12 V ad anodo comune, 3 canali MOSFET PWM | Luce diurna calda, bianco pieno a metà giornata, si spegne di notte, bagliore caldo all'alba |
 | **TRAMONTO** (sinistra) | striscia RGB 12 V, 3 canali PWM | Ondata arancio/rossa solo durante il tramonto, altrimenti spenta del tutto |
 | **ALBA** (destra) | striscia RGB 12 V, 3 canali PWM | Ondata calda più chiara solo durante l'alba |
-| **STELLE** | catena WS2811 12 V (50 pixel di default) | Stelle casuali che compaiono al crepuscolo, scintillano una per una di notte e svaniscono all'alba |
-| **CASETTE** | catena WS2811 12 V (50 pixel di default) | Luce calda alle finestre da metà tramonto a metà alba, con un leggero tremolio diverso per ogni casa |
+| **STELLE_01** | catena WS2811 12 V su D5 (50 pixel di default) | Stelle casuali che compaiono al crepuscolo, scintillano una per una di notte e svaniscono all'alba |
+| **STELLE_02** | catena WS2811 12 V su D8 (50 pixel di default) | Come STELLE_01, con i suoi valori: una seconda zona del cielo |
 | **Relè 1–16** | Omron G5Q-1, contatti puliti COM/NO/NC | Si accendono e spengono in punti programmabili di ogni fase |
 | **Comandi** | pulsanti START/STOP, AVANTI (NEXT), TEST, potenziometro velocità | Pausa/ripresa, salto alla fase successiva, test delle uscite, scelta di 1 fra 3 durate del ciclo |
 | **OLED** | SSD1306 0,96" 128×64 I2C | Fase, avanzamento, durata del ciclo, stato SD, passi di test (opzionale) |
@@ -138,6 +138,7 @@ La Rev E mantiene contorno, morsetti, posizione dei componenti e pin della Rev D
 | **LED di stato** D1 (verde, 3 mm) con RLED 1 kΩ (0805) sul pin D13 della Mega, in alto a sinistra accanto alla microSD | mostra a colpo d'occhio se la centralina è in marcia, in pausa, in TEST o in STOP (vedi [Funzionamento](#funzionamento)) |
 | **Punti di misura** TP1–TP5 in fila: +12V, GND, +5V, GND, +3V3 (piazzole metallizzate da 2 mm, nessun componente) | misurare le alimentazioni con il tester senza cercare un piedino; se il puntale scivola può solo cortocircuitare un'alimentazione con GND, mai i 12 V sui 5 V |
 | Nessuna via sopra la presa USB-B della Mega (area vietata nella scheda, usata dal router e dal DRC di KiCad) | sulla Rev D era solo controllato dopo |
+| Morsetti delle stelle chiamati **J_STELLE_01** / **J_STELLE_02** (serigrafia STELLE_01 / STELLE_02, piste `D5_STELLE_01_DATA` / `D8_STELLE_02_DATA`) | il firmware comanda due catene di stelle uguali; la Rev D dice ancora STELLE / CASETTE |
 
 Lo sbroglio è nuovo (Freerouting) ed è salvato in `hardware/rev-e/build/data/routing.ses`, così la ricostruzione è riproducibile. Prima di ordinare, stampa il PDF 1:1 e verifica sopra buzzer, C1 e LED veri ([Prima di ordinare una nuova revisione](#prima-di-ordinare-una-nuova-revisione)).
 
@@ -158,8 +159,8 @@ Il pin 1 è la piazzola quadrata. La funzione di ogni pin è stampata anche sull
 | **J_CIELO** | +12 V | R− | G− | B− | Striscia RGB del cielo (anodo comune) |
 | **J_TRAMONTO** | +12 V | R− | G− | B− | Striscia RGB del tramonto |
 | **J_ALBA** | +12 V | R− | G− | B− | Striscia RGB dell'alba |
-| **J_STELLE** | +12 V | GND | DATA (D5) | | Stelle WS2811 |
-| **J_CASETTE** | +12 V | GND | DATA (D8) | | Casette WS2811 |
+| **J_STELLE** (Rev D) / **J_STELLE_01** (Rev E) | +12 V | GND | DATA (D5) | | Catena WS2811 STELLE_01 |
+| **J_CASETTE** (Rev D) / **J_STELLE_02** (Rev E) | +12 V | GND | DATA (D8) | | Catena WS2811 STELLE_02 (sulla Rev D la serigrafia dice ancora CASETTE) |
 
 ### Bordi superiore e destro (zona relè)
 
@@ -176,10 +177,10 @@ JR1–JR8 stanno lungo il bordo superiore e JR9–JR16 lungo il bordo destro. Il
 | Pin Mega | Funzione | Note |
 |---|---|---|
 | D2, D3, D4 | CIELO R, G, B (PWM) | Q1–Q3. D4 usa il Timer0, quindi solo PWM a 8 bit |
-| D5 | Dati WS2811 STELLE | |
+| D5 | Dati WS2811 STELLE_01 | |
 | D6 | Buzzer | tramite RBZ1 da 220 Ω |
 | D7, D11, D12 | TRAMONTO R, G, B (PWM) | Q4–Q6, timer a 16 bit |
-| D8 | Dati WS2811 CASETTE | |
+| D8 | Dati WS2811 STELLE_02 | |
 | D20 / D21 | I2C SDA / SCL | OLED all'indirizzo 0x3C |
 | D22, D23, D24 | START, AVANTI, TEST | `INPUT_PULLUP`; il pulsante chiude il pin verso GND |
 | D25 … D40 | Relè 1 … 16 | HIGH = relè acceso (tramite ULN2803A) |
@@ -226,17 +227,19 @@ J_CIELO pin 4 (B−)    ──► striscia B
 
 Non collegare R/G/B di una striscia direttamente a +12 V o a GND.
 
-### Catene WS2811 (STELLE / CASETTE)
+### Catene WS2811 (STELLE_01 / STELLE_02)
 
 ```
-J_STELLE pin 1 (+12 V) ──► catena +12V
-J_STELLE pin 2 (GND)   ──► catena GND
-J_STELLE pin 3 (DATA)  ──[330 Ω, consigliata, all'ingresso della catena]──► catena DIN
+J_STELLE_01 pin 1 (+12 V) ──► catena +12V
+J_STELLE_01 pin 2 (GND)   ──► catena GND
+J_STELLE_01 pin 3 (DATA)  ──[330 Ω, consigliata, all'ingresso della catena]──► catena DIN
 ```
+
+J_STELLE_02 si collega allo stesso modo. Sulla scheda Rev D i due morsetti si chiamano STELLE e CASETTE.
 
 Sulla scheda non c'è una resistenza in serie al segnale DATA. Metti una resistenza da 330–470 Ω nel filo dati, vicino al primo pixel; conta soprattutto con fili lunghi.
 
-Per catene lunghe porta i +12 V anche all'altra estremità. Il numero di pixel si imposta con `[STELLE] numero` e `[CASETTE] numero`, fino a 100 per catena.
+Per catene lunghe porta i +12 V anche all'altra estremità. Il numero di pixel si imposta con `[STELLE_01] numero` e `[STELLE_02] numero`, fino a 100 per catena; 0 lascia la catena inutilizzata.
 
 ### Relè (contatti puliti)
 
@@ -302,7 +305,7 @@ Con moduli relè del commercio da 4 o 8 canali, collega IN1…IN16 a D25…D40. 
 ### 8.3 Catene WS2811
 
 ```
-Mega D5 ──[330 Ω]──► STELLE DIN        Mega D8 ──[330 Ω]──► CASETTE DIN
+Mega D5 ──[330 Ω]──► STELLE_01 DIN     Mega D8 ──[330 Ω]──► STELLE_02 DIN
 alimentatore 12 V + / 0 V ──► catena +12V / GND, con lo 0 V in comune col GND dell'Arduino
 ```
 
@@ -442,9 +445,9 @@ Con la scheda montata i DIP switch restano sotto lo shield: fai C1–C3 con la s
 
 | Pulsante | Azione |
 |---|---|
-| **START/STOP** | Pressione breve (al rilascio): pausa o ripresa; riparte esattamente da dove si era fermato. In modalità TEST, esce dal TEST. **Tenuto 2 s: STOP**: tutto spento (relè, anche quelli forzati con `forzaN = on`, strisce, stelle, casette); l'OLED mostra `STOP`, NEXT e TEST sono ignorati. Una pressione breve in STOP è **PLAY**: il ciclo riparte dall'inizio del GIORNO. Pensato per le cerimonie. |
+| **START/STOP** | Pressione breve (al rilascio): pausa o ripresa; riparte esattamente da dove si era fermato. In modalità TEST, esce dal TEST. **Tenuto 2 s: STOP**: tutto spento (relè, anche quelli forzati con `forzaN = on`, strisce, le due catene di stelle); l'OLED mostra `STOP`, NEXT e TEST sono ignorati. Una pressione breve in STOP è **PLAY**: il ciclo riparte dall'inizio del GIORNO. Pensato per le cerimonie. |
 | **AVANTI (NEXT)** | Salta all'inizio della fase successiva. |
-| **TEST** | Entra in modalità TEST, poi scorre 34 prove (con `[WIFI] abilitato` 1, 2 o 3 la prima schermata mostra lo stato del WiFi: indirizzo IP e `<nome>.local`, in modo access point anche il nome della rete; `non collegato` con 1, `cerco la rete...` con 3 mentre sta ancora provando, `ESP non risponde` in modo access point quando l'ESP8266 non risponde): ogni colore di ogni striscia, colori di stelle e casette, tutto insieme, poi i relè 1–16 uno alla volta, con il loro nome se definito. Durante il TEST il tempo del ciclo è fermo. |
+| **TEST** | Entra in modalità TEST, poi scorre 34 prove (con `[WIFI] abilitato` 1, 2 o 3 la prima schermata mostra lo stato del WiFi: indirizzo IP e `<nome>.local`, in modo access point anche il nome della rete; `non collegato` con 1, `cerco la rete...` con 3 mentre sta ancora provando, `ESP non risponde` in modo access point quando l'ESP8266 non risponde): ogni colore di ogni striscia, i colori di STELLE_01 e di STELLE_02, tutto insieme, poi i relè 1–16 uno alla volta, con il loro nome se definito. Durante il TEST il tempo del ciclo è fermo. |
 | **Potenziometro** | Sceglie una delle tre durate del ciclo; la modifica vale quando la manopola si ferma. |
 
 **Monitor seriale** (115200 baud): all'avvio stampa tutta la configurazione in uso, compresi tutti gli eventi dei relè, poi una riga di stato periodica (`debug_ms`).
@@ -462,7 +465,7 @@ Con la scheda montata i DIP switch restano sotto lo shield: fai C1–C3 con la s
 
 ### Modalità colore (trovare i valori R, G, B per le tappe)
 
-Premi **TEST durante i 3 s della schermata iniziale** ("by Vanni", in basso `TEST = modo colore`): invece del ciclo normale parte la modalità colore. Va bene anche tenerlo premuto dall'accensione. Relè, stelle e casette restano spenti.
+Premi **TEST durante i 3 s della schermata iniziale** ("by Vanni", in basso `TEST = modo colore`): invece del ciclo normale parte la modalità colore. Va bene anche tenerlo premuto dall'accensione. Relè e stelle restano spenti.
 
 1. **Scelta della striscia.** La striscia proposta si accende di **bianco**, le altre restano spente. **AVANTI** scorre ALBA → CIELO → TRAMONTO → ALBA…; **START** conferma.
 2. **Regolazione.** Le pressioni brevi di **START / AVANTI / TEST** scelgono il canale **R / G / B**, e il potenziometro lo regola da 0 a 255.
@@ -474,9 +477,9 @@ Premi **TEST durante i 3 s della schermata iniziale** ("by Vanni", in basso `TES
 
 ### Simulazione
 
-Il firmware gira invariato nel simulatore Wokwi con il cablaggio Rev D: barre RGB, stelle, casette, relè come LED, OLED, pulsanti, potenziometro e microSD. `PSN-Presepe.ino` si incolla così com'è nel `sketch.ino` di Wokwi. Wokwi non accetta file `.ini`, quindi la configurazione va in un file del progetto chiamato `PRESEPE.TXT`, che il firmware legge quando manca `PRESEPE.INI`. Vedi [simulation/README.md](simulation/README.md).
+Il firmware gira invariato nel simulatore Wokwi con il cablaggio Rev D: barre RGB, le due catene di stelle, relè come LED, OLED, pulsanti, potenziometro e microSD. `PSN-Presepe.ino` si incolla così com'è nel `sketch.ino` di Wokwi. Wokwi non accetta file `.ini`, quindi la configurazione va in un file del progetto chiamato `PRESEPE.TXT`, che il firmware legge quando manca `PRESEPE.INI`. Vedi [simulation/README.md](simulation/README.md).
 
-Per provare i valori di `PRESEPE.INI` senza hardware, apri [`simulation_web/index.html`](simulation_web/index.html) nel browser: incolli il file e vedi lungo il ciclo le strisce CIELO, TRAMONTO e ALBA, le stelle, le casette e i relè. Vedi [simulation_web/README.md](simulation_web/README.md).
+Per provare i valori di `PRESEPE.INI` senza hardware, apri [`simulation_web/index.html`](simulation_web/index.html) nel browser: incolli il file e vedi lungo il ciclo le strisce CIELO, TRAMONTO e ALBA, le due catene di stelle e i relè. Vedi [simulation_web/README.md](simulation_web/README.md).
 
 ### WiFi (scheda Mega + WiFi R3)
 
@@ -488,7 +491,7 @@ Con `abilitato = 1` l'ESP8266 si collega alla rete WPA/WPA2 indicata in `[WIFI]`
 
 - **`http://presepe.local/`** (oppure `http://<IP>/`): il pannello di controllo. Mostra la fase, il punto del ciclo e i colori delle strisce, e ha *Pausa / Avvia*, *Fase successiva*, *Entra in test*, *Modifica configurazione* e *Stop: spegni tutto* (lo stesso STOP di START tenuto 2 s; la pagina mostra allora solo il pulsante *Play*, e i comandi di test sono rifiutati fino a Play). In test (dalla pagina, o con TEST sulla scheda) mostra:
   - le tre strisce: scegli TRAMONTO / CIELO / ALBA, prendi un colore dal gradiente e regola la luminosità con la levetta, oppure scrivi R, G, B (*Spegni* spegne la striscia); la striscia segue subito, e il colore compare come riga `cielo = %, R, G, B` pronta da copiare;
-  - stelle o casette, un pulsante per ogni pixel (`numero` del file) per accenderli e spegnerli uno alla volta, più *Tutti accesi / Tutti spenti*;
+  - le catene di stelle (*Stelle 01* / *Stelle 02*), un pulsante per ogni pixel (`numero` del file) per accenderli e spegnerli uno alla volta, più *Tutti accesi / Tutti spenti*;
   - i 16 relè con il loro nome, ON/OFF uno per uno;
   - *Bip del buzzer* ed *Esci dal test* (il ciclo prosegue, in marcia o in pausa come era prima del test).
 - **`http://presepe.local/config`**: `PRESEPE.INI` così com'è sulla scheda, nello stesso editor del [simulatore web](simulation_web/README.md), con l'anteprima del ciclo e l'elenco degli errori. *Salva sul presepe* scrive il file (il precedente resta come `PRESEPE.BAK`, *Ripristina il file precedente* li scambia); *Riavvia il presepe* fa ripartire il Mega, che rilegge la scheda. Prima di salvare l'editor chiede conferma se il file ha errori o spegne il WiFi. Il file viene prima inviato tutto in `PRESEPE.NEW`; se il trasferimento si interrompe, resta il file vecchio. Se manca la corrente mentre `PRESEPE.NEW` viene copiato sopra il file vecchio, la copia viene completata alla riaccensione successiva (file segnale `PRESEPE.CMT`). L'editor invia al massimo 24000 caratteri.
@@ -531,7 +534,7 @@ Gli aggiornamenti successivi dell'ESP si possono fare via WiFi (IDE Arduino → 
 
 **Sicurezza.** Le pagine usano l'autenticazione HTTP Basic su HTTP semplice: la password viaggia in chiaro sulla rete di casa. In modo access point cambia anche la password della rete: chi la conosce arriva alla pagina di accesso. Usa la scheda solo su una rete fidata e non riutilizzare una password importante. Il monitor seriale avvisa se è ancora in uso la password predefinita.
 
-**Problemi:** l'access point non compare sul telefono → `nascosta = 1`, oppure dispositivo solo 5 GHz; se la connessione cade prova un altro `canale`. `non collegato` → controlla SSID e password (8–63 caratteri, rete a 2,4 GHz: l'ESP8266 non vede il 5 GHz). La pagina non si apre per nome → alcuni Android non risolvono `.local`, usa l'IP. Per controllare il collegamento tra Mega ed ESP8266 indipendentemente dalla rete, metti per un momento `abilitato = 2`: se la schermata di TEST mostra `ESP non risponde` invece di un indirizzo, controlla DIP 1, 2, il selettore RXD3, oppure il firmware dell'ESP (non caricato).
+**Problemi:** l'access point non compare sul telefono → `nascosta = 1`, oppure dispositivo solo 5 GHz; se la connessione cade prova un altro `canale`. `non collegato` → controlla SSID e password (8–63 caratteri, rete a 2,4 GHz: l'ESP8266 non vede il 5 GHz). La pagina non si apre per nome → alcuni Android non risolvono `.local`, usa l'IP. Pagine lente o ferme in caricamento → il pannello mostra `risposta … ms` accanto al segnale: qualche decina di ms è normale; centinaia di ms o più con un `segnale` debole (sotto circa −75 dBm) indicano la rete (avvicina la scheda o il ripetitore). L'ESP8266 tiene la radio sempre accesa (niente risparmio energetico) e le pagine non aspettano i font di Google, quindi si aprono anche su una rete senza Internet. Per controllare il collegamento tra Mega ed ESP8266 indipendentemente dalla rete, metti per un momento `abilitato = 2`: se la schermata di TEST mostra `ESP non risponde` invece di un indirizzo, controlla DIP 1, 2, il selettore RXD3, oppure il firmware dell'ESP (non caricato).
 
 ## 10. Configurazione da microSD (PRESEPE.INI)
 
@@ -546,12 +549,13 @@ La scheda viene letta all'accensione, e di nuovo dopo *Riavvia il presepe* dalla
 | `[RELE]` | `logica = alta / bassa`, `nome1..16` (max 12 caratteri, senza virgole; definiscili prima degli eventi che li usano), `forza1..16 = auto / on / off` |
 | `[GIORNO]`, `[TRAMONTO]`, `[CREPUSCOLO]`, `[NOTTE]`, `[ALBA]` | cosa succede in quella fase: `cielo` / `tramonto` / `alba = %, R, G, B [, morbida / lineare]` (colori delle strisce, fino a 20 tappe per striscia) e `rele = RELÈ, ON/OFF, %` (fino a 64 eventi in tutto), vedi sotto |
 | `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
-| `[STELLE]` | `numero` (≤ 100), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tinta in %) |
-| `[CASETTE]` | `numero` (≤ 100, 0 = spente), `colore`, `accendi = FASE, %`, `spegni = FASE, %` (può scavalcare la fine del ciclo), `fuoco` (0–100), `dissolvenza_ms` |
+| `[STELLE_01]`, `[STELLE_02]` | una sezione per catena di stelle, stesse chiavi e stessi valori predefiniti: `numero` (≤ 100, 0 = non usata), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tinta in %). Le vecchie sezioni `[STELLE]` e `[CASETTE]` non vengono più lette (contano come errori) |
 | `[SISTEMA]` | `fastboot` (predefinito 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (entrambi solo con `fastboot = 0`), `oled`, `debug_ms` |
 | `[WIFI]` | `abilitato` (predefinito 0; 1 = rete di casa, 2 o `ap` = access point, 3 o `auto` = rete di casa, access point se non si collega), `ssid` (≤ 32 caratteri), `password` (vuota = rete aperta, altrimenti 8–63 caratteri, WPA/WPA2), `nome` (nome in rete, fino a 24 tra lettere, cifre e `-`, non all'inizio; predefinito `presepe` → `http://presepe.local`) |
 | `[ACCESS_POINT]` | rete creata con `abilitato = 2` (o 3 senza rete di casa): `ssid` (predefinito `Presepe`), `password` (predefinita `presepe2026`), `canale` (1–13, predefinito 6), `nascosta` (0/1), `max_client` (1–8, predefinito 4), `ip` (predefinito `192.168.4.1`), `portale` (0/1), `attesa` (s, 10–600, predefinito 60, solo per 3); vedi [WiFi](#wifi-scheda-mega--wifi-r3) |
 | `[AUTENTICAZIONE]` | `utente` e `password` (1–32 caratteri ciascuno) chiesti dalla pagina web (predefiniti `admin` / `presepe2026`; sono anche la password OTA dell'ESP8266) |
+
+**File scritti per un firmware precedente:** rinomina `[STELLE]` in `[STELLE_01]` e sostituisci `[CASETTE]` (con `accendi`, `spegni`, `fuoco`, `dissolvenza_ms`) con una sezione `[STELLE_02]` con le stesse chiavi di `[STELLE_01]`. Il modo più semplice è partire dal nuovo file di esempio: su una microSD senza `PRESEPE.INI` viene scritto all'accensione.
 
 I valori di testo di `[WIFI]`, `[ACCESS_POINT]` e `[AUTENTICAZIONE]` si possono scrivere tra virgolette doppie, così possono contenere `;`, `#` o spazi all'inizio e alla fine: `password = "la;mia#password"`. Le virgolette non fanno parte del valore. Altrove (per esempio nei nomi dei relè) le virgolette sono caratteri normali. Le righe sono al massimo di 126 caratteri.
 
@@ -750,7 +754,7 @@ KiCad 8–10 aprono i file di KiCad 7, ma gli script sono scritti per l'API Pyth
 | B | Shield per Arduino Mega con relè, MOSFET e morsetti (versione precedente del repository). |
 | C | Correzioni per la produzione: pin NO/NC del G5Q-1 corretti, footprint DIP-18 dell'ULN2803A, resistenza in serie al buzzer, isolamenti 6 / 5 / 2 mm, piste di alimentazione da 3 mm, fori di attrezzaggio JLCPCB, suite di verifica completa. |
 | D | microSD push-push con regolatore 3,3 V e traslatore di livello; il firmware legge `PRESEPE.INI` all'avvio (con valori di default incorporati); potenziometro di bordo sostituito dal morsetto J_POT; catena CASETTE gestita nel ciclo; file per il montaggio chiavi in mano PCBWay. |
-| E | (in progettazione, non ordinata) BZ1 a passo 6,5 mm, C1 polarizzato, distanza minima 0,22 mm, LED di stato su D13, punti di misura per +12V / GND / +5V / GND / +3V3, nessuna via sopra la presa USB della Mega; sbroglio nuovo. Stessi contorno, morsetti e firmware della Rev D. |
+| E | (in progettazione, non ordinata) BZ1 a passo 6,5 mm, C1 polarizzato, distanza minima 0,22 mm, LED di stato su D13, punti di misura per +12V / GND / +5V / GND / +3V3, nessuna via sopra la presa USB della Mega, morsetti delle stelle J_STELLE_01 / J_STELLE_02; sbroglio nuovo. Stessi contorno, morsetti e firmware della Rev D. |
 
 ---
 
