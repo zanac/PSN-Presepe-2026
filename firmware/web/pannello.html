@@ -190,17 +190,20 @@ let pixels = [[], []];
 
 // ---------------------------------------------------------------- comandi verso il presepe (uno alla volta)
 let busy = false; const queue = new Map();   // chiave -> comando: il piu' recente vince
-function send(key, c) { queue.set(key, c); pump(); }
+const falliti = new Map();                   // chiave -> funzione da chiamare se il comando non va a buon fine
+function send(key, c, seFallisce) { queue.set(key, c); if (seFallisce) falliti.set(key, seFallisce); else falliti.delete(key); pump(); }
+function fallito(key) { const f = falliti.get(key); falliti.delete(key); if (f) f(); }
 async function pump() {
   if (busy || !queue.size) return;
-  if (!st || !st.mega) { queue.clear(); say("Il presepe non risponde: comando non inviato.", true); return; }
+  if (!st || !st.mega) { [...queue.keys()].forEach(fallito); queue.clear(); say("Il presepe non risponde: comando non inviato.", true); return; }
   const [key, c] = queue.entries().next().value; queue.delete(key);
   busy = true;
   try {
     const r = await fetch("/api/cmd", { method: "POST", headers: { "Content-Type": "text/plain", "X-Presepe": "1" }, body: c });
     const j = await r.json();
-    if (!j.ok) say("Comando non eseguito: " + (j.msg || c), true);
-  } catch (e) { say("Il presepe non risponde.", true); }
+    if (!j.ok) { say("Comando non eseguito: " + (j.msg || c), true); if (!queue.has(key)) fallito(key); }
+    else if (!queue.has(key)) falliti.delete(key);
+  } catch (e) { say("Il presepe non risponde.", true); if (!queue.has(key)) fallito(key); }
   busy = false; pump();
 }
 let msgT = null;
@@ -252,7 +255,13 @@ function show() {
   $("testNote").textContent = modo === 2 ? "Comandi dal telefono: la scheda mostra «TEST DA WEB». START sulla scheda o «Esci dal test» riprendono il ciclo."
     : `Test a passi dalla scheda (passo ${st.passo ? st.passo + "/34" : "Wi-Fi"}). Il primo comando qui sotto passa al controllo dal telefono con tutte le uscite spente.`;
   if (st.ns1 !== pixels.n0 || st.ns2 !== pixels.n1) drawPix();
-  [...$("rel").children].forEach((b, i) => { const on = !!(st.rele & (1 << i)); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+  [...$("rel").children].forEach((b, i) => {
+    const on = !!(st.rele & (1 << i)), a = relAtteso[i];
+    if (a && on !== a.v && performance.now() < a.fino) return;    // comando appena dato: lo stato non e' ancora arrivato
+    if (a && on !== a.v) say(`Relè ${i + 1}: la scheda non ha confermato, ${on ? "acceso" : "spento"} come prima.`, true);
+    relAtteso[i] = null;
+    mostraRele(b, on);
+  });
   STRIP.forEach((s, j) => { const sw = $("segStrip").children[j].querySelector("i"); sw.style.background = `rgb(${st[s.k]})`; });
 }
 
@@ -363,6 +372,10 @@ $("bAllOff").addEventListener("click", () => allPix(false));
 $("pcol").addEventListener("change", e => send("PC", "PC " + e.target.value.split(",").join(" ")));
 
 // ---------------------------------------------------------------- rele', buzzer, ciclo
+// Il pulsante cambia subito al clic. Se entro 5 s lo stato della scheda non lo conferma
+// (o il comando non va a buon fine) torna com'era.
+const relAtteso = [];                        // i -> { v: acceso atteso, fino: ms }
+function mostraRele(b, on) { b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); }
 function drawRel(nomi) {
   const box = $("rel"); box.innerHTML = "";
   for (let i = 0; i < 16; i++) {
@@ -370,8 +383,14 @@ function drawRel(nomi) {
     b.innerHTML = `<span>Relè ${i + 1}</span><small></small>`;
     b.querySelector("small").textContent = nomi[i] || `Grp_0${Math.floor(i / 4) + 1}_0${i % 4 + 1}`;
     b.addEventListener("click", () => {
-      const v = !b.classList.contains("on"); b.classList.toggle("on", v); b.setAttribute("aria-pressed", v);
-      send("R" + i, `R ${i + 1} ${v ? 1 : 0}`);
+      const v = !b.classList.contains("on");
+      relAtteso[i] = { v, fino: performance.now() + 5000 }; mostraRele(b, v);
+      setTimeout(() => { if (st && relAtteso[i] && relAtteso[i].v === v) show(); }, 5100);   // anche se lo stato non arriva piu'
+      send("R" + i, `R ${i + 1} ${v ? 1 : 0}`, () => {
+        if (!relAtteso[i] || relAtteso[i].v !== v) return;            // nel frattempo un altro clic
+        relAtteso[i] = null;
+        if (st) mostraRele(b, !!(st.rele & (1 << i)));
+      });
     });
     box.appendChild(b);
   }
