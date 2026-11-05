@@ -13,8 +13,8 @@
     {
       "type": "wokwi-ssd1306",
       "id": "oled",
-      "top": -445,
-      "left": 285,
+      "top": -245,
+      "left": 300,
       "attrs": {
         "i2cAddress": "0x3c"
       }
@@ -23,7 +23,7 @@
       "type": "wokwi-pushbutton",
       "id": "start",
       "top": -490,
-      "left": 1100,
+      "left": 1720,
       "attrs": {
         "label": "START/STOP"
       }
@@ -32,7 +32,7 @@
       "type": "wokwi-pushbutton",
       "id": "next",
       "top": -400,
-      "left": 1100,
+      "left": 1720,
       "attrs": {
         "label": "AVANTI"
       }
@@ -41,7 +41,7 @@
       "type": "wokwi-pushbutton",
       "id": "test",
       "top": -310,
-      "left": 1100,
+      "left": 1720,
       "attrs": {
         "label": "TEST"
       }
@@ -50,7 +50,7 @@
       "type": "wokwi-potentiometer",
       "id": "speed",
       "top": -210,
-      "left": 1090,
+      "left": 1710,
       "attrs": {
         "value": "0",
         "label": "Durata ciclo"
@@ -60,7 +60,7 @@
       "type": "wokwi-led",
       "id": "relay1",
       "top": -490,
-      "left": 1280,
+      "left": 1900,
       "attrs": {
         "color": "yellow",
         "label": "Grp_01_01"
@@ -70,7 +70,7 @@
       "type": "wokwi-led",
       "id": "relay2",
       "top": -490,
-      "left": 1380,
+      "left": 2000,
       "attrs": {
         "color": "yellow",
         "label": "Grp_01_02"
@@ -80,7 +80,7 @@
       "type": "wokwi-led",
       "id": "relay3",
       "top": -490,
-      "left": 1480,
+      "left": 2100,
       "attrs": {
         "color": "yellow",
         "label": "Grp_01_03"
@@ -90,7 +90,7 @@
       "type": "wokwi-led",
       "id": "relay4",
       "top": -490,
-      "left": 1580,
+      "left": 2200,
       "attrs": {
         "color": "yellow",
         "label": "Grp_01_04"
@@ -100,7 +100,7 @@
       "type": "wokwi-led",
       "id": "relay5",
       "top": -420,
-      "left": 1280,
+      "left": 1900,
       "attrs": {
         "color": "yellow",
         "label": "Grp_02_01"
@@ -110,7 +110,7 @@
       "type": "wokwi-led",
       "id": "relay6",
       "top": -420,
-      "left": 1380,
+      "left": 2000,
       "attrs": {
         "color": "yellow",
         "label": "Grp_02_02"
@@ -120,7 +120,7 @@
       "type": "wokwi-led",
       "id": "relay7",
       "top": -420,
-      "left": 1480,
+      "left": 2100,
       "attrs": {
         "color": "yellow",
         "label": "Grp_02_03"
@@ -130,7 +130,7 @@
       "type": "wokwi-led",
       "id": "relay8",
       "top": -420,
-      "left": 1580,
+      "left": 2200,
       "attrs": {
         "color": "yellow",
         "label": "Grp_02_04"
@@ -140,7 +140,7 @@
       "type": "wokwi-led",
       "id": "relay9",
       "top": -350,
-      "left": 1280,
+      "left": 1900,
       "attrs": {
         "color": "yellow",
         "label": "Grp_03_01"
@@ -150,7 +150,7 @@
       "type": "wokwi-led",
       "id": "relay10",
       "top": -350,
-      "left": 1380,
+      "left": 2000,
       "attrs": {
         "color": "yellow",
         "label": "Grp_03_02"
@@ -160,7 +160,7 @@
       "type": "wokwi-led",
       "id": "relay11",
       "top": -350,
-      "left": 1480,
+      "left": 2100,
       "attrs": {
         "color": "yellow",
         "label": "Grp_03_03"
@@ -170,7 +170,7 @@
       "type": "wokwi-led",
       "id": "relay12",
       "top": -350,
-      "left": 1580,
+      "left": 2200,
       "attrs": {
         "color": "yellow",
         "label": "Grp_03_04"
@@ -180,7 +180,7 @@
       "type": "wokwi-led",
       "id": "relay13",
       "top": -280,
-      "left": 1280,
+      "left": 1900,
       "attrs": {
         "color": "yellow",
         "label": "Grp_04_01"
@@ -190,7 +190,7 @@
       "type": "wokwi-led",
       "id": "relay14",
       "top": -280,
-      "left": 1380,
+      "left": 2000,
       "attrs": {
         "color": "yellow",
         "label": "Grp_04_02"
@@ -200,7 +200,7 @@
       "type": "wokwi-led",
       "id": "relay15",
       "top": -280,
-      "left": 1480,
+      "left": 2100,
       "attrs": {
         "color": "yellow",
         "label": "Grp_04_03"
@@ -210,7 +210,7 @@
       "type": "wokwi-led",
       "id": "relay16",
       "top": -280,
-      "left": 1580,
+      "left": 2200,
       "attrs": {
         "color": "yellow",
         "label": "Grp_04_04"
@@ -597,7 +597,7 @@
       "type": "wokwi-buzzer",
       "id": "buzzer",
       "top": -120,
-      "left": 1100,
+      "left": 1720,
       "attrs": {
         "volume": "0.15"
       }
@@ -605,358 +605,358 @@
     {
       "type": "wokwi-neopixel",
       "id": "s2_1",
-      "top": -92,
-      "left": 999,
+      "top": -512,
+      "left": 1620,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_2",
-      "top": -79,
-      "left": 927,
+      "top": -499,
+      "left": 1548,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_3",
-      "top": -91,
-      "left": 876,
+      "top": -511,
+      "left": 1497,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_4",
-      "top": -78,
-      "left": 825,
+      "top": -498,
+      "left": 1446,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_5",
-      "top": -90,
-      "left": 774,
+      "top": -510,
+      "left": 1395,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_6",
-      "top": -77,
-      "left": 723,
+      "top": -497,
+      "left": 1344,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_7",
-      "top": -89,
-      "left": 651,
+      "top": -509,
+      "left": 1272,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_8",
-      "top": -76,
-      "left": 600,
+      "top": -496,
+      "left": 1221,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_9",
-      "top": -88,
-      "left": 549,
+      "top": -508,
+      "left": 1170,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_10",
-      "top": -75,
-      "left": 498,
+      "top": -495,
+      "left": 1119,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_11",
-      "top": -42,
-      "left": 979,
+      "top": -462,
+      "left": 1600,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_12",
-      "top": -29,
-      "left": 907,
+      "top": -449,
+      "left": 1528,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_13",
-      "top": -41,
-      "left": 856,
+      "top": -461,
+      "left": 1477,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_14",
-      "top": -28,
-      "left": 805,
+      "top": -448,
+      "left": 1426,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_15",
-      "top": -40,
-      "left": 754,
+      "top": -460,
+      "left": 1375,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_16",
-      "top": -27,
-      "left": 703,
+      "top": -447,
+      "left": 1324,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_17",
-      "top": -39,
-      "left": 631,
+      "top": -459,
+      "left": 1252,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_18",
-      "top": -26,
-      "left": 580,
+      "top": -446,
+      "left": 1201,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_19",
-      "top": -38,
-      "left": 529,
+      "top": -458,
+      "left": 1150,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_20",
-      "top": -25,
-      "left": 478,
+      "top": -445,
+      "left": 1099,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_21",
-      "top": 8,
-      "left": 995,
+      "top": -412,
+      "left": 1616,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_22",
-      "top": 21,
-      "left": 944,
+      "top": -399,
+      "left": 1565,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_23",
-      "top": 9,
-      "left": 872,
+      "top": -411,
+      "left": 1493,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_24",
-      "top": 22,
-      "left": 821,
+      "top": -398,
+      "left": 1442,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_25",
-      "top": 10,
-      "left": 770,
+      "top": -410,
+      "left": 1391,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_26",
-      "top": -2,
-      "left": 719,
+      "top": -422,
+      "left": 1340,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_27",
-      "top": 11,
-      "left": 668,
+      "top": -409,
+      "left": 1289,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_28",
-      "top": -1,
-      "left": 596,
+      "top": -421,
+      "left": 1217,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_29",
-      "top": 12,
-      "left": 545,
+      "top": -408,
+      "left": 1166,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_30",
-      "top": 0,
-      "left": 494,
+      "top": -420,
+      "left": 1115,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_31",
-      "top": 58,
-      "left": 975,
+      "top": -362,
+      "left": 1596,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_32",
-      "top": 46,
-      "left": 924,
+      "top": -374,
+      "left": 1545,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_33",
-      "top": 59,
-      "left": 852,
+      "top": -361,
+      "left": 1473,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_34",
-      "top": 47,
-      "left": 801,
+      "top": -373,
+      "left": 1422,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_35",
-      "top": 60,
-      "left": 750,
+      "top": -360,
+      "left": 1371,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_36",
-      "top": 48,
-      "left": 699,
+      "top": -372,
+      "left": 1320,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_37",
-      "top": 61,
-      "left": 648,
+      "top": -359,
+      "left": 1269,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_38",
-      "top": 49,
-      "left": 576,
+      "top": -371,
+      "left": 1197,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_39",
-      "top": 62,
-      "left": 525,
+      "top": -358,
+      "left": 1146,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_40",
-      "top": 50,
-      "left": 474,
+      "top": -370,
+      "left": 1095,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_41",
-      "top": 108,
-      "left": 991,
+      "top": -312,
+      "left": 1612,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_42",
-      "top": 96,
-      "left": 940,
+      "top": -324,
+      "left": 1561,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_43",
-      "top": 109,
-      "left": 889,
+      "top": -311,
+      "left": 1510,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_44",
-      "top": 97,
-      "left": 817,
+      "top": -323,
+      "left": 1438,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_45",
-      "top": 110,
-      "left": 766,
+      "top": -310,
+      "left": 1387,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_46",
-      "top": 98,
-      "left": 715,
+      "top": -322,
+      "left": 1336,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_47",
-      "top": 111,
-      "left": 664,
+      "top": -309,
+      "left": 1285,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_48",
-      "top": 99,
-      "left": 613,
+      "top": -321,
+      "left": 1234,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_49",
-      "top": 112,
-      "left": 541,
+      "top": -308,
+      "left": 1162,
       "attrs": {}
     },
     {
       "type": "wokwi-neopixel",
       "id": "s2_50",
-      "top": 100,
-      "left": 490,
+      "top": -320,
+      "left": 1111,
       "attrs": {}
     },
     {
       "type": "wokwi-microsd-card",
       "id": "sd",
-      "top": -300,
-      "left": 60,
+      "top": -190,
+      "left": 2020,
       "rotate": 90,
       "attrs": {}
     }
@@ -3136,10 +3136,10 @@
     ]
   ],
   "attrs": {
-    "layout-note": "OLED left of stars; controls right of stars; RGB strips directly below stars, contiguous and aligned: ALBA - CIELO - TRAMONTO; STELLE_02: 50 neopixels (D8, second sky zone, mirrored layout) below the RGB strips, microSD (SPI D50-D53) left of the OLED",
+    "layout-note": "STELLE_01 (D5) and STELLE_02 (D8, mirrored layout) side by side at the top; RGB strips below STELLE_01, contiguous and aligned: ALBA - CIELO - TRAMONTO, OLED left of ALBA; controls, potentiometer and buzzer right of STELLE_02, then the 16 relays; microSD (SPI D50-D53) below the relays",
     "layout-revision": "2026-09-25-rgb-strips-wide-v1",
     "relay-label-standard": "Grp_GG_RR: GG=relay board group 01-04, RR=relay channel 01-04",
     "rev": "D"
   },
-  "layoutRevision": "2026-11-05-stelle-01-02-v2"
+  "layoutRevision": "2026-11-05-stelle-01-02-v3"
 }
