@@ -185,6 +185,7 @@ input[type=range] { flex: 1; accent-color: var(--accent); min-width: 0; height: 
   </section>
 
   <div class="msg" id="msg" hidden role="status"></div>
+  <p class="note" id="ver"></p>
 </div>
 
 <script>
@@ -454,7 +455,7 @@ return { parse, faseDi, inizio, fine, colore, rele, STRISCE };
     const col = s => modo === 4 ? [0, 0, 0] : ciclo ? E.colore(cfg, s, p) : test[E.STRISCE[s]];
     const releCiclo = E.rele(cfg, p).reduce((m, on, i) => on ? m | (1 << i) : m, 0);
     return {
-      versione: "demo", ip: "192.168.1.50", ssid: "Casa", host: "presepe", rssi: -58,
+      versione: "demo", build: "nella demo", ip: "192.168.1.50", ssid: "Casa", host: "presepe", rssi: -58,
       mega, eta: mega ? 200 : 999999, modo, run: run ? 1 : 0, fase: fa,
       pctFase: Math.round(b > a ? (p - a) * 100 / (b - a) : 0), pct: Math.round(p * 10) / 10, durata: durata(),
       sd: errori ? 4 : 3, err: errori, riga: prima, ns1: cfg.stelle[0].numero, ns2: cfg.stelle[1].numero,
@@ -603,6 +604,7 @@ function show() {
     ? `rete «${st.ssid}» · ${st.ip} · ${st.clienti} ${st.clienti === 1 ? "dispositivo collegato" : "dispositivi collegati"}`
     : `${st.host}.local · ${st.ip} · segnale ${st.rssi} dBm`;
   if (st.ms !== undefined) $("net").textContent += ` · risposta ${st.ms} ms`;
+  $("ver").textContent = `Firmware ESP ${st.versione}` + (st.build ? `, compilato il ${st.build}` : "");
   // diagnostica dell'ESP (passa il mouse sopra, o tieni premuto): un "avviato da" che riparte da zero = l'ESP si e' riavviato
   if (st.esp) $("net").title = `ESP: memoria libera ${st.esp.heap} byte (blocco max ${st.esp.blocco}), avviato da ${st.esp.avvio} s, ultimo riavvio: ${st.esp.reset}`;   // tempo di /api/stato: rete lenta o scheda occupata
   $("offline").hidden = st.mega;

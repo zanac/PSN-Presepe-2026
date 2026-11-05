@@ -317,6 +317,7 @@ void apiStato() {
   bool mega = statoValido && millis() - statoMs < 3000;
   String j = "{";
   j += "\"versione\":\"" VERSIONE "\"";
+  j += ",\"build\":\"" __DATE__ " " __TIME__ "\"";   // quando e' stato compilato il firmware ESP caricato
   j += ",\"ip\":" + jsonTesto(indirizzo());
   j += ",\"ssid\":" + jsonTesto(modoAp ? cfgApSsid : cfgSsid);
   j += ",\"ap\":" + String(modoAp ? "true" : "false");

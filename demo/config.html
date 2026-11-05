@@ -520,7 +520,7 @@ return { parse, faseDi, inizio, fine, colore, rele, STRISCE };
     const col = s => modo === 4 ? [0, 0, 0] : ciclo ? E.colore(cfg, s, p) : test[E.STRISCE[s]];
     const releCiclo = E.rele(cfg, p).reduce((m, on, i) => on ? m | (1 << i) : m, 0);
     return {
-      versione: "demo", ip: "192.168.1.50", ssid: "Casa", host: "presepe", rssi: -58,
+      versione: "demo", build: "nella demo", ip: "192.168.1.50", ssid: "Casa", host: "presepe", rssi: -58,
       mega, eta: mega ? 200 : 999999, modo, run: run ? 1 : 0, fase: fa,
       pctFase: Math.round(b > a ? (p - a) * 100 / (b - a) : 0), pct: Math.round(p * 10) / 10, durata: durata(),
       sd: errori ? 4 : 3, err: errori, riga: prima, ns1: cfg.stelle[0].numero, ns2: cfg.stelle[1].numero,

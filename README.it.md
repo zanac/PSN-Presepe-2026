@@ -418,7 +418,7 @@ Con la scheda montata i DIP switch restano sotto lo shield: fai C1–C3 con la s
 
 **Aggiornamenti successivi (senza togliere la scheda):**
 - **Mega:** con l'impostazione normale (DIP 1–4 su ON) l'USB arriva al Mega: carica come nella parte B.
-- **ESP8266:** via WiFi. Il PC deve essere sulla stessa rete del presepe (in modo access point: collegato alla rete del presepe). In *Strumenti → Porta* scegli la porta di rete **presepe** invece della COM e carica; l'IDE chiede la password di `[AUTENTICAZIONE]`. Senza la porta di rete: `python espota.py -i <IP> -p 8266 -a <password> -f PSN-Presepe-WiFi.ino.bin` (`espota.py` è nella cartella `tools` del pacchetto esp8266 installato). Solo se un firmware dell'ESP non riparte più la scheda va tolta per passare dall'USB (DIP 5, 6, 7).
+- **ESP8266:** via WiFi. Il PC deve essere sulla stessa rete del presepe (in modo access point: collegato alla rete del presepe). In *Strumenti → Porta* scegli la porta di rete **presepe** invece della COM e carica; l'IDE chiede la password di `[AUTENTICAZIONE]`. Senza la porta di rete: `python espota.py -i <IP> -p 8266 -a <password> -f PSN-Presepe-WiFi.ino.bin` (`espota.py` è nella cartella `tools` del pacchetto esp8266 installato). Solo se un firmware dell'ESP non riparte più la scheda va tolta per passare dall'USB (DIP 5, 6, 7). Per sapere quale firmware ESP c'è sulla scheda guarda in fondo al pannello: `Firmware ESP 039, compilato il …` indica data e ora della compilazione.
 
 ### Funzionamento
 

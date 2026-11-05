@@ -418,7 +418,7 @@ The DIP switches sit under the shield once the board is mounted: do C1–C3 with
 
 **Later updates (no need to remove the board):**
 - **Mega:** with the normal setting (DIP 1–4 ON) the USB still reaches the Mega: upload as in part B.
-- **ESP8266:** over WiFi. The PC must be on the same network as the presepe (in access-point mode: connected to the presepe's network). In *Tools → Port* choose the network port **presepe** instead of the COM port and upload; the IDE asks for the password of `[AUTENTICAZIONE]`. Without the network port: `python espota.py -i <IP> -p 8266 -a <password> -f PSN-Presepe-WiFi.ino.bin` (`espota.py` is in the `tools` folder of the installed esp8266 package). Only if an ESP firmware no longer starts does the board have to come off for the USB route (DIP 5, 6, 7).
+- **ESP8266:** over WiFi. The PC must be on the same network as the presepe (in access-point mode: connected to the presepe's network). In *Tools → Port* choose the network port **presepe** instead of the COM port and upload; the IDE asks for the password of `[AUTENTICAZIONE]`. Without the network port: `python espota.py -i <IP> -p 8266 -a <password> -f PSN-Presepe-WiFi.ino.bin` (`espota.py` is in the `tools` folder of the installed esp8266 package). Only if an ESP firmware no longer starts does the board have to come off for the USB route (DIP 5, 6, 7). To check which ESP firmware is on the board, look at the bottom of the panel: `Firmware ESP 039, compilato il …` shows the date and time it was compiled.
 
 ### Operation
 

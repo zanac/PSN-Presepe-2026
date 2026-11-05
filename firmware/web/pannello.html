@@ -175,6 +175,7 @@ input[type=range] { flex: 1; accent-color: var(--accent); min-width: 0; height: 
   </section>
 
   <div class="msg" id="msg" hidden role="status"></div>
+  <p class="note" id="ver"></p>
 </div>
 
 <script>
@@ -221,6 +222,7 @@ function show() {
     ? `rete «${st.ssid}» · ${st.ip} · ${st.clienti} ${st.clienti === 1 ? "dispositivo collegato" : "dispositivi collegati"}`
     : `${st.host}.local · ${st.ip} · segnale ${st.rssi} dBm`;
   if (st.ms !== undefined) $("net").textContent += ` · risposta ${st.ms} ms`;
+  $("ver").textContent = `Firmware ESP ${st.versione}` + (st.build ? `, compilato il ${st.build}` : "");
   // diagnostica dell'ESP (passa il mouse sopra, o tieni premuto): un "avviato da" che riparte da zero = l'ESP si e' riavviato
   if (st.esp) $("net").title = `ESP: memoria libera ${st.esp.heap} byte (blocco max ${st.esp.blocco}), avviato da ${st.esp.avvio} s, ultimo riavvio: ${st.esp.reset}`;   // tempo di /api/stato: rete lenta o scheda occupata
   $("offline").hidden = st.mega;

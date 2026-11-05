@@ -61,6 +61,7 @@ int main() {
   r = server.chiama("/api/stato", HTTP_GET, "");
   CHECK(r.code == 200 && r.body.find("\"mega\":true") != std::string::npos && r.body.find("\"pct\":45.0") != std::string::npos);
   CHECK(r.body.find("\"nomi\":[\"\",\"\",\"Mulino\"") != std::string::npos && r.body.find("\"ip\":\"192.168.1.50\"") != std::string::npos);
+  CHECK(r.body.find("\"build\":\"") != std::string::npos);
   CHECK(r.body.find("\"esp\":{\"heap\":40000,\"blocco\":30000,\"avvio\":") != std::string::npos && r.body.find("\"reset\":\"Power On\"}") != std::string::npos);
 
   perdita = 0.5;                                  // from now on: 50 % of the commands sent to an idle Mega lose their first bytes
