@@ -561,7 +561,7 @@
       "type": "chip-rgb-strip",
       "id": "albaStrip",
       "top": -245,
-      "left": 490,
+      "left": 795,
       "attrs": {
         "labelId": "0"
       }
@@ -570,7 +570,7 @@
       "type": "chip-rgb-strip",
       "id": "cieloStrip",
       "top": -245,
-      "left": 670,
+      "left": 975,
       "attrs": {
         "labelId": "1"
       }
@@ -579,7 +579,7 @@
       "type": "chip-rgb-strip",
       "id": "tramontoStrip",
       "top": -245,
-      "left": 850,
+      "left": 1155,
       "attrs": {
         "labelId": "2"
       }
@@ -3103,7 +3103,7 @@
     ]
   ],
   "attrs": {
-    "layout-note": "STELLE_01 (D5) and STELLE_02 (D8, mirrored layout) side by side at the top; RGB strips below STELLE_01, contiguous and aligned: ALBA - CIELO - TRAMONTO, OLED left of ALBA; controls, potentiometer and buzzer right of STELLE_02, then the 16 relays; microSD (SPI D50-D53) below the relays",
+    "layout-note": "STELLE_01 (D5) and STELLE_02 (D8, mirrored layout) side by side at the top; OLED and RGB strips (ALBA - CIELO - TRAMONTO, contiguous) centred below the two star fields, OLED left of ALBA; controls, potentiometer and buzzer right of STELLE_02, then the 16 relays; microSD (SPI D50-D53) below the relays",
     "layout-revision": "2026-09-25-rgb-strips-wide-v1",
     "relay-label-standard": "Grp_GG_RR: GG=relay board group 01-04, RR=relay channel 01-04",
     "test-variant": "NO DISPLAY - test optional OLED handling",
