@@ -216,9 +216,15 @@ String comando(const String &c, unsigned long attesaMs = 600, uint8_t tentativi 
 String nuovoId() { if (++idComando == 0) idComando = 1; return String(idComando); }
 
 // Indirizzo della centralina: quello dell'access point, o quello avuto dalla rete di casa.
+// Solo un indirizzo vero (a.b.c.d) o "none": IPAddress::toString() di un indirizzo non ancora
+// assegnato da' "(IP unset)", che il Mega mostrerebbe sul display come "IP: (IP".
+String ipValido(const String &s) {
+  IPAddress a;
+  return (a.fromString(s) && s != "0.0.0.0") ? s : String("none");
+}
 String indirizzo() {
-  if (modoAp) return WiFi.softAPIP().toString();
-  return WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String("none");
+  if (modoAp) return ipValido(WiFi.softAPIP().toString());
+  return WiFi.status() == WL_CONNECTED ? ipValido(WiFi.localIP().toString()) : String("none");
 }
 
 // ------------------------------------------------------------------ pagine

@@ -2598,6 +2598,17 @@ char *lnkCampo(char *&s) {
   if (*s) *s++ = 0;
   return inizio;
 }
+// "none" oppure un indirizzo a.b.c.d con numeri 0..255 (al massimo 15 caratteri).
+bool lnkIpValido(const char *ip) {
+  if (!strcmp(ip, "none")) return true;
+  uint8_t punti = 0, cifre = 0; uint16_t n = 0;
+  for (const char *c = ip; ; c++) {
+    if (*c >= '0' && *c <= '9') { n = n * 10 + (*c - '0'); if (++cifre > 3 || n > 255) return false; }
+    else if (*c == '.' || !*c) { if (!cifre) return false; if (!*c) break; if (++punti > 3) return false; cifre = 0; n = 0; }
+    else return false;
+  }
+  return punti == 3;
+}
 bool lnkNumero(char *&s, long &out, long minimo, long massimo) {
   char *c = lnkCampo(s);
   if (!c) return false;
@@ -2827,9 +2838,11 @@ void lnkComando(char *riga) {
   if (!strcmp(cmd, "HELLO")) { lnkInviaConfig(); return; }
   if (!strcmp(cmd, "IP")) {
     char *ip = lnkCampo(s);                  // IP indirizzo [AP]
-    if (!ip || strlen(ip) >= sizeof(wifiIp)) { lnkErr(F("ip")); return; }
     char *tipo = lnkCampo(s);
-    bool ap = tipo && !strcmp(tipo, "AP");
+    // Solo "none" o a.b.c.d (cifre e 3 punti), e dopo al piu' "AP": qualunque altra cosa
+    // (riga rovinata, "(IP unset)") viene rifiutata e sul display resta l'indirizzo di prima.
+    if (!ip || !lnkIpValido(ip) || (tipo && strcmp(tipo, "AP") != 0) || lnkCampo(s)) { lnkErr(F("ip")); return; }
+    bool ap = tipo != 0;
     if (strcmp(ip, wifiIp) != 0 || ap != wifiAp) {
       strcpy(wifiIp, ip); wifiAp = ap;
       Serial.print(F("WiFi: IP ")); Serial.print(wifiIp); Serial.println(ap ? F(" (access point)") : F(""));

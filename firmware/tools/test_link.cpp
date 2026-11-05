@@ -214,6 +214,10 @@ int main() {
   CHECK(ok(cmd("@IP 192.168.4.1 AP")) && std::strcmp(wifiIp, "192.168.4.1") == 0 && wifiAp);   // access point
   CHECK(ok(cmd("@IP 192.168.1.23")) && !wifiAp);
   CHECK(ok(cmd("@IP none")) && std::strcmp(wifiIp, "none") == 0 && !wifiAp);
+  CHECK(ok(cmd("@IP 10.0.0.7")));
+  CHECK(!ok(cmd("@IP (IP unset)")) && std::strcmp(wifiIp, "10.0.0.7") == 0);      // not an address: the old one stays
+  CHECK(!ok(cmd("@IP 192.168.1.2x")) && !ok(cmd("@IP 192.168.1")) && !ok(cmd("@IP 192.168.1.256")) && !ok(cmd("@IP 1..2.3")));
+  CHECK(!ok(cmd("@IP 192.168.4.1 XY")) && !ok(cmd("@IP 192.168.4.1 AP X")) && std::strcmp(wifiIp, "10.0.0.7") == 0 && !wifiAp);
 
   // 4. status line once per second: 23 fields
   T += 1000; Serial3.out.clear(); lnkTick();
