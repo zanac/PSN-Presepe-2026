@@ -48,7 +48,7 @@ int main() {
   CHECK(server.chiama("/", HTTP_GET, "", "admin", "sbagliata").code == 401);
   Risposta r = server.chiama("/", HTTP_GET, "");
   CHECK(r.code == 200 && r.headers["Content-Encoding"] == "gzip" && r.body.size() == PAGINA_PANNELLO_LEN);
-  CHECK(server.timeoutCorpo == 20000 && !r.headers["ETag"].empty());
+  CHECK(server.timeoutCorpo == 20000 && server.cliente.flushMs == 10000 && !r.headers["ETag"].empty());
   {   // same page again with the browser's copy: 304 without body
     Risposta r2 = server.chiama("/", HTTP_GET, "", "admin", "presepe2026", {{"If-None-Match", r.headers["ETag"]}});
     CHECK(r2.code == 304 && r2.body.empty() && r2.headers["ETag"] == r.headers["ETag"]);
@@ -61,6 +61,7 @@ int main() {
   r = server.chiama("/api/stato", HTTP_GET, "");
   CHECK(r.code == 200 && r.body.find("\"mega\":true") != std::string::npos && r.body.find("\"pct\":45.0") != std::string::npos);
   CHECK(r.body.find("\"nomi\":[\"\",\"\",\"Mulino\"") != std::string::npos && r.body.find("\"ip\":\"192.168.1.50\"") != std::string::npos);
+  CHECK(r.body.find("\"esp\":{\"heap\":40000,\"blocco\":30000,\"avvio\":") != std::string::npos && r.body.find("\"reset\":\"Power On\"}") != std::string::npos);
 
   perdita = 0.5;                                  // from now on: 50 % of the commands sent to an idle Mega lose their first bytes
 

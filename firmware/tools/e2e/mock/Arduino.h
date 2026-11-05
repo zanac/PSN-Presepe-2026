@@ -61,5 +61,6 @@ struct EspSerial {
   void print(char c) { put(c); }
 };
 extern EspSerial Serial;
-struct EspMock { int restarts = 0; void restart() { restarts++; } uint32_t random() { return 0x5a5a; } };
+struct EspMock { int restarts = 0; void restart() { restarts++; } uint32_t random() { return 0x5a5a; }
+  uint32_t getFreeHeap() { return 40000; } uint32_t getMaxFreeBlockSize() { return 30000; } String getResetReason() { return String("Power On"); } };
 extern EspMock ESP;

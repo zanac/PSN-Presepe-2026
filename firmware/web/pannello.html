@@ -220,7 +220,9 @@ function show() {
   $("net").textContent = st.ap
     ? `rete «${st.ssid}» · ${st.ip} · ${st.clienti} ${st.clienti === 1 ? "dispositivo collegato" : "dispositivi collegati"}`
     : `${st.host}.local · ${st.ip} · segnale ${st.rssi} dBm`;
-  if (st.ms !== undefined) $("net").textContent += ` · risposta ${st.ms} ms`;   // tempo di /api/stato: rete lenta o scheda occupata
+  if (st.ms !== undefined) $("net").textContent += ` · risposta ${st.ms} ms`;
+  // diagnostica dell'ESP (passa il mouse sopra, o tieni premuto): un "avviato da" che riparte da zero = l'ESP si e' riavviato
+  if (st.esp) $("net").title = `ESP: memoria libera ${st.esp.heap} byte (blocco max ${st.esp.blocco}), avviato da ${st.esp.avvio} s, ultimo riavvio: ${st.esp.reset}`;   // tempo di /api/stato: rete lenta o scheda occupata
   $("offline").hidden = st.mega;
   if (!st.mega) { ["cardCiclo", "cardTest", "cardColore", "cardStop"].forEach(id => { $(id).hidden = true; }); modo = -1;
     $("offlineMsg").textContent = "Il presepe non risponde: è in avvio, oppure l'ESP8266 non è collegato alla Serial3 (DIP 1-2 e selettore su RXD3/TXD3)."; return; }

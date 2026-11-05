@@ -249,10 +249,16 @@ bool autorizzato() {
 // (ERR_CONTENT_LENGTH_MISMATCH) e lo script della pagina non parte. Con piu' di ~8 kB
 // (/config, il file INI) succede quasi sempre su una rete appena disturbata. Qui la sorgente
 // ha 20 s: l'invio aspetta le ritrasmissioni invece di chiudere.
+// Poi aspetta che il browser abbia confermato di aver ricevuto tutto (ACK TCP) prima di
+// tornare al server: se nel frattempo arriva un'altra richiesta (la pagina chiede lo stato
+// ogni secondo) il server chiude subito questa connessione, e una chiusura con dati ancora
+// da confermare puo' finire in un reset (tcp_abort): risposta tagliata, stesso errore
+// ERR_CONTENT_LENGTH_MISMATCH. Visto su /api/ini (il file INI, ~16 kB).
 void inviaCorpo(int codice, const char *tipo, const char *dati, size_t len) {
   StreamConstPtr sorgente(dati, len);
   sorgente.setTimeout(20000);
   server.send(codice, tipo, &sorgente, len);
+  server.client().flush(10000);           // fino a 10 s per gli ACK
 }
 
 // Pagine (gzip in flash). Ogni pagina ha un ETag legato alla compilazione: il browser
@@ -325,6 +331,9 @@ void apiStato() {
   j += ",\"tramonto\":[" + String(s[15]) + "," + String(s[16]) + "," + String(s[17]) + "]";
   j += ",\"alba\":[" + String(s[18]) + "," + String(s[19]) + "," + String(s[20]) + "]";
   j += ",\"passo\":" + String(s[21]);
+  // diagnostica dell'ESP: memoria libera, blocco piu' grande, secondi dall'avvio, motivo dell'ultimo riavvio
+  j += ",\"esp\":{\"heap\":" + String(ESP.getFreeHeap()) + ",\"blocco\":" + String(ESP.getMaxFreeBlockSize()) +
+       ",\"avvio\":" + String(millis() / 1000) + ",\"reset\":" + jsonTesto(ESP.getResetReason()) + "}";
   j += ",\"nomi\":[";
   for (int i = 0; i < 16; i++) { if (i) j += ","; j += jsonTesto(nomiRele[i]); }
   j += "]}";
@@ -368,7 +377,7 @@ void apiComando() {
 void apiLeggiFile() {
   if (!autorizzato()) return;
   inGet = true; getTesto = ""; getNome = "";
-  getTesto.reserve(12000);
+  getTesto.reserve(17000);                  // il file di esempio e' ~16.5 kB: una sola allocazione
   String r = comando("GET", 1500, 4, 15000);
   inGet = false;
   if (!r.startsWith("@END")) {
