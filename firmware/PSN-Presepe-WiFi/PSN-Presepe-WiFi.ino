@@ -378,8 +378,35 @@ void apiComando() {
   rispostaJson(ok, "msg", ok ? String("") : motivo(r));
 }
 
+// Firma del file sulla microSD: "nome:crc:byte" (il Mega la calcola con @SUM e la manda alla
+// fine di @GET). La pagina tiene una copia del file e manda la sua firma in X-Firma: se il file
+// non e' cambiato risponde X-Invariato senza corpo, e i ~16 kB non passano di nuovo dal WiFi
+// (con un segnale debole sono quasi 5 s). Con un Mega di prima (senza @SUM) si legge sempre tutto.
+String firmaMega() {             // "" se il Mega non sa rispondere
+  String r = comando("SUM", 1500, 3);
+  if (!r.startsWith("@OK SUM ")) return "";
+  r = r.substring(8);
+  int a = r.indexOf(' '), b = r.lastIndexOf(' ');
+  if (a <= 0 || b <= a) return "";
+  return r.substring(0, a) + ":" + r.substring(a + 1, b) + ":" + r.substring(b + 1);
+}
+
 void apiLeggiFile() {
   if (!autorizzato()) return;
+  String nota = server.header("X-Firma");
+  if (nota.length()) {
+    unsigned long t0 = millis();
+    String firma = firmaMega();
+    if (firma.length() && firma == nota) {
+      server.sendHeader("X-Invariato", "1");
+      server.sendHeader("X-Firma", firma);
+      server.sendHeader("X-File", firma.substring(0, firma.indexOf(':')));
+      server.sendHeader("X-Tempo", String(millis() - t0));
+      server.sendHeader("Cache-Control", "no-store");
+      server.send(200, "text/plain; charset=utf-8", "");
+      return;
+    }
+  }
   inGet = true; getTesto = ""; getNome = "";
   getTesto.reserve(17000);                  // il file di esempio e' ~16.5 kB: una sola allocazione
   unsigned long t0 = millis();
@@ -391,6 +418,10 @@ void apiLeggiFile() {
     getTesto = ""; return;
   }
   server.sendHeader("X-File", getNome);
+  {                                          // "@END righe crc byte" -> firma (Mega di prima: niente)
+    int a = r.indexOf(' ', 5), b = r.lastIndexOf(' ');
+    if (a > 0 && b > a) server.sendHeader("X-Firma", getNome + ":" + r.substring(a + 1, b) + ":" + r.substring(b + 1));
+  }
   server.sendHeader("X-Tempo", String(tempo));   // la pagina mostra quanto e' scheda e quanto e' rete
   server.sendHeader("Access-Control-Expose-Headers", "X-File");
   server.sendHeader("Cache-Control", "no-store");
@@ -463,7 +494,9 @@ void apiScriviFile() {
   r = comando("COMMIT " + String(salvByte) + " " + nuovoId(), 1500, 4, 20000);
   if (!r.startsWith("@OK")) { rispostaJson(false, "msg", motivo(r), 503); return; }
   String nome = r.length() > 4 ? r.substring(4) : String("PRESEPE.INI");
-  rispostaJson(true, "file", nome);
+  // firma del file appena scritto: la pagina aggiorna la sua copia e la prossima apertura
+  // non lo riscarica ("" con un Mega di prima)
+  server.send(200, "application/json", "{\"ok\":true,\"file\":" + jsonTesto(nome) + ",\"firma\":" + jsonTesto(firmaMega()) + "}");
 }
 
 void apiRiavvia() {
@@ -489,7 +522,7 @@ void setup() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();            // nessuna rete ricordata: si collega solo con i dati del Mega
   idComando = (uint16_t)(ESP.random() | 1);   // diverso a ogni avvio dell'ESP
-  server.collectHeaders("X-Presepe", "X-Len", "X-Parte", "If-None-Match");   // lette da daPagina(), apiScriviFile(), inviaPagina()
+  server.collectHeaders("X-Presepe", "X-Len", "X-Parte", "If-None-Match", "X-Firma");   // lette da daPagina(), apiScriviFile(), inviaPagina()
 
   server.on("/", HTTP_GET, []() { if (autorizzato()) inviaPagina(PAGINA_PANNELLO, PAGINA_PANNELLO_LEN); });
   server.on("/config", HTTP_GET, []() { if (autorizzato()) inviaPagina(PAGINA_CONFIG, PAGINA_CONFIG_LEN); });

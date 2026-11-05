@@ -342,7 +342,7 @@ Libraries: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (with Adafruit BusI
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Size: 88.2 kB flash (34 %, of which 16.3 kB is the embedded default `PRESEPE.INI`), 4.9 kB static RAM. That leaves about 3.3 kB for heap and stack; the OLED buffer (1 kB) and the LED buffers (3 bytes per pixel) are allocated at run time, after which about 2 kB stay free.
+Size: 89.0 kB flash (35 %, of which 16.3 kB is the embedded default `PRESEPE.INI`), 4.9 kB static RAM. That leaves about 3.3 kB for heap and stack; the OLED buffer (1 kB) and the LED buffers (3 bytes per pixel) are allocated at run time, after which about 2 kB stay free.
 
 ### Build
 
@@ -498,6 +498,7 @@ With `abilitato = 1` the ESP8266 joins the WPA/WPA2 network named in `[WIFI]`; w
   - **Grafico** view (the default; *Testo* shows the plain file): pick a phase, and each strip (Tramonto, Cielo, Alba) and the relays get a lane from 0 to 100 % of that phase. Strip stops are dots over the resulting gradient (round = *morbida*, square = *lineare*, dashed = firmware default, written to the file as soon as it is changed), relay events are numbered tags. Tap or drag a lane to move the preview point; drag a dot to change its %; tap it to edit colour (R/G/B sliders, colour wheel, ready colours and the colours already used), position, curve and comment; *+ tappa* / *+ evento* adds one at the preview point, *Duplica* / *Elimina* / *Annulla* as named. Each change rewrites only the lines of that strip (or the `rele` lines) in that phase section and keeps their comments; the limits (20 stops per strip, 64 relay events) are shown on each lane.
   - On the board the editor is always live and there is no on-screen stage: at the first action (a phase, a stop, a touch on a lane, a test) the board enters TEST and the real strips and relays follow the preview (the same `S` / `R` commands as the panel). *Torna al ciclo* leaves the test and the cycle continues; closing or leaving the page does the same. *Prova la fase* plays the selected phase on the strips at real speed (cycle duration chosen with the potentiometer). Nothing is saved until *Salva sul presepe*. The demo and the simulator on GitHub keep the on-screen stage, as there is no board.
   - After reading, the status line says how long it took and how much of it was the board reading the microSD (`X-Tempo` from the ESP) and how much the network.
+  - The browser keeps a copy of the file with its signature (CRC-32 and size, computed by the Mega on the card). When the page opens it sends the signature: if the file on the microSD has not changed, the board answers without sending it again and the editor opens the copy in a fraction of a second. If the file changed (edited on the PC, saved from another phone, restored) it is read again in full. After a save the copy is updated with the new file. This needs both firmwares from this version; with an older Mega firmware the file is always read in full.
 
 The Mega stays in charge of everything: the ESP8266 only bridges the network to the Mega's `Serial3` (D14/D15, not used by the board). If the network is missing or the password is wrong, the board starts and runs normally; the TEST screen then shows `non collegato` (`cerco la rete...` with `abilitato = 3`), and the ESP keeps trying to connect.
 

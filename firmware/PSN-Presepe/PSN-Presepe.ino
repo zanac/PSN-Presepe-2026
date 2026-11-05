@@ -2556,7 +2556,7 @@ bool attesaSplash(unsigned long durataMs) {
 //                subito "@ACK" (lavoro sulla SD in corso), poi "@OK"/"@ERR".
 //   Mega -> ESP: configurazione WiFi (@SSID @WPWD @USER @APWD @HOST @MODE @APSSID @APPWD
 //                @APOPT @APIP @NREL @GO),
-//                stato ogni secondo (@ST), contenuto del file (@L @C @END).
+//                stato ogni secondo (@ST), contenuto del file (@L @C @END righe crc byte).
 // Con [WIFI] abilitato = 0 la Serial3 non viene nemmeno aperta.
 #define LNK_SERIAL Serial3
 #define LNK_RIGA_MAX 200
@@ -2783,20 +2783,52 @@ void lnkChiudiScrittura(bool cancella) {
   SD.end();
 }
 
-// "@GET": invia il file riga per riga (pezzi da 120 caratteri, @C = continua).
+// Firma del file = CRC-32 (quello di zip) dei byte sulla microSD, cosi' come sono (\r compresi).
+// La pagina tiene una copia del file con la sua firma: se la firma non e' cambiata il file non
+// viaggia di nuovo sulla rete.
+uint32_t lnkCrc(uint32_t c, uint8_t b) {
+  c ^= b;
+  for (uint8_t k = 0; k < 8; k++) c = (c >> 1) ^ (0xEDB88320UL & (0UL - (c & 1)));
+  return c;
+}
+void lnkStampaFirma(uint32_t crc, uint32_t tot) {     // "crc byte": crc in 8 cifre esadecimali
+  crc = ~crc;
+  for (int8_t k = 28; k >= 0; k -= 4) LNK_SERIAL.print("0123456789abcdef"[(crc >> k) & 15]);
+  LNK_SERIAL.print(' '); LNK_SERIAL.println(tot);
+}
+
+// "@SUM": solo la firma del file, senza mandarlo ("@OK SUM nome crc byte"; file assente: 0 byte).
+void lnkFirmaFile() {
+  if (lnkScrittura) { lnkErr(F("occupato")); return; }
+  if (!SD.begin(PIN_SD_CS)) { lnkErr(F("sd")); return; }
+  const char *nome = lnkNomeFile();
+  File f = SD.open(nome, FILE_READ);
+  uint32_t crc = 0xFFFFFFFFUL, tot = 0;
+  if (f) {
+    uint8_t b[64]; int n;
+    while ((n = f.read(b, sizeof(b))) > 0) { for (int i = 0; i < n; i++) crc = lnkCrc(crc, b[i]); tot += n; }
+    f.close();
+  }
+  SD.end();
+  LNK_SERIAL.print(F("@OK SUM ")); LNK_SERIAL.print(nome); LNK_SERIAL.print(' ');
+  lnkStampaFirma(crc, tot);
+}
+
+// "@GET": invia il file riga per riga (pezzi da 120 caratteri, @C = continua),
+// poi "@END righe crc byte".
 void lnkInviaFile() {
   if (lnkScrittura) { lnkErr(F("occupato")); return; }
   if (!SD.begin(PIN_SD_CS)) { lnkErr(F("sd")); return; }
   const char *nome = lnkNomeFile();
   File f = SD.open(nome, FILE_READ);
-  uint16_t righe = 0; uint32_t tot = 0;
+  uint16_t righe = 0; uint32_t tot = 0, crc = 0xFFFFFFFFUL;
   LNK_SERIAL.print(F("@FILE ")); LNK_SERIAL.println(nome);
   if (f) {
     char pezzo[LNK_PEZZO_MAX + 1]; uint8_t l = 0;
     while (true) {
       int ch = f.read();
       if (ch < 0) break;
-      tot++;
+      tot++; crc = lnkCrc(crc, (uint8_t)ch);
       if (ch == '\r') continue;
       if (ch == '\n') { pezzo[l] = 0; LNK_SERIAL.print(F("@L ")); LNK_SERIAL.println(pezzo); l = 0; righe++; continue; }
       pezzo[l++] = (char)ch;
@@ -2806,7 +2838,7 @@ void lnkInviaFile() {
     f.close();
   }
   SD.end();
-  LNK_SERIAL.print(F("@END ")); LNK_SERIAL.print(righe); LNK_SERIAL.print(' '); LNK_SERIAL.println(tot);
+  LNK_SERIAL.print(F("@END ")); LNK_SERIAL.print(righe); LNK_SERIAL.print(' '); lnkStampaFirma(crc, tot);
 }
 
 
@@ -2905,6 +2937,7 @@ void lnkComando(char *riga) {
   }
   // ---------------------------------------------------------------- file sulla SD
   if (!strcmp(cmd, "GET")) { lnkInviaFile(); return; }
+  if (!strcmp(cmd, "SUM")) { lnkFirmaFile(); return; }
   if (!strcmp(cmd, "PUT")) {
     if (lnkScrittura) lnkChiudiScrittura(true);
     if (!SD.begin(PIN_SD_CS)) { lnkErr(F("sd")); return; }

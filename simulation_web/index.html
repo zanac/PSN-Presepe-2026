@@ -616,18 +616,29 @@ async function dPost(url, body, parte) {
   return j;
 }
 const sec = ms => (ms / 1000).toFixed(1).replace(".", ",") + " s";
+// Copia del file della microSD con la sua firma ("nome:crc:byte", la calcola il Mega). La pagina
+// manda la firma in X-Firma: se il file non e' cambiato il presepe risponde X-Invariato senza
+// mandarlo di nuovo (sul WiFi 16 kB possono volere diversi secondi).
+const COPIA_SD = "presepe-ini-sd";
+function copiaSd() { try { const c = JSON.parse(store.get(COPIA_SD) || "null"); return c && c.firma && typeof c.testo === "string" ? c : null; } catch (e) { return null; } }
+function salvaCopiaSd(firma, testo) { store.set(COPIA_SD, firma ? JSON.stringify({ firma, testo }) : ""); }
 async function dLoad() {
   dBusy(true); dStatus("Lettura del file dal presepe…");
   try {
-    const t0 = performance.now();
-    const r = await fetch("/api/ini", { cache: "no-store" });
-    const t = await r.text();
+    const t0 = performance.now(), copia = copiaSd();
+    const r = await fetch("/api/ini", { cache: "no-store", headers: copia ? { "X-Firma": copia.firma } : {} });
+    let t = await r.text();
     if (!r.ok) throw new Error(t || "il presepe non risponde (" + r.status + ")");
+    const invariato = r.headers.get("X-Invariato") === "1" && copia;
+    if (invariato) t = copia.testo; else salvaCopiaSd(r.headers.get("X-Firma"), t);
     ta.value = t; store.set("presepe-ini", t); rebuild();
     // tempi: X-Tempo = ms che l'ESP ha aspettato il Mega (lettura della microSD + seriale); il resto e' rete
     const tot = performance.now() - t0, mega = +r.headers.get("X-Tempo") || 0;
-    const tempi = mega ? ` in ${sec(tot)}: ${sec(mega)} per leggerlo dalla microSD, ${sec(Math.max(0, tot - mega))} di rete` : ` in ${sec(tot)}`;
-    dStatus(`Letto ${r.headers.get("X-File") || "il file"} dal presepe (${t.split("\n").length - 1} righe, ${(t.length / 1024).toFixed(1).replace(".", ",")} kB)${tempi}.`);
+    const tempi = invariato ? ` in ${sec(tot)}` : mega ? ` in ${sec(tot)}: ${sec(mega)} per leggerlo dalla microSD, ${sec(Math.max(0, tot - mega))} di rete` : ` in ${sec(tot)}`;
+    const quanto = `${t.split("\n").length - 1} righe, ${(t.length / 1024).toFixed(1).replace(".", ",")} kB`;
+    dStatus(invariato
+      ? `${r.headers.get("X-File") || "Il file"} sul presepe non è cambiato: aperta la copia già nel browser (${quanto})${tempi}.`
+      : `Letto ${r.headers.get("X-File") || "il file"} dal presepe (${quanto})${tempi}.`);
   } catch (e) { dStatus("Lettura non riuscita: " + e.message, true); }
   dBusy(false);
 }
@@ -651,7 +662,12 @@ async function dSave() {
   if (errors.length && !confirm(`Il file ha ${errors.length} righe con errori (prima: ${errors[0].n ? "riga " + errors[0].n : "controllo dei valori"}).\nIl presepe le ignorerà e userà i valori predefiniti per quelle righe.\nSalvare comunque?`)) return;
   if (!nc.wifi && !confirm("Con questo file il Wi-Fi è spento ([WIFI] abilitato = 0 o sezione mancante).\nDopo il riavvio questa pagina non sarà più raggiungibile: per riaccenderlo bisognerà modificare la microSD dal computer.\nSalvare comunque?")) return;
   dBusy(true); dStatus("Salvataggio sulla microSD…");
-  try { const j = await dSalvaParti(ta.value); dStatus(`Salvato in ${j.file}. La copia precedente è in PRESEPE.BAK. Premi «Riavvia il presepe» per usarlo.`); }
+  try {
+    const j = await dSalvaParti(ta.value);
+    // sulla microSD il file e' senza \r e finisce con un a capo: e' il testo che rilegge @GET
+    const scritto = ta.value.replace(/\r/g, "").replace(/([^\n])$/, "$1\n");
+    salvaCopiaSd(j.firma, scritto);
+    dStatus(`Salvato in ${j.file}. La copia precedente è in PRESEPE.BAK. Premi «Riavvia il presepe» per usarlo.`); }
   catch (e) { dStatus("Salvataggio non riuscito: " + e.message + ". Il file sulla microSD non è cambiato.", true); }
   dBusy(false);
 }

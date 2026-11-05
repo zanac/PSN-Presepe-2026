@@ -512,6 +512,13 @@ return { parse, faseDi, inizio, fine, colore, rele, STRISCE };
   const json = (o, code = 200) => new Response(JSON.stringify(o), { status: code, headers: { "Content-Type": "application/json" } });
   const lento = ms => new Promise(r => setTimeout(r, ms));          // the real board takes a moment
   const offline = () => json({ ok: false, msg: "il presepe non risponde" }, 503);
+  // firma del file come la calcola il Mega: "nome:crc32:byte" dei byte sulla microSD
+  const firma = testo => {
+    const b = new TextEncoder().encode(testo);
+    let c = ~0;
+    for (const x of b) { c ^= x; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xEDB88320 & -(c & 1)); }
+    return `PRESEPE.INI:${((~c) >>> 0).toString(16).padStart(8, "0")}:${b.length}`;
+  };
   let inArrivo = "";                                               // parti del salvataggio ricevute
   const vero = window.fetch.bind(window);
   window.fetch = async (url, opt = {}) => {
@@ -522,9 +529,14 @@ return { parse, faseDi, inizio, fine, colore, rele, STRISCE };
     if (u === "/api/stato") return json(stato());
     if (u === "/api/cmd" && metodo === "POST") { await lento(60); return mega ? json(comando(corpo)) : offline(); }
     if (u === "/api/ini" && metodo === "GET") {
+      const nota = (opt.headers || {})["X-Firma"];
+      if (nota && mega && nota === firma(sd.ini)) {                     // file invariato: solo la firma
+        await lento(120);
+        return new Response("", { headers: { "X-Invariato": "1", "X-Firma": nota, "X-File": "PRESEPE.INI", "X-Tempo": "90" } });
+      }
       await lento(400);
       if (!mega) return new Response("il presepe non risponde", { status: 503 });
-      return new Response(sd.ini.replace(/\r/g, "").replace(/([^\n])$/, "$1\n"), { headers: { "Content-Type": "text/plain; charset=utf-8", "X-File": "PRESEPE.INI", "X-Tempo": "380" } });
+      return new Response(sd.ini.replace(/\r/g, "").replace(/([^\n])$/, "$1\n"), { headers: { "Content-Type": "text/plain; charset=utf-8", "X-File": "PRESEPE.INI", "X-Tempo": "380", "X-Firma": firma(sd.ini) } });
     }
     if (u === "/api/ini" && metodo === "POST") {
       await lento(150);                                              // per parte (il file va in ~8 parti)
@@ -534,8 +546,8 @@ return { parse, faseDi, inizio, fine, colore, rele, STRISCE };
       inArrivo += corpo;
       if (parte[0] < parte[1]) return json({ ok: true, parte: String(parte[0]) });
       if (!inArrivo) return json({ ok: false, msg: "file vuoto, non salvato" }, 400);
-      sd.bak = sd.ini; sd.ini = inArrivo; inArrivo = ""; keep();
-      return json({ ok: true, file: "PRESEPE.INI" });
+      sd.bak = sd.ini; sd.ini = inArrivo.replace(/\r/g, "").replace(/([^\n])$/, "$1\n"); inArrivo = ""; keep();
+      return json({ ok: true, file: "PRESEPE.INI", firma: firma(sd.ini) });
     }
     if (u === "/api/ripristina" && metodo === "POST") {
       await lento(700);

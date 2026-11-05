@@ -137,6 +137,23 @@ int main() {
     r = parte(p1, "0/3"); CHECK(r.code == 400);
   }
 
+  // 6c. file signature: an unchanged file is not sent again; the save returns the new signature
+  {
+    r = server.chiama("/api/ini", HTTP_GET, "");
+    std::string firma = r.headers["X-Firma"], testo = r.body;
+    CHECK(r.code == 200 && firma.rfind("PRESEPE.INI:", 0) == 0 && firma.size() == 12 + 8 + 1 + std::to_string(megaFile("PRESEPE.INI").size()).size());
+    Risposta u = server.chiama("/api/ini", HTTP_GET, "", "admin", "presepe2026", {{"X-Firma", firma}});
+    CHECK(u.code == 200 && u.body.empty() && u.headers["X-Invariato"] == "1" && u.headers["X-Firma"] == firma && u.headers["X-File"] == "PRESEPE.INI");
+    r = server.chiama("/api/ini", HTTP_POST, testo + "; nuova\n", "admin", "presepe2026", {{"X-Presepe", "1"}, {"X-Parte", "1/1"}});
+    size_t p = r.body.find("\"firma\":\"");
+    std::string nuova = p == std::string::npos ? "" : r.body.substr(p + 9, r.body.find('"', p + 9) - p - 9);
+    CHECK(r.code == 200 && !nuova.empty() && nuova != firma);
+    u = server.chiama("/api/ini", HTTP_GET, "", "admin", "presepe2026", {{"X-Firma", firma}});     // old copy: full file
+    CHECK(u.code == 200 && u.body == testo + "; nuova\n" && u.headers["X-Firma"] == nuova && u.headers["X-Invariato"].empty());
+    u = server.chiama("/api/ini", HTTP_GET, "", "admin", "presepe2026", {{"X-Firma", nuova}});
+    CHECK(u.code == 200 && u.body.empty() && u.headers["X-Invariato"] == "1");
+  }
+
   // 6b. empty or truncated body (ESP out of memory): refused, nothing sent to the Mega
   {
     std::string prima = megaFile("PRESEPE.INI");

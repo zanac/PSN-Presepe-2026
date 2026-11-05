@@ -178,8 +178,16 @@ static std::string getFile(std::string *name = 0, std::string *end = 0) {
   return text;
 }
 
+// reference CRC-32 (zip), 8 hex digits
+static std::string crc32hex(const std::string &d) {
+  uint32_t c = 0xFFFFFFFFu;
+  for (unsigned char b : d) { c ^= b; for (int k = 0; k < 8; k++) c = (c >> 1) ^ (c & 1 ? 0xEDB88320u : 0); }
+  char h[9]; std::snprintf(h, sizeof(h), "%08x", (unsigned)~c); return h;
+}
+
 int main() {
   cfgDefault(cfg);
+  CHECK(crc32hex("123456789") == "cbf43926");
 
   // 1. [WIFI] abilitato = 0: Serial3 never opened, nothing sent, nothing read
   lnkInizio();
@@ -282,7 +290,11 @@ int main() {
     std::string name, end;
     std::string t = getFile(&name, &end);
     CHECK(name == "PRESEPE.INI" && t == "[CICLO]\ndurata1 = 60 ; uno\n\n" + lunga + "\nultima\n");
-    CHECK(end == "5 " + std::to_string(disk["PRESEPE.INI"].size()));
+    std::string firma = crc32hex(disk["PRESEPE.INI"]) + " " + std::to_string(disk["PRESEPE.INI"].size());
+    CHECK(end == "5 " + firma);
+    // SUM: same signature without sending the file
+    std::vector<std::string> r = cmd("@SUM");
+    CHECK(r.size() == 1 && r[0] == "@OK SUM PRESEPE.INI " + firma);
   }
 
   // 7. PUT: retransmitted pieces are written once, leading spaces kept, empty lines kept
@@ -356,12 +368,14 @@ int main() {
   // empty card: GET returns an empty file named PRESEPE.INI, COMMIT creates it without backup
   disk.clear();
   {
-    std::string name, end; CHECK(getFile(&name, &end) == "" && name == "PRESEPE.INI" && end == "0 0");
+    std::string name, end; CHECK(getFile(&name, &end) == "" && name == "PRESEPE.INI" && end == "0 00000000 0");
+    CHECK(cmd("@SUM")[0] == "@OK SUM PRESEPE.INI 00000000 0");
     CHECK(ok(cmd("@PUT")) && ok(cmd("@W 0 x")) && ok(cmd("@COMMIT 2 301")) && disk["PRESEPE.INI"] == "x\n" && !disk.count("PRESEPE.BAK"));
   }
 
   // 10. errors: no card, write failure, interrupted upload (30 s), too long line
   cardOk = false;
+  CHECK(cmd("@SUM")[0] == "@ERR sd");
   CHECK(cmd("@GET")[0] == "@ERR sd" && cmd("@PUT")[0] == "@ERR sd" && cmd("@RESTORE 302")[0] == "@ERR sd");
   cardOk = true;
   CHECK(ok(cmd("@PUT")));
