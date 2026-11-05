@@ -119,6 +119,24 @@ int main() {
   r = server.chiama("/api/ini", HTTP_GET, "");
   CHECK(r.code == 200 && r.body == atteso.substr(0, atteso.size() - 1) + "19\n");
 
+  // 6a. save in parts (X-Parte k/n, whole lines), as the page does; out-of-order part aborts
+  {
+    std::string vecchio = megaFile("PRESEPE.INI");
+    std::string p1 = "[CICLO]\r\ndurata1 = 90\n", p2 = "; seconda parte\n" + lunga + "\n", p3 = "ultima senza a capo";
+    auto parte = [&](const std::string &b, const char *k) {
+      return server.chiama("/api/ini", HTTP_POST, b, "admin", "presepe2026", {{"X-Presepe", "1"}, {"X-Parte", k}}); };
+    r = parte(p1, "1/3"); CHECK(r.code == 200 && r.body.find("\"parte\":\"1\"") != std::string::npos && megaFile("PRESEPE.INI") == vecchio);
+    r = parte(p2, "2/3"); CHECK(r.code == 200);
+    r = parte(p3, "3/3");
+    CHECK(r.code == 200 && r.body.find("\"file\":\"PRESEPE.INI\"") != std::string::npos &&
+          megaFile("PRESEPE.INI") == "[CICLO]\ndurata1 = 90\n; seconda parte\n" + lunga + "\nultima senza a capo\n" && megaFile("PRESEPE.BAK") == vecchio);
+    std::string ora = megaFile("PRESEPE.INI");
+    r = parte(p1, "1/3"); CHECK(r.code == 200);
+    r = parte(p3, "3/3"); CHECK(r.code == 409 && megaFile("PRESEPE.INI") == ora && !megaHaFile("PRESEPE.NEW"));   // part 2 missing
+    r = parte(p2, "2/3"); CHECK(r.code == 409 && megaFile("PRESEPE.INI") == ora);                                  // nothing in progress any more
+    r = parte(p1, "0/3"); CHECK(r.code == 400);
+  }
+
   // 6b. empty or truncated body (ESP out of memory): refused, nothing sent to the Mega
   {
     std::string prima = megaFile("PRESEPE.INI");

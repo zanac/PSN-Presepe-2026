@@ -93,6 +93,7 @@
   const json = (o, code = 200) => new Response(JSON.stringify(o), { status: code, headers: { "Content-Type": "application/json" } });
   const lento = ms => new Promise(r => setTimeout(r, ms));          // the real board takes a moment
   const offline = () => json({ ok: false, msg: "il presepe non risponde" }, 503);
+  let inArrivo = "";                                               // parti del salvataggio ricevute
   const vero = window.fetch.bind(window);
   window.fetch = async (url, opt = {}) => {
     const u = typeof url === "string" ? url : url.url;
@@ -107,10 +108,14 @@
       return new Response(sd.ini.replace(/\r/g, "").replace(/([^\n])$/, "$1\n"), { headers: { "Content-Type": "text/plain; charset=utf-8", "X-File": "PRESEPE.INI", "X-Tempo": "380" } });
     }
     if (u === "/api/ini" && metodo === "POST") {
-      await lento(900);
+      await lento(150);                                              // per parte (il file va in ~8 parti)
       if (!mega) return offline();
-      if (!corpo) return json({ ok: false, msg: "file vuoto, non salvato" }, 400);
-      sd.bak = sd.ini; sd.ini = corpo; keep();
+      const parte = ((opt.headers || {})["X-Parte"] || "1/1").split("/").map(Number);   // salvataggio a parti, come l'ESP
+      if (parte[0] === 1) inArrivo = "";
+      inArrivo += corpo;
+      if (parte[0] < parte[1]) return json({ ok: true, parte: String(parte[0]) });
+      if (!inArrivo) return json({ ok: false, msg: "file vuoto, non salvato" }, 400);
+      sd.bak = sd.ini; sd.ini = inArrivo; inArrivo = ""; keep();
       return json({ ok: true, file: "PRESEPE.INI" });
     }
     if (u === "/api/ripristina" && metodo === "POST") {

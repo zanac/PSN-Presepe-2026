@@ -399,21 +399,48 @@ void apiLeggiFile() {
 }
 
 // Salva il testo sulla microSD: PUT, righe a pezzi da 100 caratteri, COMMIT.
+// La pagina manda il file in parti di righe intere (~2 kB, intestazione X-Parte "k/n"): il
+// server dell'ESP tiene in memoria tutto il corpo di una richiesta, e un file intero (16 kB,
+// piu' la sua copia nell'argomento "plain") non trova piu' spazio: il testo arrivava vuoto
+// ("file vuoto, non salvato"). Senza X-Parte il corpo e' il file intero, come prima.
+// PUT alla prima parte, COMMIT dopo l'ultima; parti fuori ordine o in ritardo annullano tutto
+// (ABORT) e sulla microSD resta il file di prima.
+bool salvIn = false;            // salvataggio a parti in corso
+uint16_t salvSeq = 0, salvParte = 0, salvParti = 0;
+uint32_t salvByte = 0;
+unsigned long salvMs = 0;
+void salvAnnulla() { if (salvIn) comando("ABORT", 3000, 2); salvIn = false; }
+
 void apiScriviFile() {
   if (!autorizzato() || !daPagina()) return;
-  const String &t = server.arg("plain");      // nessuna copia: il file puo' essere lungo
-  // X-Len = byte inviati dalla pagina: se la memoria e' finita il testo arriva vuoto o tagliato
-  if (!t.length() || String(t.length()) != server.header("X-Len")) {
-    rispostaJson(false, "msg", t.length() ? "file arrivato incompleto, riprova" : "file vuoto, non salvato", 400); return;
+  const String &t = server.arg("plain");      // nessuna copia: la parte puo' essere lunga
+  int k = 1, n = 1;
+  String xp = server.header("X-Parte");
+  if (xp.length()) {
+    int s = xp.indexOf('/');
+    k = s > 0 ? xp.substring(0, s).toInt() : 0; n = s > 0 ? xp.substring(s + 1).toInt() : 0;
+    if (k < 1 || n < 1 || k > n || n > 64) { rispostaJson(false, "msg", "richiesta non valida", 400); return; }
   }
-  if (t.length() > 24000) { rispostaJson(false, "msg", "file troppo lungo (massimo 24000 caratteri)", 413); return; }
-  String r = comando("PUT", 3000, 3);
-  if (!r.startsWith("@OK")) { rispostaJson(false, "msg", motivo(r), 503); return; }
-  uint16_t seq = 0; uint32_t byte = 0;
-  size_t i = 0, n = t.length();
-  while (i < n) {
+  // X-Len = byte inviati dalla pagina: se la memoria e' finita il testo arriva vuoto o tagliato
+  if ((!t.length() && n == 1) || String(t.length()) != server.header("X-Len")) {
+    salvAnnulla();
+    rispostaJson(false, "msg", t.length() || n > 1 ? "file arrivato incompleto, riprova" : "file vuoto, non salvato", 400); return;
+  }
+  if (t.length() > 24000) { salvAnnulla(); rispostaJson(false, "msg", "file troppo lungo (massimo 24000 caratteri)", 413); return; }
+  String r;
+  if (k == 1) {
+    salvAnnulla();                           // un salvataggio lasciato a meta' non si mescola a questo
+    r = comando("PUT", 3000, 3);
+    if (!r.startsWith("@OK")) { rispostaJson(false, "msg", motivo(r), 503); return; }
+    salvIn = true; salvSeq = 0; salvByte = 0; salvParti = n;
+  } else if (!salvIn || k != salvParte + 1 || n != salvParti || millis() - salvMs > 20000UL) {
+    salvAnnulla(); rispostaJson(false, "msg", "salvataggio interrotto, riprova", 409); return;
+  }
+  salvParte = k; salvMs = millis();
+  size_t i = 0, lun = t.length();
+  while (i < lun) {
     int fine = t.indexOf('\n', i);
-    size_t fineRiga = fine < 0 ? n : (size_t)fine;
+    size_t fineRiga = fine < 0 ? lun : (size_t)fine;
     // pezzi da 100: tutti "C" tranne l'ultimo della riga, che e' "W" (aggiunge il ritorno a capo)
     size_t p = i;
     do {
@@ -421,16 +448,19 @@ void apiScriviFile() {
       bool ultimo = q == fineRiga;
       String pezzo = t.substring(p, q);
       pezzo.replace("\r", "");
-      String cmd = String(ultimo ? "W " : "C ") + String(seq) + " " + pezzo;
+      String cmd = String(ultimo ? "W " : "C ") + String(salvSeq) + " " + pezzo;
       r = comando(cmd, 1500, 4);
-      if (!r.startsWith("@OK")) { comando("ABORT", 3000, 2); rispostaJson(false, "msg", motivo(r), 503); return; }
-      seq++; byte += pezzo.length() + (ultimo ? 1 : 0);
+      if (!r.startsWith("@OK")) { salvAnnulla(); rispostaJson(false, "msg", motivo(r), 503); return; }
+      salvSeq++; salvByte += pezzo.length() + (ultimo ? 1 : 0);
       p = q;
     } while (p < fineRiga);
     i = fineRiga + 1;
     if (fine < 0) break;
   }
-  r = comando("COMMIT " + String(byte) + " " + nuovoId(), 1500, 4, 20000);
+  salvMs = millis();
+  if (k < n) { rispostaJson(true, "parte", String(k)); return; }
+  salvIn = false;
+  r = comando("COMMIT " + String(salvByte) + " " + nuovoId(), 1500, 4, 20000);
   if (!r.startsWith("@OK")) { rispostaJson(false, "msg", motivo(r), 503); return; }
   String nome = r.length() > 4 ? r.substring(4) : String("PRESEPE.INI");
   rispostaJson(true, "file", nome);
@@ -459,7 +489,7 @@ void setup() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();            // nessuna rete ricordata: si collega solo con i dati del Mega
   idComando = (uint16_t)(ESP.random() | 1);   // diverso a ogni avvio dell'ESP
-  server.collectHeaders("X-Presepe", "X-Len", "If-None-Match");   // lette da daPagina(), apiScriviFile(), inviaPagina()
+  server.collectHeaders("X-Presepe", "X-Len", "X-Parte", "If-None-Match");   // lette da daPagina(), apiScriviFile(), inviaPagina()
 
   server.on("/", HTTP_GET, []() { if (autorizzato()) inviaPagina(PAGINA_PANNELLO, PAGINA_PANNELLO_LEN); });
   server.on("/config", HTTP_GET, []() { if (autorizzato()) inviaPagina(PAGINA_CONFIG, PAGINA_CONFIG_LEN); });
