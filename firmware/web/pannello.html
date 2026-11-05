@@ -1,4 +1,6 @@
 <title>Pannello presepe</title>
+<!-- icona inline: il browser non chiede /favicon.ico alla scheda -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Cpath fill=%22%23f0b45a%22 d=%22M16 2l3.6 9.4L30 12l-8 6.6L24.6 29 16 23.4 7.4 29 10 18.6 2 12l10.4-.6z%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- font caricati senza bloccare la pagina: senza Internet (access point, rete chiusa) il browser
@@ -260,7 +262,7 @@ function rgb2hsv(r, g, b) {
   let h = 0; if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
   return { h: (h * 60 + 360) % 360, s: mx ? d / mx : 0, v: mx };
 }
-const cv = $("picker"), ctx = cv.getContext("2d");
+const cv = $("picker"), ctx = cv.getContext("2d", { willReadFrequently: true });
 let grad = null;
 function drawPicker() {
   const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;

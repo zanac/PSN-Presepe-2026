@@ -447,6 +447,7 @@ void setup() {
 
   server.on("/", HTTP_GET, []() { if (autorizzato()) inviaPagina(PAGINA_PANNELLO, PAGINA_PANNELLO_LEN); });
   server.on("/config", HTTP_GET, []() { if (autorizzato()) inviaPagina(PAGINA_CONFIG, PAGINA_CONFIG_LEN); });
+  server.on("/favicon.ico", HTTP_GET, []() { server.send(204, "image/x-icon", ""); });   // le pagine hanno l'icona inline
   server.on("/api/stato", HTTP_GET, apiStato);
   server.on("/api/cmd", HTTP_POST, apiComando);
   server.on("/api/ini", HTTP_GET, apiLeggiFile);
