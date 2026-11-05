@@ -2,7 +2,7 @@
 
 The simulation runs the **real firmware** on a simulated Arduino Mega. The wiring follows the Rev D PCB, including the microSD card (configuration in `PRESEPE.TXT`) and both star chains.
 
-Online project: <https://wokwi.com/projects/476977183363259393>
+Online project: <https://wokwi.com/projects/479833442709933057>
 
 ## Updating the Wokwi project
 

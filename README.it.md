@@ -477,7 +477,7 @@ Premi **TEST durante i 3 s della schermata iniziale** ("by Vanni", in basso `TES
 
 ### Simulazione
 
-Il firmware gira invariato nel simulatore Wokwi con il cablaggio Rev D: barre RGB, le due catene di stelle, relè come LED, OLED, pulsanti, potenziometro e microSD. `PSN-Presepe.ino` si incolla così com'è nel `sketch.ino` di Wokwi. Wokwi non accetta file `.ini`, quindi la configurazione va in un file del progetto chiamato `PRESEPE.TXT`, che il firmware legge quando manca `PRESEPE.INI`. Vedi [simulation/README.md](simulation/README.md).
+Il firmware gira invariato nel simulatore Wokwi con il cablaggio Rev D: barre RGB, le due catene di stelle, relè come LED, OLED, pulsanti, potenziometro e microSD. `PSN-Presepe.ino` si incolla così com'è nel `sketch.ino` di Wokwi. Wokwi non accetta file `.ini`, quindi la configurazione va in un file del progetto chiamato `PRESEPE.TXT`, che il firmware legge quando manca `PRESEPE.INI`. Progetto online: <https://wokwi.com/projects/479833442709933057>. Vedi [simulation/README.md](simulation/README.md).
 
 Per provare i valori di `PRESEPE.INI` senza hardware, apri [`simulation_web/index.html`](simulation_web/index.html) nel browser: incolli il file e vedi lungo il ciclo le strisce CIELO, TRAMONTO e ALBA, le due catene di stelle e i relè. Vedi [simulation_web/README.md](simulation_web/README.md).
 

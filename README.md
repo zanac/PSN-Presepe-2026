@@ -477,7 +477,7 @@ Press **TEST during the 3 s splash** ("by Vanni", bottom line `TEST = modo color
 
 ### Simulation
 
-The firmware runs unchanged in the Wokwi simulator, with the Rev D wiring: RGB bars, both star chains, relays as LEDs, OLED, buttons, potentiometer and a microSD card. Paste `PSN-Presepe.ino` into Wokwi's `sketch.ino` as it is. Wokwi does not accept `.ini` files, so the configuration goes in a project file named `PRESEPE.TXT`; the firmware reads it when `PRESEPE.INI` is missing. See [simulation/README.md](simulation/README.md).
+The firmware runs unchanged in the Wokwi simulator, with the Rev D wiring: RGB bars, both star chains, relays as LEDs, OLED, buttons, potentiometer and a microSD card. Paste `PSN-Presepe.ino` into Wokwi's `sketch.ino` as it is. Wokwi does not accept `.ini` files, so the configuration goes in a project file named `PRESEPE.TXT`; the firmware reads it when `PRESEPE.INI` is missing. Online project: <https://wokwi.com/projects/479833442709933057>. See [simulation/README.md](simulation/README.md).
 
 To try `PRESEPE.INI` values without any hardware, open [`simulation_web/index.html`](simulation_web/index.html) in a browser: paste the file and watch the CIELO, TRAMONTO and ALBA strips, the two star chains and the relays over the cycle. See [simulation_web/README.md](simulation_web/README.md).
 
