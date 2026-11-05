@@ -25,7 +25,7 @@ struct ESP8266WebServer {
   void send(int c, const char *t, const char *b) { send(c, t, String(b)); }
   void send_P(int c, const char *t, const char *b, size_t n) { send(c, t, String(std::string(b, n))); }
   unsigned long timeoutCorpo = 0;   // timeout of the source stream of the last long body
-  struct Cliente { unsigned long flushMs = 0; bool noDelay = false; void setNoDelay(bool v) { noDelay = v; } bool flush(unsigned int ms) { flushMs = ms; return true; } } cliente;
+  struct Cliente { unsigned long flushMs = 0; bool flush(unsigned int ms) { flushMs = ms; return true; } } cliente;
   Cliente &client() { return cliente; }
   void send(int c, const char *t, Stream *src, size_t n) { auto *p = static_cast<StreamConstPtr *>(src); timeoutCorpo = p->getTimeout(); send(c, t, String(std::string(p->buf, n))); }
   // POST from the pages: X-Presepe and X-Len as the browser sends them (h overrides)

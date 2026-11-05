@@ -257,11 +257,7 @@ bool autorizzato() {
 // ogni secondo) il server chiude subito questa connessione, e una chiusura con dati ancora
 // da confermare puo' finire in un reset (tcp_abort): risposta tagliata, stesso errore
 // ERR_CONTENT_LENGTH_MISMATCH. Visto su /api/ini (il file INI, ~16 kB).
-// Nagle spento: con Nagle l'ESP tiene fermo ogni pezzo non pieno finche' il browser non
-// conferma il precedente, e Windows conferma in ritardo (fino a 200 ms, "delayed ACK"):
-// i due ritardi si sommano a ogni pezzo e 16 kB arrivano in ~5 s invece che in pochi decimi.
 void inviaCorpo(int codice, const char *tipo, const char *dati, size_t len) {
-  server.client().setNoDelay(true);
   StreamConstPtr sorgente(dati, len);
   sorgente.setTimeout(20000);
   server.send(codice, tipo, &sorgente, len);

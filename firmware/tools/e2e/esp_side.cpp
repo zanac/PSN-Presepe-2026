@@ -48,7 +48,7 @@ int main() {
   CHECK(server.chiama("/", HTTP_GET, "", "admin", "sbagliata").code == 401);
   Risposta r = server.chiama("/", HTTP_GET, "");
   CHECK(r.code == 200 && r.headers["Content-Encoding"] == "gzip" && r.body.size() == PAGINA_PANNELLO_LEN);
-  CHECK(server.timeoutCorpo == 20000 && server.cliente.flushMs == 10000 && server.cliente.noDelay && !r.headers["ETag"].empty());
+  CHECK(server.timeoutCorpo == 20000 && server.cliente.flushMs == 10000 && !r.headers["ETag"].empty());
   {   // same page again with the browser's copy: 304 without body
     Risposta r2 = server.chiama("/", HTTP_GET, "", "admin", "presepe2026", {{"If-None-Match", r.headers["ETag"]}});
     CHECK(r2.code == 304 && r2.body.empty() && r2.headers["ETag"] == r.headers["ETag"]);
