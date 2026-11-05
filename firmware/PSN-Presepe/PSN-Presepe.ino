@@ -1260,8 +1260,9 @@ void mostraStelle(uint8_t k, float livello) {
 // spenti dalla trasmissione WS2811 farebbero perdere caratteri. Un aggiornamento
 // rimandato resta in sospeso e lo manda loop() appena possibile (serve quando la
 // scena non viene piu' ricalcolata: STOP, test da web).
-// Al massimo una catena per chiamata (a turno): gli interrupt restano spenti per
-// una sola trasmissione alla volta (~3 ms con 100 pixel), non per due di fila.
+// Al massimo una catena per chiamata (a turno): fra le due trasmissioni (~3 ms
+// l'una con 100 pixel) gli interrupt tornano attivi e lnkQuiet() viene ricontrollato,
+// cosi' una riga dell'ESP annunciata nel frattempo ferma anche la seconda.
 void stelleFlush() {
   static uint8_t turno = 0;
   for (uint8_t n = 0; n < CFG_NUM_CATENE; n++) {

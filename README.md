@@ -342,7 +342,7 @@ Libraries: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (with Adafruit BusI
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Size: 89.4 kB flash (35 %, of which 15.4 kB is the embedded default `PRESEPE.INI`), 4.8 kB static RAM. That leaves about 3.4 kB for heap and stack; the OLED buffer (1 kB) and the LED buffers (3 bytes per pixel) are allocated at run time, after which about 2 kB stay free.
+Size: 88.2 kB flash (34 %, of which 16.3 kB is the embedded default `PRESEPE.INI`), 4.9 kB static RAM. That leaves about 3.3 kB for heap and stack; the OLED buffer (1 kB) and the LED buffers (3 bytes per pixel) are allocated at run time, after which about 2 kB stay free.
 
 ### Build
 
@@ -387,7 +387,7 @@ Download the repository (*Code → Download ZIP* on GitHub) and unpack it into a
 1. Connect the Mega by USB. If it is already on the shield, switch the 12 V supply off.
 2. Open `firmware/PSN-Presepe/PSN-Presepe.ino`. Only one tab must appear.
 3. *Tools → Board → Arduino AVR Boards → Arduino Mega or Mega 2560*, *Processor: ATmega2560*, *Port*: the Mega's COM port.
-4. **Upload**. The IDE reports about 89 kB (35 %) of program storage.
+4. **Upload**. The IDE reports about 88 kB (34 %) of program storage.
 5. Check: *Serial Monitor* at **115200 baud** prints the configuration at start-up.
 
 **C. "Mega + WiFi R3" board (two firmwares)**

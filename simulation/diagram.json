@@ -603,14 +603,354 @@
       }
     },
     {
-      "type": "wokwi-led-strip",
-      "id": "stelle_02",
-      "top": -110,
+      "type": "wokwi-neopixel",
+      "id": "s2_1",
+      "top": -92,
+      "left": 999,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_2",
+      "top": -79,
+      "left": 927,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_3",
+      "top": -91,
+      "left": 876,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_4",
+      "top": -78,
+      "left": 825,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_5",
+      "top": -90,
+      "left": 774,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_6",
+      "top": -77,
+      "left": 723,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_7",
+      "top": -89,
+      "left": 651,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_8",
+      "top": -76,
+      "left": 600,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_9",
+      "top": -88,
+      "left": 549,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_10",
+      "top": -75,
+      "left": 498,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_11",
+      "top": -42,
+      "left": 979,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_12",
+      "top": -29,
+      "left": 907,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_13",
+      "top": -41,
+      "left": 856,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_14",
+      "top": -28,
+      "left": 805,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_15",
+      "top": -40,
+      "left": 754,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_16",
+      "top": -27,
+      "left": 703,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_17",
+      "top": -39,
+      "left": 631,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_18",
+      "top": -26,
+      "left": 580,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_19",
+      "top": -38,
+      "left": 529,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_20",
+      "top": -25,
+      "left": 478,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_21",
+      "top": 8,
+      "left": 995,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_22",
+      "top": 21,
+      "left": 944,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_23",
+      "top": 9,
+      "left": 872,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_24",
+      "top": 22,
+      "left": 821,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_25",
+      "top": 10,
+      "left": 770,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_26",
+      "top": -2,
+      "left": 719,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_27",
+      "top": 11,
+      "left": 668,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_28",
+      "top": -1,
+      "left": 596,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_29",
+      "top": 12,
+      "left": 545,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_30",
+      "top": 0,
+      "left": 494,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_31",
+      "top": 58,
+      "left": 975,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_32",
+      "top": 46,
+      "left": 924,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_33",
+      "top": 59,
+      "left": 852,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_34",
+      "top": 47,
+      "left": 801,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_35",
+      "top": 60,
+      "left": 750,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_36",
+      "top": 48,
+      "left": 699,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_37",
+      "top": 61,
+      "left": 648,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_38",
+      "top": 49,
+      "left": 576,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_39",
+      "top": 62,
+      "left": 525,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_40",
+      "top": 50,
+      "left": 474,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_41",
+      "top": 108,
+      "left": 991,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_42",
+      "top": 96,
+      "left": 940,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_43",
+      "top": 109,
+      "left": 889,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_44",
+      "top": 97,
+      "left": 817,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_45",
+      "top": 110,
+      "left": 766,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_46",
+      "top": 98,
+      "left": 715,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_47",
+      "top": 111,
+      "left": 664,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_48",
+      "top": 99,
+      "left": 613,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_49",
+      "top": 112,
+      "left": 541,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-neopixel",
+      "id": "s2_50",
+      "top": 100,
       "left": 490,
-      "attrs": {
-        "pixels": "50",
-        "pixelShape": "square"
-      }
+      "attrs": {}
     },
     {
       "type": "wokwi-microsd-card",
@@ -1859,24 +2199,6 @@
       []
     ],
     [
-      "mega:8",
-      "stelle_02:DIN",
-      "green",
-      []
-    ],
-    [
-      "stelle_02:VDD",
-      "mega:5V",
-      "red",
-      []
-    ],
-    [
-      "stelle_02:VSS",
-      "mega:GND.1",
-      "black",
-      []
-    ],
-    [
       "sd:VCC",
       "mega:5V",
       "red",
@@ -1911,13 +2233,913 @@
       "mega:53",
       "yellow",
       []
+    ],
+    [
+      "mega:8",
+      "s2_1:DIN",
+      "green",
+      []
+    ],
+    [
+      "s2_1:DOUT",
+      "s2_2:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_1:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_1:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_2:DOUT",
+      "s2_3:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_2:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_2:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_3:DOUT",
+      "s2_4:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_3:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_3:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_4:DOUT",
+      "s2_5:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_4:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_4:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_5:DOUT",
+      "s2_6:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_5:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_5:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_6:DOUT",
+      "s2_7:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_6:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_6:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_7:DOUT",
+      "s2_8:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_7:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_7:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_8:DOUT",
+      "s2_9:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_8:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_8:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_9:DOUT",
+      "s2_10:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_9:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_9:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_10:DOUT",
+      "s2_11:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_10:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_10:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_11:DOUT",
+      "s2_12:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_11:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_11:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_12:DOUT",
+      "s2_13:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_12:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_12:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_13:DOUT",
+      "s2_14:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_13:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_13:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_14:DOUT",
+      "s2_15:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_14:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_14:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_15:DOUT",
+      "s2_16:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_15:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_15:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_16:DOUT",
+      "s2_17:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_16:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_16:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_17:DOUT",
+      "s2_18:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_17:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_17:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_18:DOUT",
+      "s2_19:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_18:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_18:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_19:DOUT",
+      "s2_20:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_19:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_19:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_20:DOUT",
+      "s2_21:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_20:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_20:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_21:DOUT",
+      "s2_22:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_21:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_21:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_22:DOUT",
+      "s2_23:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_22:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_22:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_23:DOUT",
+      "s2_24:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_23:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_23:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_24:DOUT",
+      "s2_25:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_24:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_24:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_25:DOUT",
+      "s2_26:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_25:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_25:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_26:DOUT",
+      "s2_27:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_26:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_26:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_27:DOUT",
+      "s2_28:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_27:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_27:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_28:DOUT",
+      "s2_29:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_28:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_28:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_29:DOUT",
+      "s2_30:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_29:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_29:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_30:DOUT",
+      "s2_31:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_30:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_30:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_31:DOUT",
+      "s2_32:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_31:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_31:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_32:DOUT",
+      "s2_33:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_32:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_32:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_33:DOUT",
+      "s2_34:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_33:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_33:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_34:DOUT",
+      "s2_35:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_34:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_34:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_35:DOUT",
+      "s2_36:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_35:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_35:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_36:DOUT",
+      "s2_37:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_36:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_36:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_37:DOUT",
+      "s2_38:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_37:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_37:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_38:DOUT",
+      "s2_39:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_38:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_38:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_39:DOUT",
+      "s2_40:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_39:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_39:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_40:DOUT",
+      "s2_41:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_40:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_40:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_41:DOUT",
+      "s2_42:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_41:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_41:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_42:DOUT",
+      "s2_43:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_42:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_42:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_43:DOUT",
+      "s2_44:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_43:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_43:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_44:DOUT",
+      "s2_45:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_44:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_44:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_45:DOUT",
+      "s2_46:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_45:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_45:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_46:DOUT",
+      "s2_47:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_46:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_46:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_47:DOUT",
+      "s2_48:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_47:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_47:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_48:DOUT",
+      "s2_49:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_48:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_48:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_49:DOUT",
+      "s2_50:DIN",
+      "",
+      []
+    ],
+    [
+      "s2_49:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_49:VSS",
+      "mega:GND.1",
+      "",
+      []
+    ],
+    [
+      "s2_50:VDD",
+      "mega:5V",
+      "",
+      []
+    ],
+    [
+      "s2_50:VSS",
+      "mega:GND.1",
+      "",
+      []
     ]
   ],
   "attrs": {
-    "layout-note": "OLED left of stars; controls right of stars; RGB strips directly below stars, contiguous and aligned: ALBA - CIELO - TRAMONTO; STELLE_02 WS2811 chain (D8, second sky zone) below the RGB strips, microSD (SPI D50-D53) left of the OLED",
+    "layout-note": "OLED left of stars; controls right of stars; RGB strips directly below stars, contiguous and aligned: ALBA - CIELO - TRAMONTO; STELLE_02: 50 neopixels (D8, second sky zone, mirrored layout) below the RGB strips, microSD (SPI D50-D53) left of the OLED",
     "layout-revision": "2026-09-25-rgb-strips-wide-v1",
     "relay-label-standard": "Grp_GG_RR: GG=relay board group 01-04, RR=relay channel 01-04",
     "rev": "D"
   },
-  "layoutRevision": "2026-11-05-stelle-01-02-v1"
+  "layoutRevision": "2026-11-05-stelle-01-02-v2"
 }

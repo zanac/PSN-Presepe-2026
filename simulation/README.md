@@ -40,7 +40,7 @@ Rename the file to check the defaults: the firmware then finds no configuration 
 | TRAMONTO RGB strip | custom `chip-rgb-strip` bar | D7 / D11 / D12 |
 | ALBA RGB strip | custom `chip-rgb-strip` bar | D44 / D45 / D46 |
 | STELLE_01, 12 V WS2811, 50 pixels | 50 × `wokwi-neopixel` (5 V, simulator only) | D5 |
-| STELLE_02, 12 V WS2811, 50 pixels (second sky zone) | `wokwi-led-strip` `stelle_02`, 50 pixels | D8 |
+| STELLE_02, 12 V WS2811, 50 pixels (second sky zone) | 50 × `wokwi-neopixel` `s2_1` … `s2_50`, below the RGB bars | D8 |
 | Passive buzzer | `wokwi-buzzer` | D6 |
 | OLED SSD1306 128×64, I2C 0x3C | `wokwi-ssd1306` | D20 / D21 |
 | START/STOP, NEXT, TEST buttons | 3 push buttons to GND | D22 / D23 / D24 |
