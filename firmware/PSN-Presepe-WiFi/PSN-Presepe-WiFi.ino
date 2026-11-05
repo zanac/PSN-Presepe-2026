@@ -206,6 +206,9 @@ String comando(const String &c, unsigned long attesaMs = 600, uint8_t tentativi 
     while (millis() - t0 < (lavoro ? lavoroMs : attesaMs)) {
       leggiSeriale();
       if (rispostaPronta) return risposta;
+      // Anche mentre aspetta il Mega (fino a ~20 s per un salvataggio) l'ESP risponde all'invito
+      // dell'IDE per l'aggiornamento via WiFi: senza, l'IDE dice "No response from device".
+      if (servizi) ArduinoOTA.handle();
       if (ackVisto && lavoroMs && !lavoro) { lavoro = true; t0 = millis(); }
       delay(1);
     }
