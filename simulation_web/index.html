@@ -56,6 +56,7 @@ h1 { font-family: var(--f-display); font-weight: 700; font-size: 1.9rem; letter-
 h1 span { color: var(--accent); }
 .sub { color: var(--muted); margin: 0; max-width: 70ch; }
 .grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; align-items: start; }
+.grid.solo { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .card h2 { font-family: var(--f-display); font-weight: 600; font-size: 1.05rem; text-transform: uppercase; letter-spacing: .08em; margin: 0; color: var(--muted); }
@@ -189,7 +190,7 @@ button.danger { color: var(--err); border-color: var(--err); }
     <div id="dStatus" class="status ok" role="status" hidden></div>
   </section>
 
-  <div class="grid">
+  <div class="grid" id="grid">
     <section class="card" aria-label="File INI">
       <h2>File INI</h2>
       <div class="vtabs" role="tablist" aria-label="Vista del file">
@@ -198,7 +199,7 @@ button.danger { color: var(--err); border-color: var(--err); }
       <div id="regia" class="card" style="border:0;padding:0" hidden>
         <div class="rtabs" id="rFasi" role="tablist" aria-label="Fase da modificare"></div>
         <div class="rbar">
-          <label class="switch" id="rLiveBox"><input type="checkbox" id="rLive"> Dal vivo sulle strisce</label>
+          <button type="button" id="rCiclo" hidden title="esce dal test: il presepe riprende il ciclo">↺ Torna al ciclo</button>
           <button type="button" class="primary" id="rProva">▶ Prova la fase</button>
           <button type="button" id="rUndo" disabled>Annulla</button>
         </div>
@@ -220,8 +221,8 @@ button.danger { color: var(--err); border-color: var(--err); }
       <ul id="errors" class="errlist"></ul>
     </section>
 
-    <section class="card" aria-label="Simulazione">
-      <h2>Palco</h2>
+    <section class="card" aria-label="Simulazione" id="palco">
+      <h2 id="palcoTit">Palco</h2>
       <div class="stage">
         <div class="clock">
           <span class="phase" id="phase">GIORNO</span>
@@ -510,6 +511,7 @@ function rebuild() {
 
 function drawTimeline() {
   const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return;                       // palco nascosto (sul presepe): niente da disegnare
   canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
   const top = 18, rowH = 30, gap = 6, order = [1, 0, 2];
@@ -554,6 +556,7 @@ let cursorX = -1;
 function drawCursor() {
   // ridisegna solo la linea del cursore sopra la timeline già pronta
   const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h || !canvas.width || !canvas.height) return;
   if (cursorX >= 0 && saved) ctx.putImageData(saved, 0, 0);
   saved = ctx.getImageData(0, 0, canvas.width, canvas.height);
   cursorX = p / 100 * w; const dpr = window.devicePixelRatio || 1;
@@ -611,14 +614,19 @@ async function dPost(url, body) {
   if (!r.ok || !j || !j.ok) throw new Error(j && j.msg ? j.msg : "il presepe non risponde (" + r.status + ")");
   return j;
 }
+const sec = ms => (ms / 1000).toFixed(1).replace(".", ",") + " s";
 async function dLoad() {
   dBusy(true); dStatus("Lettura del file dal presepe…");
   try {
+    const t0 = performance.now();
     const r = await fetch("/api/ini", { cache: "no-store" });
     const t = await r.text();
     if (!r.ok) throw new Error(t || "il presepe non risponde (" + r.status + ")");
     ta.value = t; store.set("presepe-ini", t); rebuild();
-    dStatus(`Letto ${r.headers.get("X-File") || "il file"} dal presepe (${t.split("\n").length - 1} righe).`);
+    // tempi: X-Tempo = ms che l'ESP ha aspettato il Mega (lettura della microSD + seriale); il resto e' rete
+    const tot = performance.now() - t0, mega = +r.headers.get("X-Tempo") || 0;
+    const tempi = mega ? ` in ${sec(tot)}: ${sec(mega)} per leggerlo dalla microSD, ${sec(Math.max(0, tot - mega))} di rete` : ` in ${sec(tot)}`;
+    dStatus(`Letto ${r.headers.get("X-File") || "il file"} dal presepe (${t.split("\n").length - 1} righe, ${(t.length / 1024).toFixed(1).replace(".", ",")} kB)${tempi}.`);
   } catch (e) { dStatus("Lettura non riuscita: " + e.message, true); }
   dBusy(false);
 }
@@ -654,6 +662,11 @@ async function dRestore() {
 }
 if (DEVICE) {
   $("device").hidden = false; $("reset").hidden = true;
+  // Sul presepe niente simulazione: si prova sulle strisce vere (editor sempre "dal vivo").
+  // Nella demo resta il palco, che fa da scheda simulata.
+  playing = false;
+  if (typeof DEMO_ENGINE === "function") $("palcoTit").textContent = "Palco (scheda simulata)";
+  else { $("palco").hidden = true; $("grid").classList.add("solo"); }
   document.title = "Configurazione presepe";
   $("dSave").addEventListener("click", dSave);
   $("dReboot").addEventListener("click", dReboot);
@@ -666,8 +679,9 @@ if (DEVICE) {
 // Mostra le righe cielo / tramonto / alba / rele della fase scelta come pallini su quattro
 // corsie. Ogni modifica riscrive solo le righe di quella chiave in quella sezione del file
 // (commenti e resto del file restano com'erano), poi il file viene riletto come sempre.
-// "Dal vivo" (solo sul presepe): le strisce e i relè veri seguono l'anteprima con i comandi
-// di test S e R; spegnendolo il presepe esce dal test (X) e torna al ciclo.
+// Sul presepe l'editor e' sempre "dal vivo": alla prima azione (tappa scelta, corsia toccata,
+// prova) il presepe entra in TEST e strisce e relè veri seguono l'anteprima con i comandi S e R.
+// "Torna al ciclo" (o chiudere la pagina) manda X: il presepe esce dal test.
 const LANE = [{ k: "tramonto", s: 1, n: "Tramonto" }, { k: "cielo", s: 0, n: "Cielo" }, { k: "alba", s: 2, n: "Alba" }, { k: "rele", n: "Relè" }];
 const PRESET = [["Spento", [0, 0, 0]], ["Tenue", [16, 16, 16]], ["Caldo", [210, 82, 18]], ["Arancio", [155, 92, 16]],
   ["Quasi bianco", [246, 220, 208]], ["Bianco", [255, 255, 255]], ["Rosa", [200, 60, 70]], ["Blu notte", [0, 8, 40]]];
@@ -791,7 +805,7 @@ let pend = null;
 function presto(f) { if (!pend) requestAnimationFrame(() => { const g = pend; pend = null; g(); }); pend = f; }
 
 // ------------------------------------------------ dal vivo
-let live = false, lbusy = false, lastRele = null; const lq = new Map();
+let live = DEVICE, inTest = false, lbusy = false, lastRele = null; const lq = new Map();
 function lsend(key, c) { lq.set(key, c); lpump(); }
 async function lpump() {
   if (lbusy || !lq.size) return;
@@ -799,27 +813,30 @@ async function lpump() {
   try {
     const r = await fetch("/api/cmd", { method: "POST", headers: { "Content-Type": "text/plain", "X-Presepe": "1" }, body: c });
     const j = await r.json();
-    if (!j.ok) { rSay("Il presepe non ha eseguito «" + c + "»: " + (j.msg || "errore"), true); if (/STOP/.test(j.msg || "")) spegniLive(false); }
-  } catch (e) { rSay("Il presepe non risponde: anteprima dal vivo sospesa.", true); spegniLive(false); }
+    if (!j.ok) { rSay("Il presepe non ha eseguito «" + c + "»: " + (j.msg || "errore"), true); lq.clear(); }
+  } catch (e) { rSay("Il presepe non risponde: le strisce non seguono l'anteprima.", true); lq.clear(); }
   lbusy = false; lpump();
 }
 function liveScena(q) {
   if (!live) return;
+  if (!inTest) {
+    inTest = true; lastRele = null; $("rCiclo").hidden = false;
+    rSay("Il presepe è in TEST: strisce e relè seguono l'editor. «Torna al ciclo» per riprendere il ciclo.", false, true);
+  }
   for (let s = 0; s < 3; s++) lsend("S" + s, `S ${s} ${colore(cfg, s, q).join(" ")}`);
   const rs = rele(cfg, q);
   rs.forEach((on, i) => { if (!lastRele || lastRele[i] !== on) lsend("R" + i, `R ${i + 1} ${on ? 1 : 0}`); });
   lastRele = rs;
 }
-function spegniLive(esci) {
-  live = false; $("rLive").checked = false; lq.clear();
-  if (esci) { lsend("X", "X"); rSay("Anteprima dal vivo spenta: il presepe torna al ciclo."); }
-  disegnaRegia();
+function tornaAlCiclo() {
+  fermaProva(); sel = null; lq.clear(); lsend("X", "X");
+  inTest = false; $("rCiclo").hidden = true;
+  rSay("Il presepe è tornato al ciclo."); disegnaRegia();
 }
-$("rLive").addEventListener("change", e => {
-  if (!e.target.checked) return spegniLive(true);
-  live = true; lastRele = null;
-  rSay("Dal vivo: il presepe è in TEST e strisce e relè seguono l'anteprima. Spegnilo per tornare al ciclo.", false, true);
-  liveScena(p); disegnaRegia();
+$("rCiclo").addEventListener("click", tornaAlCiclo);
+// chiudendo o lasciando la pagina il presepe non resta in TEST (keepalive: la richiesta parte anche a pagina chiusa)
+addEventListener("pagehide", () => {
+  if (inTest) try { fetch("/api/cmd", { method: "POST", keepalive: true, headers: { "Content-Type": "text/plain", "X-Presepe": "1" }, body: "X" }); } catch (e) {}
 });
 
 // ------------------------------------------------ prova della fase
@@ -1048,7 +1065,7 @@ function editor(Ls) {
     $("eSw").style.background = `rgb(${schermo(cfg, l.s, it.col)})`; set("eCol", hex(it.col)); seg("eCurva", it.curva);
     if (!it.pred && L.length === 1 && defaults().tappe[l.s].some(t => t.fase === rFase))
       hint = "È l'unica tappa di questa striscia in questa fase: se la elimini tornano le tappe predefinite del firmware. ";
-    if (!live) hint += DEVICE ? "Lo schermo non rende i LED: accendi «Dal vivo» per vedere il colore sulla striscia vera." : "Lo schermo non rende i LED: sul presepe, con «Dal vivo», il colore si vede sulla striscia vera.";
+    hint += live ? "La striscia vera mostra questo colore." : "Lo schermo non rende i LED: sul presepe il colore si vede direttamente sulla striscia vera.";
   } else {
     set("eRele", it.rele); seg("eStato", it.acceso ? 1 : 0);
     if (!it.pred && cfg.eventi.length === 1) hint = "È l'ultimo evento relè del file: se lo elimini tornano gli eventi predefiniti (relè 3 acceso al 30 % del TRAMONTO, spento a metà NOTTE).";
@@ -1064,7 +1081,6 @@ function mostraVista(v) {
 }
 $("vGrafico").addEventListener("click", () => mostraVista("grafico"));
 $("vTesto").addEventListener("click", () => mostraVista("testo"));
-if (!DEVICE) $("rLiveBox").hidden = true;
 mostraVista(vista);
 
 rebuild();

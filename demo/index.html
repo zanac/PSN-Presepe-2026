@@ -523,7 +523,7 @@ return { parse, faseDi, inizio, fine, colore, rele, STRISCE };
     if (u === "/api/ini" && metodo === "GET") {
       await lento(400);
       if (!mega) return new Response("il presepe non risponde", { status: 503 });
-      return new Response(sd.ini.replace(/\r/g, "").replace(/([^\n])$/, "$1\n"), { headers: { "Content-Type": "text/plain; charset=utf-8", "X-File": "PRESEPE.INI" } });
+      return new Response(sd.ini.replace(/\r/g, "").replace(/([^\n])$/, "$1\n"), { headers: { "Content-Type": "text/plain; charset=utf-8", "X-File": "PRESEPE.INI", "X-Tempo": "380" } });
     }
     if (u === "/api/ini" && metodo === "POST") {
       await lento(900);

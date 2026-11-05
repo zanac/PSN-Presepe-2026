@@ -97,7 +97,7 @@ int main() {
   // 5. read the file (CRLF removed)
   server.timeoutCorpo = 0;
   r = server.chiama("/api/ini", HTTP_GET, "");
-  CHECK(r.code == 200 && r.body == "[CICLO]\ndurata1 = 60\n" && r.headers["X-File"] == "PRESEPE.INI" && server.timeoutCorpo == 20000);
+  CHECK(r.code == 200 && r.body == "[CICLO]\ndurata1 = 60\n" && r.headers["X-File"] == "PRESEPE.INI" && !r.headers["X-Tempo"].empty() && server.timeoutCorpo == 20000);
 
   // 6. write: long lines, UTF-8, empty lines, CRLF, leading spaces, no final newline; 20 rounds with losses
   std::string lunga(250, 'z'), testo;

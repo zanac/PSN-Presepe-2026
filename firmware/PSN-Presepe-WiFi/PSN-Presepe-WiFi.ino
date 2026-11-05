@@ -382,13 +382,16 @@ void apiLeggiFile() {
   if (!autorizzato()) return;
   inGet = true; getTesto = ""; getNome = "";
   getTesto.reserve(17000);                  // il file di esempio e' ~16.5 kB: una sola allocazione
+  unsigned long t0 = millis();
   String r = comando("GET", 1500, 4, 15000);
+  unsigned long tempo = millis() - t0;      // lettura dalla microSD del Mega + seriale
   inGet = false;
   if (!r.startsWith("@END")) {
     server.send(503, "text/plain; charset=utf-8", motivo(r));
     getTesto = ""; return;
   }
   server.sendHeader("X-File", getNome);
+  server.sendHeader("X-Tempo", String(tempo));   // la pagina mostra quanto e' scheda e quanto e' rete
   server.sendHeader("Access-Control-Expose-Headers", "X-File");
   server.sendHeader("Cache-Control", "no-store");
   inviaCorpo(200, "text/plain; charset=utf-8", getTesto.c_str(), getTesto.length());
