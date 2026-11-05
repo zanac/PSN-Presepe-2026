@@ -19,7 +19,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 SK=$(cd "$HERE/../PSN-Presepe-WiFi" && pwd)
 OUT=${1:-$SK/build}
 ACLI=${ARDUINO_CLI:-arduino-cli}
-set -- --fqbn esp8266:esp8266:generic:eesz=4M1M,baud=115200 --warnings default --output-dir "$OUT"
+set -- --fqbn esp8266:esp8266:generic:eesz=4M1M,baud=115200,ip=hb2f --warnings default --output-dir "$OUT"
 if [ -n "$CTAGS_DIR" ]; then
   set -- "$@" --build-property "runtime.tools.ctags.path=$CTAGS_DIR" --build-property "tools.ctags.cmd.path=$CTAGS_DIR/ctags"
 fi

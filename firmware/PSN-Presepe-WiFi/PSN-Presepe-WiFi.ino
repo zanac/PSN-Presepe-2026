@@ -21,7 +21,7 @@
   risposta "@OK ..." / "@ERR ...". Senza risposta il comando viene ritrasmesso.
 
   Compilazione: IDE Arduino con il pacchetto "esp8266" (scheda "Generic ESP8266
-  Module", Flash Size "4MB (FS:1MB OTA:~1019KB)"). Caricamento: DIP 5, 6, 7 su ON
+  Module", Flash Size "4MB (FS:1MB OTA:~1019KB)", lwIP Variant "v2 Higher Bandwidth"). Caricamento: DIP 5, 6, 7 su ON
   (vedi README). Le pagine web sono in pagine_web.h, generato da
   firmware/tools/build_web.py.
 */

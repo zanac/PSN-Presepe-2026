@@ -401,7 +401,7 @@ The DIP switches sit under the shield once the board is mounted: do C1–C3 with
 *C2 – ESP8266 firmware*
 1. Unplug the USB. DIP **5, 6 and 7 ON**, all others OFF (DIP 7 puts the ESP8266 in flash mode). Plug in the USB.
 2. Open `firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino`. Two tabs appear: the sketch and `pagine_web.h` (the web pages, generated; it must stay in the same folder).
-3. *Tools*: **Board: Generic ESP8266 Module**, **Flash Size: 4MB (FS:1MB OTA:~1019KB)**, **Upload Speed: 115200**, *Port*: the same COM port. Leave the other options as they are.
+3. *Tools*: **Board: Generic ESP8266 Module**, **Flash Size: 4MB (FS:1MB OTA:~1019KB)**, **lwIP Variant: v2 Higher Bandwidth** (larger TCP packets and buffers: pages and the INI file load several times faster than with the default *v2 Lower Memory*), **Upload Speed: 115200**, *Port*: the same COM port. Leave the other options as they are.
 4. **Upload**. The first build takes a few minutes; then "Connecting…", "Writing at … (100 %)" and "Hard resetting via RTS pin…". If it says *Failed to connect to ESP8266*, unplug and replug the USB with DIP 5, 6, 7 still ON and upload again.
 5. Check: unplug the USB, set DIP 7 OFF (5 and 6 stay ON), plug in, *Serial Monitor* at 115200: a line `@HELLO*B4` every 2 s means the ESP firmware runs and is calling the Mega.
 

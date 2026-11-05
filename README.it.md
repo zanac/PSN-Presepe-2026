@@ -401,7 +401,7 @@ Con la scheda montata i DIP switch restano sotto lo shield: fai C1–C3 con la s
 *C2 – firmware dell'ESP8266*
 1. Scollega l'USB. DIP **5, 6 e 7 su ON**, tutti gli altri su OFF (il DIP 7 mette l'ESP8266 in modo programmazione). Collega l'USB.
 2. Apri `firmware/PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino`. Compaiono due schede: lo sketch e `pagine_web.h` (le pagine web, generate; deve restare nella stessa cartella).
-3. *Strumenti*: **Scheda: Generic ESP8266 Module**, **Flash Size: 4MB (FS:1MB OTA:~1019KB)**, **Upload Speed: 115200**, *Porta*: la stessa COM. Le altre voci lasciale come sono.
+3. *Strumenti*: **Scheda: Generic ESP8266 Module**, **Flash Size: 4MB (FS:1MB OTA:~1019KB)**, **lwIP Variant: v2 Higher Bandwidth** (pacchetti e buffer TCP più grandi: pagine e file INI arrivano molto più in fretta che con il predefinito *v2 Lower Memory*), **Upload Speed: 115200**, *Porta*: la stessa COM. Le altre voci lasciale come sono.
 4. **Carica**. La prima compilazione dura qualche minuto; poi "Connecting…", "Writing at … (100 %)" e "Hard resetting via RTS pin…". Se compare *Failed to connect to ESP8266*, scollega e ricollega l'USB con i DIP 5, 6, 7 ancora su ON e carica di nuovo.
 5. Controllo: scollega l'USB, metti il DIP 7 su OFF (5 e 6 restano su ON), ricollega, *Monitor seriale* a 115200: una riga `@HELLO*B4` ogni 2 s vuol dire che il firmware dell'ESP gira e sta chiamando il Mega.
 
