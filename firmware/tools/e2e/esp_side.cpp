@@ -154,6 +154,19 @@ int main() {
     CHECK(u.code == 200 && u.body.empty() && u.headers["X-Invariato"] == "1");
   }
 
+  // 6d. compressed transfer when the browser accepts gzip (the browser decompresses it itself)
+  {
+    std::string grande;
+    for (int i = 0; i < 60; i++) grande += "; riga di commento " + std::to_string(i) + "\ndurata" + std::to_string(i % 6) + " = 60\n";
+    CHECK(server.chiama("/api/ini", HTTP_POST, grande, "admin", "presepe2026", {{"X-Presepe", "1"}, {"X-Parte", "1/1"}}).code == 200);
+    Risposta piano = server.chiama("/api/ini", HTTP_GET, "");
+    Risposta z = server.chiama("/api/ini", HTTP_GET, "", "admin", "presepe2026", {{"Accept-Encoding", "gzip, deflate, br"}});
+    CHECK(z.code == 200 && z.headers["Content-Encoding"] == "gzip" && z.body.size() < piano.body.size() &&
+          (unsigned char)z.body[0] == 0x1f && (unsigned char)z.body[1] == 0x8b && z.headers["X-Byte"] == std::to_string(piano.body.size()) &&
+          z.headers["X-Compresso"] == std::to_string(z.body.size()) && z.headers["X-Firma"] == piano.headers["X-Firma"]);
+    CHECK(piano.headers["Content-Encoding"].empty() && piano.body == grande);
+  }
+
   // 6b. empty or truncated body (ESP out of memory): refused, nothing sent to the Mega
   {
     std::string prima = megaFile("PRESEPE.INI");

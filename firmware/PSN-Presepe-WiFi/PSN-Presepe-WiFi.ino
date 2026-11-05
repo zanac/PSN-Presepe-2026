@@ -32,6 +32,7 @@
 #include <DNSServer.h>
 #include <StreamDev.h>
 #include "pagine_web.h"
+#include "comprimi.h"
 
 #define VERSIONE "039"
 
@@ -425,6 +426,27 @@ void apiLeggiFile() {
   server.sendHeader("X-Tempo", String(tempo));   // la pagina mostra quanto e' scheda e quanto e' rete
   server.sendHeader("Access-Control-Expose-Headers", "X-File");
   server.sendHeader("Cache-Control", "no-store");
+  // Compresso (gzip) se il browser lo accetta: 16 kB diventano ~6 kB e sul WiFi conta. Il browser
+  // lo decomprime da solo. Serve memoria (~10 kB di tabelle + il risultato): se non c'e', o
+  // se il file non si comprime, parte com'e'.
+  // Se manca memoria lo dice in X-Compresso ("memoria"): la pagina lo mostra.
+  size_t n = getTesto.length(), cap = n / 2 + 1024;
+  if (n > 512 && server.header("Accept-Encoding").indexOf("gzip") >= 0) {
+    // tabelle e lavoro del compressore ~14 kB, piu' ~6 kB lasciati al WiFi
+    uint8_t *z = ESP.getFreeHeap() > cap + 20000 && ESP.getMaxFreeBlockSize() > cap ? (uint8_t *)malloc(cap) : nullptr;
+    size_t zn = z ? gzipComprimi((const uint8_t *)getTesto.c_str(), n, z, cap) : 0;
+    if (zn) {
+      getTesto = "";                         // memoria libera per l'invio
+      server.sendHeader("Content-Encoding", "gzip");
+      server.sendHeader("X-Byte", String(n));   // la pagina mostra quanto ha viaggiato sulla rete
+      server.sendHeader("X-Compresso", String(zn));
+      inviaCorpo(200, "text/plain; charset=utf-8", (const char *)z, zn);
+      free(z);
+      return;
+    }
+    if (!z) server.sendHeader("X-Compresso", "memoria");
+    free(z);
+  }
   inviaCorpo(200, "text/plain; charset=utf-8", getTesto.c_str(), getTesto.length());
   getTesto = "";
 }
@@ -522,7 +544,7 @@ void setup() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();            // nessuna rete ricordata: si collega solo con i dati del Mega
   idComando = (uint16_t)(ESP.random() | 1);   // diverso a ogni avvio dell'ESP
-  server.collectHeaders("X-Presepe", "X-Len", "X-Parte", "If-None-Match", "X-Firma");   // lette da daPagina(), apiScriviFile(), inviaPagina()
+  server.collectHeaders("X-Presepe", "X-Len", "X-Parte", "If-None-Match", "X-Firma", "Accept-Encoding");   // lette da daPagina(), apiScriviFile(), inviaPagina()
 
   server.on("/", HTTP_GET, []() { if (autorizzato()) inviaPagina(PAGINA_PANNELLO, PAGINA_PANNELLO_LEN); });
   server.on("/config", HTTP_GET, []() { if (autorizzato()) inviaPagina(PAGINA_CONFIG, PAGINA_CONFIG_LEN); });

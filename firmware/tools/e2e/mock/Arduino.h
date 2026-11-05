@@ -39,6 +39,7 @@ class String {
   String substring(size_t a) const { return a >= s.size() ? String() : String(s.substr(a)); }
   String substring(size_t a, size_t b) const { if (a > s.size()) return String(); if (b > s.size()) b = s.size(); return b <= a ? String() : String(s.substr(a, b - a)); }
   int indexOf(char c, size_t from = 0) const { size_t p = s.find(c, from); return p == std::string::npos ? -1 : (int)p; }
+  int indexOf(const char *t) const { size_t p = s.find(t); return p == std::string::npos ? -1 : (int)p; }
   int lastIndexOf(char c) const { size_t p = s.rfind(c); return p == std::string::npos ? -1 : (int)p; }
   long toInt() const { return std::strtol(s.c_str(), nullptr, 10); }
   void reserve(size_t n) { s.reserve(n); }

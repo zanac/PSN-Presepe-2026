@@ -117,7 +117,13 @@
       }
       await lento(400);
       if (!mega) return new Response("il presepe non risponde", { status: 503 });
-      return new Response(sd.ini.replace(/\r/g, "").replace(/([^\n])$/, "$1\n"), { headers: { "Content-Type": "text/plain; charset=utf-8", "X-File": "PRESEPE.INI", "X-Tempo": "380", "X-Firma": firma(sd.ini) } });
+      const testo = sd.ini.replace(/\r/g, "").replace(/([^\n])$/, "$1\n");
+      // come l'ESP: dice quanti byte compressi avrebbe mandato (qui il browser comprime da se')
+      let zip = 0;
+      try { zip = (await new Response(new Blob([testo]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer()).byteLength; } catch (e) {}
+      const h = { "Content-Type": "text/plain; charset=utf-8", "X-File": "PRESEPE.INI", "X-Tempo": "380", "X-Firma": firma(sd.ini) };
+      if (zip) h["X-Compresso"] = String(zip);
+      return new Response(testo, { headers: h });
     }
     if (u === "/api/ini" && metodo === "POST") {
       await lento(150);                                              // per parte (il file va in ~8 parti)

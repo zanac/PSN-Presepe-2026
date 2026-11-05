@@ -635,7 +635,9 @@ async function dLoad() {
     // tempi: X-Tempo = ms che l'ESP ha aspettato il Mega (lettura della microSD + seriale); il resto e' rete
     const tot = performance.now() - t0, mega = +r.headers.get("X-Tempo") || 0;
     const tempi = invariato ? ` in ${sec(tot)}` : mega ? ` in ${sec(tot)}: ${sec(mega)} per leggerlo dalla microSD, ${sec(Math.max(0, tot - mega))} di rete` : ` in ${sec(tot)}`;
-    const quanto = `${t.split("\n").length - 1} righe, ${(t.length / 1024).toFixed(1).replace(".", ",")} kB`;
+    const kB = b => (b / 1024).toFixed(1).replace(".", ",") + " kB";
+    const xc = r.headers.get("X-Compresso"), zip = +xc || 0;  // byte sulla rete se l'ESP l'ha mandato compresso
+    const quanto = `${t.split("\n").length - 1} righe, ${kB(byteLen(t))}${invariato ? "" : zip ? `, ${kB(zip)} compressi sulla rete` : xc === "memoria" ? ", non compresso: poca memoria libera sull'ESP" : ""}`;
     dStatus(invariato
       ? `${r.headers.get("X-File") || "Il file"} sul presepe non è cambiato: aperta la copia già nel browser (${quanto})${tempi}.`
       : `Letto ${r.headers.get("X-File") || "il file"} dal presepe (${quanto})${tempi}.`);

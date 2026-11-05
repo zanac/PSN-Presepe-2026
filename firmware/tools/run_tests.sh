@@ -40,6 +40,26 @@ sed -n '/^\/\/ ==== INI SCRIVI BEGIN ====$/,/^\/\/ ==== INI SCRIVI END ====$/p' 
 [ -s "$T/iniprede.inc" ] && [ -s "$T/iniscrivi.inc" ] || { echo "INI PREDEFINITO / INI SCRIVI blocks not found in PSN-Presepe.ino"; exit 1; }
 ${CXX:-g++} -std=c++11 -Wall -Wno-unused-function -I"$T" "$HERE/test_ini.cpp" -o "$T/test_ini"
 "$T/test_ini" "$SK/PRESEPE.INI"
+# gzip compressor of the ESP: the example file and random/repetitive texts, checked with Python
+${CXX:-g++} -std=c++11 -Wall -Wno-unused-function "$HERE/test_comprimi.cpp" -o "$T/test_comprimi"
+python3 - "$T" "$SK/PRESEPE.INI" <<'PY' || exit 1
+import gzip, os, random, subprocess, sys
+t, ini = sys.argv[1], sys.argv[2]
+random.seed(7)
+casi = [open(ini, "rb").read().replace(b"\r", b""), b"a", b"ab", b"x" * 5000, bytes(range(256)) * 30, os.urandom(3000)]
+for _ in range(60):
+    n = random.randint(1, 24000)
+    casi.append(bytes(random.randrange(random.choice([2, 16, 256])) for _ in range(n)) if random.random() < 0.4 else
+                b"".join(random.choice([b"; commento ", b"durata = 60\n", b"[CICLO]\n", bytes([random.randrange(256)])]) for _ in range(n // 8 + 1)))
+nomi = []
+for i, c in enumerate(casi):
+    nomi.append(os.path.join(t, "gz%d" % i)); open(nomi[-1], "wb").write(c)
+subprocess.run([os.path.join(t, "test_comprimi")] + nomi, check=True)
+male = sum(gzip.decompress(open(n + ".gz", "rb").read()) != c for n, c in zip(nomi, casi))
+z = len(open(nomi[0] + ".gz", "rb").read())
+print("gzip compressor: %d texts, %d failures (example file %d -> %d bytes)" % (len(casi), male, len(casi[0]), z))
+sys.exit(1 if male else 0)
+PY
 E=$HERE/e2e
 ${CXX:-g++} -std=c++14 -Wall -Wno-unused-function -I"$T" -I"$E" -c "$E/mega_side.cpp" -o "$T/mega_side.o"
 ${CXX:-g++} -std=c++14 -Wall -Wno-unused-function -I"$E/mock" -DESP_INO="\"$HERE/../PSN-Presepe-WiFi/PSN-Presepe-WiFi.ino\"" -c "$E/esp_side.cpp" -o "$T/esp_side.o"
