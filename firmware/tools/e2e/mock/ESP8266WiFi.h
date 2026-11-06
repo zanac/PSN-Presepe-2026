@@ -1,5 +1,7 @@
 #pragma once
 #include "Arduino.h"
+#include <deque>
+#include <memory>
 enum { WL_IDLE_STATUS = 0, WL_CONNECTED = 3 };
 enum { WIFI_STA = 1, WIFI_AP = 2 };
 struct IPAddress {
@@ -30,3 +32,24 @@ struct WiFiMock {
   int softAPgetStationNum() { return stazioni; }
 };
 extern WiFiMock WiFi;
+
+// TCP connections for the WebSocket server (ws_mini.h): the test writes what the browser sends
+// into "in" and reads what the ESP sent from "out".
+struct Connessione { std::string in, out; bool aperta = true; size_t spazio = 4096; };
+struct WiFiClient {
+  std::shared_ptr<Connessione> k;
+  explicit operator bool() const { return (bool)k; }
+  bool connected() const { return k && (k->aperta || !k->in.empty()); }
+  int available() const { return k ? (int)k->in.size() : 0; }
+  int read() { if (!k || k->in.empty()) return -1; int c = (unsigned char)k->in[0]; k->in.erase(0, 1); return c; }
+  size_t write(const uint8_t *b, size_t n) { if (!k || !k->aperta) return 0; k->out.append((const char *)b, n); return n; }
+  size_t availableForWrite() const { return k ? k->spazio : 0; }
+  void stop() { if (k) k->aperta = false; k.reset(); }
+  void setNoDelay(bool) {}
+};
+struct WiFiServer {
+  static std::deque<std::shared_ptr<Connessione>> &coda() { static std::deque<std::shared_ptr<Connessione>> q; return q; }
+  explicit WiFiServer(uint16_t) {}
+  void begin() {}
+  WiFiClient accept() { WiFiClient c; if (!coda().empty()) { c.k = coda().front(); coda().pop_front(); } return c; }
+};

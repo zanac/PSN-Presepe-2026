@@ -2617,7 +2617,9 @@ bool lnkNumero(char *&s, long &out, long minimo, long massimo) {
   out = v; return true;
 }
 
-void lnkOk() { LNK_SERIAL.println(F("@OK")); }
+// Dopo un comando eseguito lo stato parte entro ~100 ms invece che al secondo successivo: il
+// pannello vede subito il rele' acceso o la fase cambiata (non durante un salvataggio).
+void lnkOk() { LNK_SERIAL.println(F("@OK")); if (!lnkScrittura) lnkStatoMs = millis() - 900UL; }
 void lnkErr(const __FlashStringHelper *motivo) { LNK_SERIAL.print(F("@ERR ")); LNK_SERIAL.println(motivo); }
 
 // Esiti dei comandi numerati (rimandati uguali a una ritrasmissione).

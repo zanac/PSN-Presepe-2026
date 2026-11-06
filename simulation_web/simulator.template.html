@@ -1,11 +1,8 @@
 <title>Simulatore PRESEPE.INI</title>
 <!-- icona inline: il browser non chiede /favicon.ico alla scheda -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Cpath fill=%22%23f0b45a%22 d=%22M16 2l3.6 9.4L30 12l-8 6.6L24.6 29 16 23.4 7.4 29 10 18.6 2 12l10.4-.6z%22/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- font caricati senza bloccare la pagina: senza Internet (access point, rete chiusa) il browser
-     non aspetta Google e usa subito i font di sistema -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+<!-- solo font di sistema: nessuna richiesta a Internet (in access point non c'e'), la pagina si
+     disegna subito con i caratteri definitivi -->
 <style>
 /* Layout: banco di prova a due colonne — a sinistra il file INI, a destra il palco con le tre strisce e la linea del ciclo */
 :root {
@@ -24,9 +21,9 @@
   --ok: #1f7a4d;
   --ok-bg: #e5f4ec;
   --code-bg: #f7f8fb;
-  --f-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
-  --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --f-display: "Avenir Next Condensed", "Roboto Condensed", "sans-serif-condensed", "Segoe UI Semibold", "Arial Narrow", system-ui, sans-serif;
+  --f-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --f-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Roboto Mono", "Liberation Mono", monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -501,6 +498,7 @@ function rebuild() {
   fillSpeed(); drawTimeline(); render(); disegnaRegia();
 }
 
+let fontLinea = "";                          // carattere delle etichette della linea del ciclo (dal CSS)
 function drawTimeline() {
   const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth, h = canvas.clientHeight;
   if (!w || !h) return;                       // palco nascosto (sul presepe): niente da disegnare
@@ -516,7 +514,7 @@ function drawTimeline() {
   const ys = top + 3 * (rowH + gap), sh = 5;
   for (let k = 0; k < 2; k++)
     for (let x = 0; x < w; x++) { const l = stelle(cfg, k, (x + 0.5) / w * 100); ctx.fillStyle = `rgb(${tintaStelle(cfg, k, l)})`; ctx.fillRect(x, ys + k * (sh + 2), 1, sh); }
-  ctx.font = "600 11px 'Barlow Semi Condensed', sans-serif"; ctx.textBaseline = "top";
+  ctx.font = fontLinea || (fontLinea = "600 11px " + getComputedStyle(document.documentElement).getPropertyValue("--f-display").trim()); ctx.textBaseline = "top";
   [0, ...cfg.fasi].forEach((a, i) => {
     const x = a / 100 * w; ctx.fillStyle = "rgba(201,208,224,0.55)"; ctx.fillRect(x, 0, 1, h);
     const b = (i < 4 ? cfg.fasi[i] : 100) / 100 * w; const label = FASI[i];
@@ -614,15 +612,25 @@ const sec = ms => (ms / 1000).toFixed(1).replace(".", ",") + " s";
 const COPIA_SD = "presepe-ini-sd";
 function copiaSd() { try { const c = JSON.parse(store.get(COPIA_SD) || "null"); return c && c.firma && typeof c.testo === "string" ? c : null; } catch (e) { return null; } }
 function salvaCopiaSd(firma, testo) { store.set(COPIA_SD, firma ? JSON.stringify({ firma, testo }) : ""); }
+// Con una copia nel browser (anche quella preparata dal pannello) l'editor la mostra subito e
+// intanto chiede al presepe se e' ancora quella: di solito si, e non c'e' niente da aspettare.
 async function dLoad() {
-  dBusy(true); dStatus("Lettura del file dal presepe…");
+  dBusy(true);
+  await new Promise(r => setTimeout(r));      // all'apertura: prima finisce di partire lo script dell'editor
+  const copia = copiaSd(), mostrata = copia ? copia.testo : null;
+  if (copia) { ta.value = copia.testo; rebuild(); dStatus("Aperta la copia nel browser: controllo che sia uguale al file del presepe…"); }
+  else dStatus("Lettura del file dal presepe…");
   try {
-    const t0 = performance.now(), copia = copiaSd();
+    const t0 = performance.now();
     const r = await fetch("/api/ini", { cache: "no-store", headers: copia ? { "X-Firma": copia.firma } : {} });
     let t = await r.text();
     if (!r.ok) throw new Error(t || "il presepe non risponde (" + r.status + ")");
     const invariato = r.headers.get("X-Invariato") === "1" && copia;
     if (invariato) t = copia.testo; else salvaCopiaSd(r.headers.get("X-Firma"), t);
+    if (!invariato && mostrata !== null && ta.value !== mostrata) {      // modificato durante il controllo: non lo tocco
+      dStatus("Il file sul presepe è diverso dalla copia che stai modificando: premi «Ricarica dal presepe» per caricarlo (perdi le modifiche).", true);
+      dBusy(false); return;
+    }
     ta.value = t; store.set("presepe-ini", t); rebuild();
     // tempi: X-Tempo = ms che l'ESP ha aspettato il Mega (lettura della microSD + seriale); il resto e' rete
     const tot = performance.now() - t0, mega = +r.headers.get("X-Tempo") || 0;

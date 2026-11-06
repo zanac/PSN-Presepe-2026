@@ -1,11 +1,8 @@
 <title>Pannello presepe</title>
 <!-- icona inline: il browser non chiede /favicon.ico alla scheda -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Cpath fill=%22%23f0b45a%22 d=%22M16 2l3.6 9.4L30 12l-8 6.6L24.6 29 16 23.4 7.4 29 10 18.6 2 12l10.4-.6z%22/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- font caricati senza bloccare la pagina: senza Internet (access point, rete chiusa) il browser
-     non aspetta Google e usa subito i font di sistema -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+<!-- solo font di sistema: nessuna richiesta a Internet (in access point non c'e'), la pagina si
+     disegna subito con i caratteri definitivi -->
 <style>
 /* Pannello servito dall'ESP8266 del presepe: stato del ciclo, comandi e test da telefono.
    Stessa palette del simulatore (laboratorio chiaro, accento ambra lanterna, palco buio). */
@@ -14,9 +11,9 @@
   --accent: #c9781a; --accent-ink: #ffffff; --soft: #f7f8fb;
   --on: #2f9e68; --on-ink: #ffffff; --err: #b42318; --err-bg: #fdecea; --ok: #1f7a4d; --ok-bg: #e5f4ec;
   --stage: #07090e; --stage-ink: #c9d0e0; --stage-line: #252b38;
-  --f-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
-  --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --f-display: "Avenir Next Condensed", "Roboto Condensed", "sans-serif-condensed", "Segoe UI Semibold", "Arial Narrow", system-ui, sans-serif;
+  --f-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --f-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Roboto Mono", "Liberation Mono", monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -86,6 +83,9 @@ input[type=range] { flex: 1; accent-color: var(--accent); min-width: 0; height: 
 .msg { font-size: 13.5px; padding: 8px 10px; border-radius: 7px; background: var(--ok-bg); color: var(--ok); }
 .msg.bad { background: var(--err-bg); color: var(--err); }
 .warn { border-color: var(--err); }
+.dot.wait { background: var(--muted); }
+/* ultimo stato noto (salvato nel browser) finche' non arriva quello vero */
+.vecchio .stage, .vecchio .card { opacity: .62; transition: opacity .3s; }
 </style>
 
 <div class="wrap">
@@ -187,6 +187,10 @@ const SD = ["non letta", "assente", "senza file", "letta", "letta con errori"];
 let st = null, modo = -1, strip = 0, chain = 0;   // strip: indice del firmware (0 CIELO, 1 TRAMONTO, 2 ALBA)
 const sstate = [{ h: 0, s: 0, v: 1, rgb: [0, 0, 0] }, { h: 0, s: 0, v: 1, rgb: [0, 0, 0] }, { h: 0, s: 0, v: 1, rgb: [0, 0, 0] }];
 let pixels = [[], []];
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const avvioPagina = performance.now();
+let ultimoTocco = 0;                         // ultimo clic o tasto sulla pagina
+["pointerdown", "keydown"].forEach(ev => addEventListener(ev, () => { ultimoTocco = performance.now(); }, { capture: true, passive: true }));
 
 // ---------------------------------------------------------------- comandi verso il presepe (uno alla volta)
 let busy = false; const queue = new Map();   // chiave -> comando: il piu' recente vince
@@ -199,8 +203,9 @@ async function pump() {
   const [key, c] = queue.entries().next().value; queue.delete(key);
   busy = true;
   try {
-    const r = await fetch("/api/cmd", { method: "POST", headers: { "Content-Type": "text/plain", "X-Presepe": "1" }, body: c });
-    const j = await r.json();
+    // sul WebSocket se e' aperto; se cade a meta' non lo rimando via HTTP (RUN o NEXT farebbero due volte)
+    const j = wsAperto ? await wsComando(c) : await (await fetch("/api/cmd", { method: "POST", headers: { "Content-Type": "text/plain", "X-Presepe": "1" }, body: c })).json();
+    if (!j) throw new Error("ws");
     if (!j.ok) { say("Comando non eseguito: " + (j.msg || c), true); if (!queue.has(key)) fallito(key); }
     else if (!queue.has(key)) falliti.delete(key);
   } catch (e) { say("Il presepe non risponde.", true); if (!queue.has(key)) fallito(key); }
@@ -212,19 +217,83 @@ function say(t, bad) { const m = $("msg"); m.hidden = false; m.textContent = t; 
 // ---------------------------------------------------------------- stato (ogni secondo)
 const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 async function poll() {
+  // con il WebSocket lo stato arriva da solo: si torna a chiederlo solo se tace da 3 s
+  if (wsAperto && performance.now() - wsUltimo < 3000) { setTimeout(poll, 1000); return; }
   try {
     const t0 = performance.now();
     const r = await fetch("/api/stato", { cache: "no-store" });
-    st = await r.json(); st.ms = Math.round(performance.now() - t0); show();
+    st = await r.json(); st.ms = Math.round(performance.now() - t0); nuovoStato();
   } catch (e) { $("dot").className = "dot"; $("net").textContent = "pagina non collegata al presepe"; }
   setTimeout(poll, 1000);
 }
+// Stato vero arrivato: lo mostra e ogni tanto lo salva nel browser, cosi' la prossima apertura
+// parte subito con l'ultimo stato noto invece che da una pagina vuota.
+let salvatoMs = -1e9;                         // il primo stato si salva subito
+function nuovoStato() {
+  document.body.classList.remove("vecchio");
+  show();
+  if (st.mega && performance.now() - salvatoMs > 5000) { salvatoMs = performance.now(); store.set("presepe-stato", JSON.stringify(Object.assign({}, st, { quando: Date.now() }))); }
+  precarica();
+  wsApri();
+}
+
+// ---------------------------------------------------------------- WebSocket (stato e comandi)
+// Una connessione che resta aperta con la scheda (porta 81, formato in ws_mini.h): lo stato
+// arriva appena il Mega lo manda e i comandi partono senza aprire ogni volta una connessione
+// HTTP. Se non si apre o cade, il pannello continua con le richieste HTTP e riprova dopo 10 s.
+let ws = null, wsAperto = false, wsUltimo = 0, wsSeq = 0, wsPingT = null, wsProssimo = 0;
+const wsAttese = new Map(), wsPing = new Map();
+function wsApri() {
+  if (ws || !st || !st.ws || st.vecchio || !window.WebSocket || performance.now() < wsProssimo) return;
+  let s;
+  try { s = new WebSocket(`ws://${location.hostname}:${st.ws.porta}/?k=${encodeURIComponent(st.ws.chiave)}`); }
+  catch (e) { wsProssimo = performance.now() + 10000; return; }
+  ws = s;
+  s.onopen = () => {
+    wsAperto = true;
+    const ping = () => { const n = ++wsSeq; wsPing.set(n, performance.now()); try { s.send("p " + n); } catch (e) {} };
+    ping(); wsPingT = setInterval(ping, 5000);       // anche il tempo di risposta mostrato in alto
+  };
+  s.onmessage = e => {
+    const d = String(e.data);
+    if (d.startsWith("s ")) {
+      let n; try { n = JSON.parse(d.slice(2)); } catch (x) { return; }
+      if (st) { n.nomi = st.nomi; n.ws = st.ws; n.ms = st.ms; }
+      n.diretto = true; st = n; wsUltimo = performance.now(); nuovoStato();
+    } else if (d.startsWith("q ")) {
+      const n = +d.slice(2), t = wsPing.get(n);
+      if (t !== undefined) { wsPing.delete(n); if (st) st.ms = Math.round(performance.now() - t); }
+    } else if (d.startsWith("r ")) {
+      const m = /^r (\d+) ([01])(?: (.*))?$/.exec(d), f = m && wsAttese.get(m[1]);
+      if (f) { wsAttese.delete(m[1]); f({ ok: m[2] === "1", msg: m[3] || "" }); }
+    }
+  };
+  s.onclose = s.onerror = () => {
+    if (ws !== s) return;
+    ws = null; wsAperto = false; clearInterval(wsPingT); wsPing.clear();
+    wsAttese.forEach(f => f(null)); wsAttese.clear();
+    wsProssimo = performance.now() + 10000;
+    try { s.close(); } catch (e) {}
+  };
+}
+function wsComando(c) {
+  return new Promise(res => {
+    const id = String(++wsSeq), t = setTimeout(() => { wsAttese.delete(id); res(null); }, 8000);
+    wsAttese.set(id, v => { clearTimeout(t); res(v); });
+    try { ws.send(`c ${id} ${c}`); } catch (e) { wsAttese.delete(id); clearTimeout(t); res(null); }
+  });
+}
+function statoSalvato() {
+  try { const v = JSON.parse(store.get("presepe-stato") || "null"); return v && typeof v.modo === "number" ? v : null; } catch (e) { return null; }
+}
 function show() {
-  $("dot").className = "dot" + (st.mega ? " on" : "");
+  $("dot").className = "dot" + (st.vecchio ? " wait" : st.mega ? " on" : "");
   $("net").textContent = st.ap
     ? `rete «${st.ssid}» · ${st.ip} · ${st.clienti} ${st.clienti === 1 ? "dispositivo collegato" : "dispositivi collegati"}`
     : `${st.host}.local · ${st.ip} · segnale ${st.rssi} dBm`;
-  if (st.ms !== undefined) $("net").textContent += ` · risposta ${st.ms} ms`;
+  if (st.vecchio) $("net").textContent = `ultimo stato noto (${new Date(st.quando).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}) · collegamento…`;
+  else if (st.ms !== undefined) $("net").textContent += ` · risposta ${st.ms} ms`;
+  if (!st.vecchio && st.diretto) $("net").textContent += " · collegamento diretto";
   $("ver").textContent = `Firmware ESP ${st.versione}` + (st.build ? `, compilato il ${st.build}` : "");
   // diagnostica dell'ESP (passa il mouse sopra, o tieni premuto): un "avviato da" che riparte da zero = l'ESP si e' riavviato
   if (st.esp) $("net").title = `ESP: memoria libera ${st.esp.heap} byte (blocco max ${st.esp.blocco}), avviato da ${st.esp.avvio} s, ultimo riavvio: ${st.esp.reset}`;   // tempo di /api/stato: rete lenta o scheda occupata
@@ -403,10 +472,48 @@ $("bNext").addEventListener("click", () => send("NEXT", "NEXT"));
 $("bStop").addEventListener("click", () => send("STOP", "STOP"));
 $("bPlay").addEventListener("click", () => send("STOP", "PLAY"));      // stessa chiave: vince l'ultimo
 
+// ---------------------------------------------------------------- precaricamento (a pagina ferma)
+// Quando il pannello e' fermo (ciclo normale, nessun comando in corso, nessun clic da 5 s):
+// 1. una volta per firmware il browser scarica /config a bassa priorita' (<link rel=prefetch>):
+//    poi la tiene in cache e l'apertura dell'editor non aspetta la pagina;
+// 2. aggiorna la copia del PRESEPE.INI che usa l'editor (con la firma: se il file non e' cambiato
+//    la scheda risponde in un attimo senza rimandarlo). Cosi' l'editor si apre gia' con il file.
+// L'ESP serve una richiesta alla volta: per questo si aspetta che la pagina sia ferma, e si fa
+// una cosa sola per volta e una volta sola per apertura del pannello.
+let precarico = 0;                           // 0 da fare, 1 in corso, 2 fatto
+const fermo = () => st && st.mega && !st.vecchio && st.modo === 0 && !busy && !queue.size &&
+  performance.now() - ultimoTocco > 5000 && performance.now() - avvioPagina > 3000;
+function precarica() {
+  if (precarico || !fermo()) return;
+  precarico = 1;
+  const versione = st.build || st.versione, a = document.querySelector('a[href*="config"]');
+  if (a && store.get("presepe-config-precaricata") !== versione) {
+    const l = document.createElement("link");
+    l.rel = "prefetch"; l.href = a.href;
+    l.onload = () => { store.set("presepe-config-precaricata", versione); setTimeout(scaldaIni, 1500); };
+    l.onerror = () => setTimeout(scaldaIni, 1500);
+    document.head.appendChild(l);
+  } else scaldaIni();
+}
+async function scaldaIni() {
+  if (!fermo()) { precarico = 0; return; }   // nel frattempo hai toccato qualcosa: si riprova dopo
+  precarico = 2;
+  let copia = null;
+  try { copia = JSON.parse(store.get("presepe-ini-sd") || "null"); } catch (e) {}
+  try {
+    const r = await fetch("/api/ini", { cache: "no-store", headers: copia && copia.firma ? { "X-Firma": copia.firma } : {} });
+    const t = await r.text(), f = r.headers.get("X-Firma");
+    if (r.ok && r.headers.get("X-Invariato") !== "1" && f) store.set("presepe-ini-sd", JSON.stringify({ firma: f, testo: t }));
+  } catch (e) {}
+}
+
 (async () => {
   setTimeout(poll, 1000);
-  try { const r = await fetch("/api/stato", { cache: "no-store" }); st = await r.json(); drawRel(st.nomi || []); show(); }
-  catch (e) { drawRel([]); }
+  // subito l'ultimo stato noto (attenuato), poi quello vero
+  const v = statoSalvato();
+  if (v && v.mega) { st = Object.assign(v, { vecchio: true }); document.body.classList.add("vecchio"); drawRel(st.nomi || []); show(); }
+  try { const r = await fetch("/api/stato", { cache: "no-store" }); st = await r.json(); drawRel(st.nomi || []); nuovoStato(); }
+  catch (e) { if (!st) drawRel([]); }
   drawPix(); drawPicker(); syncStrip();
   window.addEventListener("resize", drawPicker);
 })();
