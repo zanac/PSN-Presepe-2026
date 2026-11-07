@@ -184,7 +184,8 @@ int main() {
     Risposta z = server.chiama("/api/ini", HTTP_GET, "", "admin", "presepe2026", {{"Accept-Encoding", "gzip, deflate, br"}});
     CHECK(z.code == 200 && z.headers["Content-Encoding"] == "gzip" && z.body.size() < piano.body.size() &&
           (unsigned char)z.body[0] == 0x1f && (unsigned char)z.body[1] == 0x8b && z.headers["X-Byte"] == std::to_string(piano.body.size()) &&
-          z.headers["X-Compresso"] == std::to_string(z.body.size()) && z.headers["X-Firma"] == piano.headers["X-Firma"]);
+          z.headers["X-Compresso"] == std::to_string(z.body.size()) && z.headers["X-Firma"] == piano.headers["X-Firma"] &&
+          z.dichiarata == (long)z.body.size() && server.cliente.flushMs == 10000 && server.timeoutCorpo == 20000);
     CHECK(piano.headers["Content-Encoding"].empty() && piano.body == grande);
   }
 

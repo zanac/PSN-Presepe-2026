@@ -10,6 +10,8 @@ int main(int argc, char **argv) {
     std::vector<uint8_t> d; int c; while ((c = std::fgetc(f)) >= 0) d.push_back((uint8_t)c); std::fclose(f);
     std::vector<uint8_t> o(d.size() + 1024);
     size_t r = gzipComprimi(d.data(), d.size(), o.data(), o.size());
+    Gzip z;                                       // the size pass must match what is written
+    if (r && (!z.prepara(d.data(), d.size()) || z.dimensione() != r)) { std::fprintf(stderr, "size mismatch %s\n", argv[a]); return 2; }
     std::string n = std::string(argv[a]) + ".gz";
     FILE *g = std::fopen(n.c_str(), "wb"); std::fwrite(o.data(), 1, r, g); std::fclose(g);
   }

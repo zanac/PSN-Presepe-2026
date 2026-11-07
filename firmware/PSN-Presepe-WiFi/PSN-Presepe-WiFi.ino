@@ -457,25 +457,31 @@ void apiLeggiFile() {
   server.sendHeader("Access-Control-Expose-Headers", "X-File");
   server.sendHeader("Cache-Control", "no-store");
   // Compresso (gzip) se il browser lo accetta: 16 kB diventano ~6 kB e sul WiFi conta. Il browser
-  // lo decomprime da solo. Serve memoria (~10 kB di tabelle + il risultato): se non c'e', o
-  // se il file non si comprime, parte com'e'.
-  // Se manca memoria lo dice in X-Compresso ("memoria"): la pagina lo mostra.
-  size_t n = getTesto.length(), cap = n / 2 + 1024;
+  // lo decomprime da solo. Con l'INI in memoria all'ESP restano ~15 kB: il compressore ne usa al
+  // massimo ~9 e il risultato esce a pezzi direttamente sulla rete, senza tenerlo tutto in RAM.
+  // Se manca memoria parte com'e', e X-Compresso: memoria lo dice alla pagina.
+  size_t n = getTesto.length();
   if (n > 512 && server.header("Accept-Encoding").indexOf("gzip") >= 0) {
-    // tabelle e lavoro del compressore ~14 kB, piu' ~6 kB lasciati al WiFi
-    uint8_t *z = ESP.getFreeHeap() > cap + 20000 && ESP.getMaxFreeBlockSize() > cap ? (uint8_t *)malloc(cap) : nullptr;
-    size_t zn = z ? gzipComprimi((const uint8_t *)getTesto.c_str(), n, z, cap) : 0;
-    if (zn) {
-      getTesto = "";                         // memoria libera per l'invio
+    Gzip z;
+    if (ESP.getFreeHeap() > 13000 && z.prepara((const uint8_t *)getTesto.c_str(), n)) {
+      size_t zn = z.dimensione();
       server.sendHeader("Content-Encoding", "gzip");
       server.sendHeader("X-Byte", String(n));   // la pagina mostra quanto ha viaggiato sulla rete
       server.sendHeader("X-Compresso", String(zn));
-      inviaCorpo(200, "text/plain; charset=utf-8", (const char *)z, zn);
-      free(z);
+      server.setContentLength(zn);
+      server.send(200, "text/plain; charset=utf-8", "");
+      // ogni pezzo come inviaCorpo: sorgente con 20 s di pazienza (sendContent(p, n) del core ne
+      // da' 1 e con un segnale debole tronca la risposta)
+      z.scrivi([](void *, const uint8_t *p, size_t k) -> bool {
+        StreamConstPtr pezzo((const char *)p, k); pezzo.setTimeout(20000);
+        server.sendContent(&pezzo, k);
+        return server.client().connected();
+      }, nullptr);
+      server.client().flush(10000);             // come inviaCorpo: aspetta le conferme prima di chiudere
+      getTesto = "";
       return;
     }
-    if (!z) server.sendHeader("X-Compresso", "memoria");
-    free(z);
+    server.sendHeader("X-Compresso", "memoria");
   }
   inviaCorpo(200, "text/plain; charset=utf-8", getTesto.c_str(), getTesto.length());
   getTesto = "";
