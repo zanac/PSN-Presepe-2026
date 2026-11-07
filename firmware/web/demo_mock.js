@@ -41,7 +41,7 @@
       pctFase: Math.round(b > a ? (p - a) * 100 / (b - a) : 0), pct: Math.round(p * 10) / 10, durata: durata(),
       sd: errori ? 4 : 3, err: errori, riga: prima, ns1: cfg.stelle[0].numero, ns2: cfg.stelle[1].numero,
       rele: modo === 4 ? 0 : ciclo ? releCiclo : test.rele, cielo: col(0), tramonto: col(1), alba: col(2), passo: 0,
-      nomi: cfg.nomi.slice(), ws: { porta: 81, chiave: "demo" },
+      nomi: cfg.nomi.slice(),
     };
   }
 
@@ -151,30 +151,6 @@
     }
     return new Response("non trovato", { status: 404 });
   };
-
-  // ------------------------------------------------------------------ WebSocket (come ws_mini.h dell'ESP)
-  // Stato spinto ogni secondo, comandi "c id ..." -> "r id 1|0 motivo", ping "p n" -> "q n".
-  class FintoWebSocket {
-    constructor() {
-      this.readyState = 0;
-      setTimeout(() => {
-        this.readyState = 1; if (this.onopen) this.onopen();
-        this.t = setInterval(() => { const s = stato(); delete s.nomi; delete s.ws; this._a("s " + JSON.stringify(s)); }, 1000);
-      }, 60);
-    }
-    _a(d) { if (this.readyState === 1 && this.onmessage) this.onmessage({ data: d }); }
-    send(d) {
-      if (d.startsWith("p ")) { setTimeout(() => this._a("q " + d.slice(2)), 25); return; }
-      if (!d.startsWith("c ")) return;
-      const sp = d.indexOf(" ", 2), id = d.slice(2, sp), c = d.slice(sp + 1);
-      setTimeout(() => {
-        const r = performance.now() > bootFino ? comando(c) : { ok: false, msg: "il presepe non risponde" };
-        this._a(`r ${id} ${r.ok ? "1" : "0 " + r.msg}`);
-      }, 40);
-    }
-    close() { clearInterval(this.t); this.readyState = 3; if (this.onclose) this.onclose(); }
-  }
-  window.WebSocket = FintoWebSocket;
 
   // ------------------------------------------------------------------ banner
   window.demoRipristinaSD = () => { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); };

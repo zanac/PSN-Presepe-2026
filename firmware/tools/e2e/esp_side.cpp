@@ -1,7 +1,6 @@
 // ESP8266 side of the end-to-end test: the real PSN-Presepe-WiFi.ino compiled on a PC
 // with mocked WiFi/web server, talking to the real Mega link code (mega_side.cpp)
 // through a serial line that loses bytes in the ESP -> Mega direction.
-#include <algorithm>
 #include "mock/Arduino.h"
 #include "mock/ESP8266WiFi.h"
 #include "mock/ESP8266WebServer.h"
@@ -32,26 +31,6 @@ extern std::map<std::string, std::string> disk;
 static int fails = 0, checks = 0;
 #define CHECK(c) do { checks++; if (!(c)) { fails++; std::printf("FAIL line %d: %s\n", __LINE__, #c); } } while (0)
 static void gira(unsigned long ms) { for (unsigned long i = 0; i < ms; i++) { T++; megaStep(); loop(); } }
-
-// WebSocket helpers: a masked text frame as the browser sends it, and the text frames the ESP sent
-static std::string wsFrame(const std::string &t) {
-  std::string f; f += (char)0x81;
-  if (t.size() < 126) f += (char)(0x80 | t.size()); else { f += (char)(0x80 | 126); f += (char)(t.size() >> 8); f += (char)(t.size() & 255); }
-  const unsigned char m[4] = {0x12, 0x34, 0x56, 0x78}; f.append((const char *)m, 4);
-  for (size_t i = 0; i < t.size(); i++) f += (char)(t[i] ^ m[i & 3]);
-  return f;
-}
-static std::vector<std::string> wsLeggi(std::string &out) {       // consumes the complete frames in out
-  std::vector<std::string> v;
-  while (out.size() >= 2) {
-    size_t len = (unsigned char)out[1] & 127, h = 2;
-    if (len == 126) { if (out.size() < 4) break; len = (unsigned char)out[2] << 8 | (unsigned char)out[3]; h = 4; }
-    if (out.size() < h + len) break;
-    if (((unsigned char)out[0] & 15) == 1) v.push_back(out.substr(h, len)); else v.push_back(std::string("#op") + std::to_string((unsigned char)out[0] & 15));
-    out.erase(0, h + len);
-  }
-  return v;
-}
 
 int main() {
   setup();
@@ -184,8 +163,7 @@ int main() {
     Risposta z = server.chiama("/api/ini", HTTP_GET, "", "admin", "presepe2026", {{"Accept-Encoding", "gzip, deflate, br"}});
     CHECK(z.code == 200 && z.headers["Content-Encoding"] == "gzip" && z.body.size() < piano.body.size() &&
           (unsigned char)z.body[0] == 0x1f && (unsigned char)z.body[1] == 0x8b && z.headers["X-Byte"] == std::to_string(piano.body.size()) &&
-          z.headers["X-Compresso"] == std::to_string(z.body.size()) && z.headers["X-Firma"] == piano.headers["X-Firma"] &&
-          z.dichiarata == (long)z.body.size() && server.cliente.flushMs == 10000 && server.timeoutCorpo == 20000);
+          z.headers["X-Compresso"] == std::to_string(z.body.size()) && z.headers["X-Firma"] == piano.headers["X-Firma"]);
     CHECK(piano.headers["Content-Encoding"].empty() && piano.body == grande);
   }
 
@@ -273,49 +251,6 @@ int main() {
     String ssid0 = cfgSsid; int r0 = ESP.restarts;
     rigaDalMega("@SSID Terza"); rigaDalMega("@WPWD 12345678"); rigaDalMega("@APWD x"); rigaDalMega("@HOST h"); rigaDalMega("@GO");
     CHECK(cfgSsid == ssid0 && ESP.restarts == r0);                             // @USER missing
-  }
-
-  // 12. WebSocket (port 81): key from /api/stato, handshake, commands, pushed state, ping, silence
-  {
-    CHECK(wsm::accetta("dGhlIHNhbXBsZSBub25jZQ==") == "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");    // RFC 6455 example
-    Risposta r = server.chiama("/api/stato", HTTP_GET, "");
-    size_t p = r.body.find("\"chiave\":\"");
-    std::string k = p == std::string::npos ? "" : r.body.substr(p + 10, 16);
-    CHECK(k.size() == 16 && r.body.find("\"porta\":81") != std::string::npos);
-    auto apri = [](const std::string &chiave) {
-      auto c = std::make_shared<Connessione>();
-      c->in = "GET /?k=" + chiave + " HTTP/1.1\r\nHost: presepe\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
-              "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n";
-      WiFiServer::coda().push_back(c);
-      return c;
-    };
-    auto no = apri("sbagliata"); gira(20);
-    CHECK(no->out.rfind("HTTP/1.1 403", 0) == 0 && !no->aperta);
-    auto c = apri(k); gira(20);
-    size_t fine = c->out.find("\r\n\r\n");
-    CHECK(c->out.rfind("HTTP/1.1 101", 0) == 0 && c->out.find("Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=") != std::string::npos && fine != std::string::npos);
-    c->out.erase(0, fine + 4);
-    CHECK(ws.clienti() == 1);
-    gira(1600);                                                        // pushed state, without asking
-    std::vector<std::string> m = wsLeggi(c->out);
-    CHECK(!m.empty() && m.back().rfind("s {\"versione\"", 0) == 0 && m.back().find("\"nomi\"") == std::string::npos &&
-          m.back().find("\"modo\"") != std::string::npos);
-    c->in += wsFrame("p 42"); gira(20);
-    m = wsLeggi(c->out); CHECK(std::find(m.begin(), m.end(), "q 42") != m.end());
-    c->in += wsFrame("c 7 R 5 1"); gira(300);
-    m = wsLeggi(c->out);
-    bool r7 = std::find(m.begin(), m.end(), "r 7 1") != m.end();
-    CHECK(r7 && (megaRele() & 16));
-    c->in += wsFrame("c 8 ZZ"); gira(50);
-    m = wsLeggi(c->out); CHECK(std::find(m.begin(), m.end(), "r 8 0 comando non valido") != m.end());
-    c->in += wsFrame("c 9 R 5 0"); gira(300);
-    m = wsLeggi(c->out); CHECK(std::find(m.begin(), m.end(), "r 9 1") != m.end() && !(megaRele() & 16));
-    // a page that stays silent (phone in standby) is closed after 15 s
-    gira(16000);
-    CHECK(!c->aperta && ws.clienti() == 0);
-    // close frame from the page
-    auto d = apri(k); gira(20); d->in += std::string("\x88\x80\x00\x00\x00\x00", 6); gira(20);
-    CHECK(!d->aperta && ws.clienti() == 0);
   }
 
   CHECK(persi > 50);                              // the loss model really dropped bytes

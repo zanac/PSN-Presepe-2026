@@ -3,9 +3,8 @@
 #include "StreamDev.h"
 enum HTTPMethod { HTTP_GET, HTTP_POST };
 enum { BASIC_AUTH };
-struct Risposta { int code = 0; long dichiarata = -1; std::string type, body; std::map<std::string, std::string> headers; };
+struct Risposta { int code = 0; std::string type, body; std::map<std::string, std::string> headers; };
 struct ESP8266WebServer {
-  long lunghezza = -1;                     // setContentLength() before a send() with the body in pieces
   std::map<std::pair<std::string, int>, std::function<void()>> rotte;
   std::function<void()> nonTrovato;
   std::string body, user, pass;      // current request
@@ -22,14 +21,11 @@ struct ESP8266WebServer {
   bool authenticate(const char *u, const char *p) { return user == u && pass == p; }
   void requestAuthentication(int, const char *) { r.code = 401; r.headers = pending; pending.clear(); }
   void sendHeader(const char *n, const String &v) { pending[n] = v.s; }
-  void send(int c, const char *t, const String &b) { r.code = c; r.type = t; r.body = b.s; r.headers = pending; pending.clear(); r.dichiarata = lunghezza; lunghezza = -1; }
+  void send(int c, const char *t, const String &b) { r.code = c; r.type = t; r.body = b.s; r.headers = pending; pending.clear(); }
   void send(int c, const char *t, const char *b) { send(c, t, String(b)); }
-  // body sent in pieces after the headers: the declared length must match what follows
-  void setContentLength(size_t n) { lunghezza = (long)n; }
-  void sendContent(Stream *src, long n) { auto *p = static_cast<StreamConstPtr *>(src); timeoutCorpo = p->getTimeout(); r.body.append(p->buf, n); }
   void send_P(int c, const char *t, const char *b, size_t n) { send(c, t, String(std::string(b, n))); }
   unsigned long timeoutCorpo = 0;   // timeout of the source stream of the last long body
-  struct Cliente { unsigned long flushMs = 0, timeout = 0; bool connected() const { return true; } void setTimeout(unsigned long t) { timeout = t; } bool flush(unsigned int ms) { flushMs = ms; return true; } } cliente;
+  struct Cliente { unsigned long flushMs = 0; bool flush(unsigned int ms) { flushMs = ms; return true; } } cliente;
   Cliente &client() { return cliente; }
   void send(int c, const char *t, Stream *src, size_t n) { auto *p = static_cast<StreamConstPtr *>(src); timeoutCorpo = p->getTimeout(); send(c, t, String(std::string(p->buf, n))); }
   // POST from the pages: X-Presepe and X-Len as the browser sends them (h overrides)

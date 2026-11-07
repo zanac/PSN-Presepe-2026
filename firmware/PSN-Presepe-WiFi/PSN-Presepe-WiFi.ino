@@ -33,15 +33,10 @@
 #include <StreamDev.h>
 #include "pagine_web.h"
 #include "comprimi.h"
-#include "ws_mini.h"
 
 #define VERSIONE "039"
 
 ESP8266WebServer server(80);
-wsm::Server ws(81);             // stato e comandi del pannello su una connessione che resta aperta (ws_mini.h)
-String wsChiave;                // chiave della connessione, nuova a ogni avvio (la da' /api/stato)
-bool statoNuovo = false;        // arrivato un @ST da spingere alle pagine collegate
-unsigned long wsStatoMs = 0;
 DNSServer dns;                  // [ACCESS_POINT] portale = 1: ogni nome porta alla centralina
 
 // ------------------------------------------------------------------ configurazione dal Mega
@@ -151,7 +146,7 @@ void rigaDalMega(String l) {
       int q = l.indexOf(' ', p); if (q < 0) q = l.length();
       stato[n++] = l.substring(p, q).toInt(); p = q + 1;
     }
-    statoValido = n == 22; statoMs = millis(); statoNuovo = true;
+    statoValido = n == 22; statoMs = millis();
     return;
   }
   // La configurazione arriva sempre in quest'ordine: @SSID apre un nuovo invio, @GO lo applica
@@ -318,9 +313,8 @@ String motivo(const String &r) {
   return r;
 }
 
-// Stato in JSON per /api/stato e per le pagine collegate con il WebSocket (senza i nomi dei
-// rele', che non cambiano: la pagina li ha gia' dal primo /api/stato).
-String statoJson(bool completo) {
+void apiStato() {
+  if (!autorizzato()) return;
   bool mega = statoValido && millis() - statoMs < 3000;
   String j = "{";
   j += "\"versione\":\"" VERSIONE "\"";
@@ -345,19 +339,11 @@ String statoJson(bool completo) {
   // diagnostica dell'ESP: memoria libera, blocco piu' grande, secondi dall'avvio, motivo dell'ultimo riavvio
   j += ",\"esp\":{\"heap\":" + String(ESP.getFreeHeap()) + ",\"blocco\":" + String(ESP.getMaxFreeBlockSize()) +
        ",\"avvio\":" + String(millis() / 1000) + ",\"reset\":" + jsonTesto(ESP.getResetReason()) + "}";
-  if (completo) {
-    j += ",\"ws\":{\"porta\":81,\"chiave\":\"" + wsChiave + "\"}";
-    j += ",\"nomi\":[";
-    for (int i = 0; i < 16; i++) { if (i) j += ","; j += jsonTesto(nomiRele[i]); }
-    j += "]";
-  }
-  return j + "}";
-}
-
-void apiStato() {
-  if (!autorizzato()) return;
+  j += ",\"nomi\":[";
+  for (int i = 0; i < 16; i++) { if (i) j += ","; j += jsonTesto(nomiRele[i]); }
+  j += "]}";
   server.sendHeader("Cache-Control", "no-store");
-  server.send(200, "application/json", statoJson(true));
+  server.send(200, "application/json", j);
 }
 
 // Comandi ammessi dalla pagina (il Mega controlla comunque gli argomenti).
@@ -383,30 +369,14 @@ bool daPagina() {
   return false;
 }
 
-// Comando della pagina (POST /api/cmd o WebSocket): "" se eseguito, altrimenti il motivo.
-String eseguiComando(String c) {
-  c.trim();
-  if (!comandoAmmesso(c)) return "comando non valido";
-  if (c == "RUN" || c == "NEXT" || c == "STOP" || c == "PLAY") c += " " + nuovoId();   // numerati
-  String r = comando(c);
-  return r.startsWith("@OK") ? String("") : motivo(r);
-}
-
 void apiComando() {
   if (!autorizzato() || !daPagina()) return;
-  String m = eseguiComando(server.arg("plain"));
-  rispostaJson(!m.length(), "msg", m, m == "comando non valido" ? 400 : 200);
-}
-
-// Messaggi delle pagine collegate con il WebSocket (formato in ws_mini.h)
-void daWebSocket(wsm::Cliente &x, const String &t) {
-  if (t.startsWith("p ")) { ws.invia(x, "q " + t.substring(2)); return; }
-  if (t.startsWith("c ")) {
-    int sp = t.indexOf(' ', 2);
-    if (sp < 0) return;
-    String id = t.substring(2, sp), m = eseguiComando(t.substring(sp + 1));
-    ws.invia(x, "r " + id + (m.length() ? " 0 " + m : String(" 1")));
-  }
+  String c = server.arg("plain"); c.trim();
+  if (!comandoAmmesso(c)) { rispostaJson(false, "msg", "comando non valido", 400); return; }
+  if (c == "RUN" || c == "NEXT" || c == "STOP" || c == "PLAY") c += " " + nuovoId();   // numerati
+  String r = comando(c);
+  bool ok = r.startsWith("@OK");
+  rispostaJson(ok, "msg", ok ? String("") : motivo(r));
 }
 
 // Firma del file sulla microSD: "nome:crc:byte" (il Mega la calcola con @SUM e la manda alla
@@ -457,31 +427,25 @@ void apiLeggiFile() {
   server.sendHeader("Access-Control-Expose-Headers", "X-File");
   server.sendHeader("Cache-Control", "no-store");
   // Compresso (gzip) se il browser lo accetta: 16 kB diventano ~6 kB e sul WiFi conta. Il browser
-  // lo decomprime da solo. Con l'INI in memoria all'ESP restano ~15 kB: il compressore ne usa al
-  // massimo ~9 e il risultato esce a pezzi direttamente sulla rete, senza tenerlo tutto in RAM.
-  // Se manca memoria parte com'e', e X-Compresso: memoria lo dice alla pagina.
-  size_t n = getTesto.length();
+  // lo decomprime da solo. Serve memoria (~10 kB di tabelle + il risultato): se non c'e', o
+  // se il file non si comprime, parte com'e'.
+  // Se manca memoria lo dice in X-Compresso ("memoria"): la pagina lo mostra.
+  size_t n = getTesto.length(), cap = n / 2 + 1024;
   if (n > 512 && server.header("Accept-Encoding").indexOf("gzip") >= 0) {
-    Gzip z;
-    if (ESP.getFreeHeap() > 13000 && z.prepara((const uint8_t *)getTesto.c_str(), n)) {
-      size_t zn = z.dimensione();
+    // tabelle e lavoro del compressore ~14 kB, piu' ~6 kB lasciati al WiFi
+    uint8_t *z = ESP.getFreeHeap() > cap + 20000 && ESP.getMaxFreeBlockSize() > cap ? (uint8_t *)malloc(cap) : nullptr;
+    size_t zn = z ? gzipComprimi((const uint8_t *)getTesto.c_str(), n, z, cap) : 0;
+    if (zn) {
+      getTesto = "";                         // memoria libera per l'invio
       server.sendHeader("Content-Encoding", "gzip");
       server.sendHeader("X-Byte", String(n));   // la pagina mostra quanto ha viaggiato sulla rete
       server.sendHeader("X-Compresso", String(zn));
-      server.setContentLength(zn);
-      server.send(200, "text/plain; charset=utf-8", "");
-      // ogni pezzo come inviaCorpo: sorgente con 20 s di pazienza (sendContent(p, n) del core ne
-      // da' 1 e con un segnale debole tronca la risposta)
-      z.scrivi([](void *, const uint8_t *p, size_t k) -> bool {
-        StreamConstPtr pezzo((const char *)p, k); pezzo.setTimeout(20000);
-        server.sendContent(&pezzo, k);
-        return server.client().connected();
-      }, nullptr);
-      server.client().flush(10000);             // come inviaCorpo: aspetta le conferme prima di chiudere
-      getTesto = "";
+      inviaCorpo(200, "text/plain; charset=utf-8", (const char *)z, zn);
+      free(z);
       return;
     }
-    server.sendHeader("X-Compresso", "memoria");
+    if (!z) server.sendHeader("X-Compresso", "memoria");
+    free(z);
   }
   inviaCorpo(200, "text/plain; charset=utf-8", getTesto.c_str(), getTesto.length());
   getTesto = "";
@@ -580,8 +544,6 @@ void setup() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();            // nessuna rete ricordata: si collega solo con i dati del Mega
   idComando = (uint16_t)(ESP.random() | 1);   // diverso a ogni avvio dell'ESP
-  char k[17]; snprintf(k, sizeof(k), "%08lx%08lx", (unsigned long)ESP.random(), (unsigned long)ESP.random());
-  wsChiave = k; ws.chiave(wsChiave);
   server.collectHeaders("X-Presepe", "X-Len", "X-Parte", "If-None-Match", "X-Firma", "Accept-Encoding");   // lette da daPagina(), apiScriviFile(), inviaPagina()
 
   server.on("/", HTTP_GET, []() { if (autorizzato()) inviaPagina(PAGINA_PANNELLO, PAGINA_PANNELLO_LEN); });
@@ -599,7 +561,6 @@ void setup() {
     server.send(404, "text/plain", "non trovato");
   });
   server.begin();
-  ws.begin();
 }
 
 void loop() {
@@ -640,12 +601,4 @@ void loop() {
   }
 
   server.handleClient();
-
-  // pagine collegate con il WebSocket: messaggi, e lo stato appena arriva dal Mega (o ogni 1,5 s
-  // se il Mega tace, cosi' la pagina vede "il presepe non risponde")
-  ws.loop(daWebSocket);
-  if (ws.clienti() && (statoNuovo || millis() - wsStatoMs > 1500)) {
-    statoNuovo = false; wsStatoMs = millis();
-    ws.inviaTutti("s " + statoJson(false));
-  }
 }
