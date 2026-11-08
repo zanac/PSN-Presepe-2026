@@ -342,7 +342,7 @@ Libraries: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (with Adafruit BusI
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Size: 89.0 kB flash (35 %, of which 16.3 kB is the embedded default `PRESEPE.INI`), 4.9 kB static RAM. That leaves about 3.3 kB for heap and stack; the OLED buffer (1 kB) and the LED buffers (3 bytes per pixel) are allocated at run time, after which about 2 kB stay free.
+Size: 91.2 kB flash (35 %, of which 16.8 kB is the embedded default `PRESEPE.INI`), 5.1 kB static RAM. That leaves about 3.1 kB for heap and stack; the OLED buffer (1 kB) and the LED buffers (3 bytes per pixel) are allocated at run time, after which about 1.8 kB stay free.
 
 ### Build
 
@@ -553,6 +553,7 @@ The card is read at power-on, and again after *Riavvia il presepe* on the web pa
 | `[GIORNO]`, `[TRAMONTO]`, `[CREPUSCOLO]`, `[NOTTE]`, `[ALBA]` | what happens in that phase: `cielo` / `tramonto` / `alba = %, R, G, B [, morbida / lineare]` (strip colours, up to 20 tappe per strip) and `rele = RELAY, ON/OFF, %` (up to 64 events in all), see below |
 | `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
 | `[STELLE_01]`, `[STELLE_02]` | one section per star chain, the same keys and defaults for both: `numero` (≤ 100, 0 = unused), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tint %). The old `[STELLE]` and `[CASETTE]` sections are no longer read (counted as errors) |
+| `[COSTELLAZIONI]` | groups of stars always lit together with a steady light (no twinkling), never among the random ones: one `costellazione = luminosity \| stars` line per group (up to 8). Luminosity at full night 0..255; stars as `chain:number` (`01` = STELLE_01, `02` = STELLE_02, numbers from 1) separated by commas, `from-to` for a run, e.g. `costellazione = 80 \| 01:3, 01:7, 01:12-14, 02:5`. A group may mix both chains; each star keeps the colour of its chain. They all fade in together during the dusk and fade out together during the dawn, following the star level. A star may belong to one group only: a wrong or repeated star discards the whole line; stars beyond `numero` are dropped. If the free stars are fewer than `attive`, fewer random stars light up |
 | `[SISTEMA]` | `fastboot` (default 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (both only with `fastboot = 0`), `oled`, `debug_ms` |
 | `[WIFI]` | `abilitato` (default 0; 1 = home network, 2 or `ap` = access point, 3 or `auto` = home network, access point if it does not connect), `ssid` (≤ 32 characters), `password` (empty = open network, otherwise 8–63 characters, WPA/WPA2), `nome` (network name, up to 24 letters, digits and `-`, not starting with `-`; default `presepe` → `http://presepe.local`) |
 | `[ACCESS_POINT]` | network created with `abilitato = 2` (or 3 without the home network): `ssid` (default `Presepe`), `password` (default `presepe2026`), `canale` (1–13, default 6), `nascosta` (0/1), `max_client` (1–8, default 4), `ip` (default `192.168.4.1`), `portale` (0/1), `attesa` (s, 10–600, default 60, only for 3); see [WiFi](#wifi-mega--wifi-r3-board) |

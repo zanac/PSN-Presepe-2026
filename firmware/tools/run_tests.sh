@@ -9,6 +9,8 @@
 #     mocked buttons/potentiometer/OLED by tools/test_colore.cpp.
 #  3. WiFi link: the "// ==== LINK WIFI BEGIN/END ====" block is driven by
 #     tools/test_link.cpp with a mocked ESP8266 (Serial3), microSD and outputs.
+#  3a. Star engine (random stars and [COSTELLAZIONI]): from "struct StatoStelle {" to
+#     riempiCatena, with mocked chains, by tools/test_stelle.cpp.
 #  3b. Default file: PRESEPE.INI embedded in the sketch (embed_ini.py --check) and written
 #     to an empty card by iniCreaPredefinito (tools/test_ini.cpp).
 #  4. End to end: the real ESP8266 firmware (PSN-Presepe-WiFi.ino, with mocked WiFi and
@@ -32,6 +34,10 @@ ${CXX:-g++} -std=c++11 -w -I"$T" "$HERE/test_colore.cpp" -o "$T/test_colore"
 "$T/test_colore"
 ${CXX:-g++} -std=c++11 -Wall -Wno-unused-function -I"$T" "$HERE/test_link.cpp" -o "$T/test_link"
 "$T/test_link"
+sed -n '/^struct StatoStelle {/,/^\/\/ Tutti i pixel di una catena dello stesso colore/p' "$INO" > "$T/stelle.inc"
+[ -s "$T/stelle.inc" ] || { echo "star engine (struct StatoStelle .. riempiCatena) not found in PSN-Presepe.ino"; exit 1; }
+${CXX:-g++} -std=c++11 -Wall -Wno-unused-function -Wno-unused-variable -I"$T" "$HERE/test_stelle.cpp" -o "$T/test_stelle"
+"$T/test_stelle"
 python3 "$HERE/embed_ini.py" --check
 python3 "$HERE/build_web.py" --check
 python3 "$HERE/../../simulation_web/build_simulator.py" --check

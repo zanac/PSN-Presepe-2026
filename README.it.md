@@ -342,7 +342,7 @@ Librerie: Adafruit NeoPixel, Adafruit GFX, Adafruit SSD1306 (con Adafruit BusIO)
 | BusIO | 1.17.4 |
 | SD | 1.3.0 |
 
-Occupazione: 89,0 kB di flash (35 %, di cui 16,3 kB sono il `PRESEPE.INI` predefinito incorporato), 4,9 kB di RAM statica. Restano circa 3,3 kB per heap e stack; il buffer dell'OLED (1 kB) e quelli dei LED (3 byte per pixel) sono allocati in esecuzione, dopo di che restano liberi circa 2 kB.
+Occupazione: 91,2 kB di flash (35 %, di cui 16,8 kB sono il `PRESEPE.INI` predefinito incorporato), 5,1 kB di RAM statica. Restano circa 3,1 kB per heap e stack; il buffer dell'OLED (1 kB) e quelli dei LED (3 byte per pixel) sono allocati in esecuzione, dopo di che restano liberi circa 1,8 kB.
 
 ### Compilazione
 
@@ -553,6 +553,7 @@ La scheda viene letta all'accensione, e di nuovo dopo *Riavvia il presepe* dalla
 | `[GIORNO]`, `[TRAMONTO]`, `[CREPUSCOLO]`, `[NOTTE]`, `[ALBA]` | cosa succede in quella fase: `cielo` / `tramonto` / `alba = %, R, G, B [, morbida / lineare]` (colori delle strisce, fino a 20 tappe per striscia) e `rele = RELÈ, ON/OFF, %` (fino a 64 eventi in tutto), vedi sotto |
 | `[COLORI]` | `lum_cielo / lum_tramonto / lum_alba` (%), `gamma`, `pwm_invertito` |
 | `[STELLE_01]`, `[STELLE_02]` | una sezione per catena di stelle, stesse chiavi e stessi valori predefiniti: `numero` (≤ 100, 0 = non usata), `attive`, `lum_min / lum_max`, `livello_notte`, `scintillio_min / max` (ms), `colore` (tinta in %). Le vecchie sezioni `[STELLE]` e `[CASETTE]` non vengono più lette (contano come errori) |
+| `[COSTELLAZIONI]` | gruppi di stelle sempre accese insieme con luce fissa (non scintillano), mai fra quelle scelte a caso: una riga `costellazione = luminosità \| stelle` per gruppo (fino a 8). Luminosità a notte piena 0..255; stelle come `catena:numero` (`01` = STELLE_01, `02` = STELLE_02, numeri da 1) separate da virgole, `da-a` per una serie, per esempio `costellazione = 80 \| 01:3, 01:7, 01:12-14, 02:5`. Un gruppo può mescolare le due catene; ogni stella ha il colore della sua catena. Compaiono tutte insieme piano nel crepuscolo e si spengono tutte insieme piano nell'alba, seguendo il livello delle stelle. Una stella può stare in un gruppo solo: una stella sbagliata o ripetuta scarta tutta la riga; quelle oltre `numero` vengono tolte. Se le stelle libere sono meno di `attive`, se ne accendono meno a caso |
 | `[SISTEMA]` | `fastboot` (predefinito 1), `buzzer`, `beep_hz`, `beep_ms`, `melodia_avvio`, `autotest_avvio` (entrambi solo con `fastboot = 0`), `oled`, `debug_ms` |
 | `[WIFI]` | `abilitato` (predefinito 0; 1 = rete di casa, 2 o `ap` = access point, 3 o `auto` = rete di casa, access point se non si collega), `ssid` (≤ 32 caratteri), `password` (vuota = rete aperta, altrimenti 8–63 caratteri, WPA/WPA2), `nome` (nome in rete, fino a 24 tra lettere, cifre e `-`, non all'inizio; predefinito `presepe` → `http://presepe.local`) |
 | `[ACCESS_POINT]` | rete creata con `abilitato = 2` (o 3 senza rete di casa): `ssid` (predefinito `Presepe`), `password` (predefinita `presepe2026`), `canale` (1–13, predefinito 6), `nascosta` (0/1), `max_client` (1–8, predefinito 4), `ip` (predefinito `192.168.4.1`), `portale` (0/1), `attesa` (s, 10–600, predefinito 60, solo per 3); vedi [WiFi](#wifi-scheda-mega--wifi-r3) |

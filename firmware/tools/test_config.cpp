@@ -124,6 +124,39 @@ int main(int argc, char **argv) {
     CHECK(c.stelle[0].numero == 30 && c.stelle[1].numero == d.stelle[1].numero);
   }
 
+  // 5c. [COSTELLAZIONI]: luminosity per line, stars of both chains, ranges, all-or-nothing lines
+  {
+    PresepeConfig c; cfgDefault(c);
+    CHECK(c.numCostellazioni == 0);
+    cfgParseBuffer(c,
+      "[COSTELLAZIONI]\n"
+      "costellazione = 70 | 01:3, 01:7, 01:12-14, 02:5   ; Orsa maggiore\n"     // line 2
+      "costellazione = 120 | 2:20 - 24\n"                                      // line 3
+      "costellazione = 90 | 01:7, 01:30\n"                                     // 4: 01:7 already used -> whole line out
+      "costellazione = 300 | 01:40\n"                                          // 5: luminosity out of range
+      "costellazione = 01:41\n"                                                // 6: no luminosity
+      "costellazione = 50 | 03:1\n"                                            // 7: no chain 03
+      "costellazione = 50 | 01:0\n"                                            // 8: stars count from 1
+      "costellazione = 50 | 01:9-8\n"                                          // 9: reversed range
+      "costellazione = 50 | \n"                                                // 10: no stars
+      "stelle = 1\n"                                                           // 11: unknown key
+      "costellazione = 40 | 02:50, 01:60\n"                                    // 12: 01:60 is beyond numero=50
+    );
+    CHECK(c.numCostellazioni == 3);
+    CHECK(c.costLum[0] == 70 && c.costLum[1] == 120 && c.costLum[2] == 40);
+    CHECK(c.costStella[0][2] == 1 && c.costStella[0][6] == 1 && c.costStella[0][11] == 1 && c.costStella[0][12] == 1 && c.costStella[0][13] == 1 && c.costStella[1][4] == 1);
+    CHECK(c.costStella[0][14] == 0 && c.costStella[0][29] == 0 && c.costStella[0][39] == 0);
+    CHECK(c.costStella[1][19] == 2 && c.costStella[1][23] == 2 && c.costStella[1][24] == 0);
+    CHECK(c.costStella[1][49] == 3 && c.costStella[0][59] == 0);      // 01:60 dropped by the final check
+    CHECK(c.errori == 9 && c.primaRigaErrata == 4);              // lines 4..11 plus the final check
+    // capacity: 8 lines
+    PresepeConfig e; cfgDefault(e);
+    std::string t = "[COSTELLAZIONI]\n";
+    for (int i = 1; i <= 9; i++) t += "costellazione = 10 | 01:" + std::to_string(i) + "\n";
+    cfgParseBuffer(e, t.c_str());
+    CHECK(e.numCostellazioni == 8 && e.errori == 1 && e.costStella[0][8] == 0 && e.costStella[0][7] == 8);
+  }
+
   // 6. event table capacity (64) and over-long line
   {
     std::string t = "[NOTTE]\n";

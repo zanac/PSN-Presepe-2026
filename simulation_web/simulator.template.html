@@ -249,7 +249,7 @@ button.danger { color: var(--err); border-color: var(--err); }
 const DEFAULT_INI = __INI__;
 const FASI = ["GIORNO", "TRAMONTO", "CREPUSCOLO", "NOTTE", "ALBA"];
 const STRISCE = ["cielo", "tramonto", "alba"];
-const MAX_TAPPE = 20, MAX_EVENTI = 64;
+const MAX_TAPPE = 20, MAX_EVENTI = 64, MAX_COSTELLAZIONI = 8;
 
 // ---------------------------------------------------------------- default (identici al firmware)
 function defaults() {
@@ -269,6 +269,8 @@ function defaults() {
     lum: [100, 100, 100], gamma: 1,
     // [STELLE_01] [STELLE_02]: stessi valori predefiniti
     stelle: [0, 1].map(() => ({ numero: 50, attive: 20, lum_min: 22, lum_max: 75, livello_notte: 235, scintillio_min: 6400, scintillio_max: 12200, colore: [100, 72, 38] })),
+    costellazioni: [],                                      // luminosita' di ogni riga "costellazione"
+    costStella: [0, 1].map(() => new Array(100).fill(0)),  // 0 = stella libera, n = costellazione n
   };
 }
 
@@ -319,7 +321,7 @@ function parse(text) {
     if (s[0] === "[") {
       const m = /^\[([^\]]*)\]$/.exec(s); if (!m) { sez = ""; return err(n, s, "sezione scritta male"); }
       const name = m[1].trim();
-      const known = ["CICLO","FASI","RELE","COLORI","STELLE_01","STELLE_02","SISTEMA","WIFI","ACCESS_POINT","AUTENTICAZIONE", ...FASI];
+      const known = ["CICLO","FASI","RELE","COLORI","STELLE_01","STELLE_02","COSTELLAZIONI","SISTEMA","WIFI","ACCESS_POINT","AUTENTICAZIONE", ...FASI];
       if (name.length > 15 || !known.some(k => ci(k, name))) { sez = ""; return err(n, s, "sezione sconosciuta"); }
       sez = name.toUpperCase(); return;
     }
@@ -349,6 +351,24 @@ function parse(text) {
       const lim = { numero: [0,100], attive: [0,100], lum_min: [0,255], lum_max: [0,255], livello_notte: [0,255], scintillio_min: [500,60000], scintillio_max: [500,60000] }[kl];
       if (lim) { const x = intIn(v, lim[0], lim[1]); if (x !== null) { ok = true; S[kl] = x; } }
       else if (kl === "colore") { const x = rgb(v, 100); if (x) { S.colore = x; ok = true; } }
+    } else if (sez === "COSTELLAZIONI") {
+      // "costellazione = lum | 01:3, 01:7, 01:12-14, 02:5": tutta la riga o niente, come il firmware
+      const bar = v.indexOf("|");
+      if (kl === "costellazione" && bar >= 0 && c.costellazioni.length < MAX_COSTELLAZIONI) {
+        const lum = intIn(v.slice(0, bar), 0, 255), st = [];
+        let buona = lum !== null;
+        for (const t of v.slice(bar + 1).split(",")) {
+          const m = /^\s*0*([12])\s*:\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/.exec(t);
+          const a = m ? +m[2] : 0, b = m && m[3] !== undefined ? +m[3] : a;
+          if (!m || a < 1 || b < a || b > 100) { buona = false; break; }
+          for (let i = a; i <= b; i++) st.push([+m[1] - 1, i - 1]);
+        }
+        if (buona && st.length && st.every(([k, i]) => !c.costStella[k][i])) {
+          const n = c.costellazioni.push(lum);
+          st.forEach(([k, i]) => { c.costStella[k][i] = n; });
+          ok = true;
+        }
+      }
     } else if (sez === "SISTEMA") {
       if (["buzzer","melodia_avvio","autotest_avvio","fastboot","oled"].includes(kl)) ok = bool(v) !== null;
       else if (kl === "beep_hz") ok = intIn(v, 100, 8000) !== null;
@@ -413,6 +433,10 @@ function parse(text) {
     if (S.lum_min > S.lum_max) { S.lum_min = 22; S.lum_max = 75; errors.push({ n: 0, line: sez, msg: "lum_min maggiore di lum_max: uso i valori predefiniti" }); }
     if (S.scintillio_min > S.scintillio_max) { S.scintillio_min = 6400; S.scintillio_max = 12200; errors.push({ n: 0, line: sez, msg: "scintillio_min maggiore di scintillio_max: uso i valori predefiniti" }); }
     if (S.attive > S.numero) S.attive = S.numero;
+    if (c.costStella[k].some((n, i) => n && i >= S.numero)) {
+      c.costStella[k] = c.costStella[k].map((n, i) => i < S.numero ? n : 0);
+      errors.push({ n: 0, line: "[COSTELLAZIONI]", msg: `stelle oltre il numero di STELLE_0${k + 1} (${S.numero}): tolte` });
+    }
   });
   return { c, errors };
 }
@@ -437,12 +461,14 @@ function colore(c, s, p) {
 // livello della catena k (0 = STELLE_01, 1 = STELLE_02): crepuscolo lineare, notte piena, alba morbida
 function stelle(c, k, p) {
   const fa = faseDi(c, p), notte = c.stelle[k].livello_notte, prog = (a, b) => b <= a ? 0 : Math.min(1, Math.max(0, (p - a) / (b - a)));
-  if (!c.stelle[k].numero || !c.stelle[k].attive) return 0;
+  if (!c.stelle[k].numero || (!c.stelle[k].attive && !inCostellazioni(c, k))) return 0;
   if (fa === 2) return interp8(0, notte, prog(c.fasi[1], c.fasi[2]));
   if (fa === 3) return notte;
   if (fa === 4) { const t = prog(c.fasi[3], 100); return interp8(notte, 0, t * t * (3 - 2 * t)); }
   return 0;
 }
+// stelle della catena k che fanno parte di una costellazione (sempre accese insieme, fisse)
+const inCostellazioni = (c, k) => c.costStella[k].filter(n => n).length;
 // colore a schermo di una catena al livello l (tinta in % per canale, come il firmware)
 const tintaStelle = (c, k, l) => c.stelle[k].colore.map(x => Math.round(l * x / 100));
 function rele(c, p) {
@@ -539,7 +565,8 @@ function render() {
   for (let k = 0; k < 2; k++) {
     const lv = stelle(cfg, k, p), bar = $("stars" + k);
     bar.style.width = (lv / 255 * 100) + "%"; bar.style.background = `rgb(${tintaStelle(cfg, k, 255)})`;
-    $("starsv" + k).textContent = cfg.stelle[k].numero ? lv : "non usata";
+    const nc = inCostellazioni(cfg, k);
+    $("starsv" + k).textContent = cfg.stelle[k].numero ? lv + (nc ? ` · ${nc} in costellazioni` : "") : "non usata";
   }
   const rs = rele(cfg, p); [...$("relays").children].forEach((d, i) => { d.classList.toggle("on", rs[i]); d.title = cfg.nomi[i] || `relè ${i + 1}`; });
   drawCursor();

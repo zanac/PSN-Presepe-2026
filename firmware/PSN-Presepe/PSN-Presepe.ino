@@ -158,6 +158,7 @@ enum EventoTasto : uint8_t { TASTO_NULLA = 0, TASTO_BREVE, TASTO_LUNGO };
 
 #define CFG_MAX_STELLE   100   // pixel WS2811 massimi per catena di stelle
 #define CFG_NUM_CATENE     2   // catene di stelle: [STELLE_01] e [STELLE_02]
+#define CFG_MAX_COSTELLAZIONI 8 // righe "costellazione" di [COSTELLAZIONI]
 #define CFG_MAX_EVENTI    64   // righe "evento" della schedulazione rele'
 #define CFG_NOME_LEN      13   // 12 caratteri + terminatore (nome rele' su OLED)
 #define CFG_MAX_TAPPE     20   // tappe di colore massime per striscia RGB (CIELO / TRAMONTO / ALBA)
@@ -235,6 +236,11 @@ struct PresepeConfig {
   uint8_t  gamma, pwmInvertito;
   // [STELLE_01] [STELLE_02]
   CfgStelle stelle[CFG_NUM_CATENE];
+  // [COSTELLAZIONI] gruppi di stelle (anche di catene diverse) accesi insieme e fissi,
+  // esclusi dalle stelle scelte a caso
+  uint8_t  numCostellazioni;
+  uint8_t  costLum[CFG_MAX_COSTELLAZIONI];              // luminosita' a notte piena 0..255
+  uint8_t  costStella[CFG_NUM_CATENE][CFG_MAX_STELLE];  // 0 = stella libera, n = costellazione n
   // [SISTEMA]
   uint8_t  buzzer, melodiaAvvio, autotestAvvio, oled;
   uint8_t  fastboot;                      // 1 = avvio rapido: niente schermata SD, autotest e melodia (lo splash di 3 s resta)
@@ -623,6 +629,51 @@ static bool sezStelle(CfgStelle &s, const char *k, char *v) {   // [STELLE_01] e
   }
   return false;
 }
+// [COSTELLAZIONI] "costellazione = lum | 01:3, 01:7, 01:12-14, 02:5": luminosita' (0..255),
+// poi le stelle come catena:numero (catena 01 o 02, numero da 1) o catena:da-a. La riga
+// si prende tutta o niente: una stella scritta male o gia' in un'altra costellazione la
+// scarta intera. I numeri oltre il "numero" della catena li toglie cfgValida().
+static bool stellaCost(char *t, uint8_t &k, uint8_t &da, uint8_t &a) {
+  char *dp = strchr(t, ':');
+  if (!dp) return false;
+  *dp = 0;
+  long kk, x, y;
+  char *cat = trim(t), *num = trim(dp + 1), *tr = strchr(num, '-');
+  if (!leggiLong(cat, kk, 1, CFG_NUM_CATENE)) return false;
+  if (tr) { *tr = 0; if (!leggiLong(trim(num), x, 1, CFG_MAX_STELLE) || !leggiLong(trim(tr + 1), y, x, CFG_MAX_STELLE)) return false; }
+  else { if (!leggiLong(num, x, 1, CFG_MAX_STELLE)) return false; y = x; }
+  k = (uint8_t)(kk - 1); da = (uint8_t)(x - 1); a = (uint8_t)(y - 1);
+  return true;
+}
+static bool sezCostellazioni(PresepeConfig &c, const char *k, char *v) {
+  if (!ugualeCI(k, "costellazione") || c.numCostellazioni >= CFG_MAX_COSTELLAZIONI) return false;
+  char *bar = strchr(v, '|');
+  if (!bar) return false;
+  *bar = 0;
+  long lum;
+  if (!leggiLong(trim(v), lum, 0, 255)) return false;
+  // due giri sulla stessa lista: il primo controlla, il secondo assegna
+  char copia[128];
+  for (uint8_t giro = 0; giro < 2; giro++) {
+    strncpy(copia, bar + 1, sizeof(copia) - 1); copia[sizeof(copia) - 1] = 0;
+    char *t = copia; uint8_t quante = 0;
+    while (t) {
+      char *virg = strchr(t, ',');
+      if (virg) *virg = 0;
+      uint8_t kk, da, a;
+      if (!stellaCost(t, kk, da, a)) return false;
+      for (uint8_t i = da; i <= a; i++) {
+        if (!giro && c.costStella[kk][i]) return false;              // gia' in una costellazione
+        if (giro) c.costStella[kk][i] = (uint8_t)(c.numCostellazioni + 1);
+        quante++;
+      }
+      t = virg ? virg + 1 : 0;
+    }
+    if (!quante) return false;
+  }
+  c.costLum[c.numCostellazioni++] = (uint8_t)lum;
+  return true;
+}
 static bool sezSistema(PresepeConfig &c, const char *k, char *v) {
   long n;
   if (ugualeCI(k, "buzzer")) return leggiBool(v, c.buzzer);
@@ -728,7 +779,7 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
     if (!(ugualeCI(n, "CICLO") || ugualeCI(n, "FASI") || ugualeCI(n, "RELE") || ugualeCI(n, "COLORI") ||
           ugualeCI(n, "GIORNO") || ugualeCI(n, "TRAMONTO") || ugualeCI(n, "CREPUSCOLO") ||
           ugualeCI(n, "NOTTE") || ugualeCI(n, "ALBA") ||
-          ugualeCI(n, "STELLE_01") || ugualeCI(n, "STELLE_02") || ugualeCI(n, "SISTEMA") ||
+          ugualeCI(n, "STELLE_01") || ugualeCI(n, "STELLE_02") || ugualeCI(n, "COSTELLAZIONI") || ugualeCI(n, "SISTEMA") ||
           ugualeCI(n, "WIFI") || ugualeCI(n, "ACCESS_POINT") || ugualeCI(n, "AUTENTICAZIONE"))) { errore(c, numeroRiga); sezione[0] = 0; }
     return;
   }
@@ -743,6 +794,7 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
   else if (ugualeCI(sezione, "COLORI")) ok = sezColori(c, k, v);
   else if (ugualeCI(sezione, "STELLE_01")) ok = sezStelle(c.stelle[0], k, v);
   else if (ugualeCI(sezione, "STELLE_02")) ok = sezStelle(c.stelle[1], k, v);
+  else if (ugualeCI(sezione, "COSTELLAZIONI")) ok = sezCostellazioni(c, k, v);
   else if (ugualeCI(sezione, "SISTEMA")) ok = sezSistema(c, k, v);
   else if (ugualeCI(sezione, "WIFI")) ok = sezWifi(c, k, v);
   else if (ugualeCI(sezione, "ACCESS_POINT")) ok = sezAccessPoint(c, k, v);
@@ -768,6 +820,10 @@ void cfgValida(PresepeConfig &c) {
     if (s.lumMin > s.lumMax) { s.lumMin = 22; s.lumMax = 75; errore(c, 0xFFFF); }
     if (s.scintillioMinMs > s.scintillioMaxMs) { s.scintillioMinMs = 6400; s.scintillioMaxMs = 12200; errore(c, 0xFFFF); }
     if (s.attive > s.numero) s.attive = (uint8_t)s.numero;
+    // stelle di costellazione oltre la fine della catena: tolte (un errore solo)
+    bool fuori = false;
+    for (uint8_t i = (uint8_t)s.numero; i < CFG_MAX_STELLE; i++) if (c.costStella[k][i]) { c.costStella[k][i] = 0; fuori = true; }
+    if (fuori) errore(c, 0xFFFF);
   }
 }
 
@@ -1154,6 +1210,7 @@ struct StatoStelle {
   uint8_t lum[CFG_MAX_STELLE];
   uint8_t ordine[CFG_MAX_STELLE];
   bool twinkle[CFG_MAX_STELLE];
+  uint8_t liberi;                 // stelle fuori dalle costellazioni: le prime "liberi" di ordine
   bool inSospeso;                 // pixel cambiati ma non ancora inviati (vedi stelleFlush)
   unsigned long ultimoShowUs;
 };
@@ -1165,15 +1222,17 @@ void generaCieloStellato(uint8_t k) {
   const CfgStelle &cs = cfg.stelle[k];
   StatoStelle &st = statoStelle[k];
   // Ogni notte scegliamo casualmente solo "attive" delle "numero" stelle fisiche.
-  // Le altre restano completamente spente.
+  // Le altre restano completamente spente. Le stelle delle costellazioni non entrano
+  // nella scelta: in ordine ci sono solo le stelle libere.
+  st.liberi = 0;
   for (uint16_t i = 0; i < cs.numero; i++) {
     st.lum[i] = random(cs.lumMin, cs.lumMax + 1); // lum_min..lum_max (tenue)
-    st.ordine[i] = i;
     st.twinkle[i] = false;
+    if (!cfg.costStella[k][i]) st.ordine[st.liberi++] = (uint8_t)i;
   }
 
-  // Fisher-Yates su tutti i pixel: i primi "attive" saranno quelli accesi.
-  for (int i = cs.numero - 1; i > 0; i--) {
+  // Fisher-Yates sulle stelle libere: le prime "attive" saranno quelle accese.
+  for (int i = st.liberi - 1; i > 0; i--) {
     int j = random(i + 1);
     uint8_t tmp = st.ordine[i];
     st.ordine[i] = st.ordine[j];
@@ -1181,7 +1240,7 @@ void generaCieloStellato(uint8_t k) {
   }
 
   // Tutte le stelle attive scintillano.
-  for (uint8_t n = 0; n < cs.attive; n++) st.twinkle[st.ordine[n]] = true;
+  for (uint8_t n = 0; n < cs.attive && n < st.liberi; n++) st.twinkle[st.ordine[n]] = true;
 }
 
 void generaTuttiICieli() {
@@ -1197,13 +1256,15 @@ void mostraStelle(uint8_t k, float livello) {
   np.clear();
 
   // Durante il crepuscolo entrano progressivamente le stelle scelte;
-  // durante l'alba scompaiono progressivamente. Mai piu' di "attive" accese.
-  uint8_t visibili = (uint8_t)(livello * cs.attive + 0.5f);
-  if (visibili > cs.attive) visibili = cs.attive;
+  // durante l'alba scompaiono progressivamente. Mai piu' di "attive" accese
+  // (meno se le costellazioni lasciano meno stelle libere).
+  uint8_t attive = cs.attive < st.liberi ? cs.attive : st.liberi;
+  uint8_t visibili = (uint8_t)(livello * attive + 0.5f);
+  if (visibili > attive) visibili = attive;
 
   for (uint8_t pos = 0; pos < visibili; pos++) {
     uint8_t i = st.ordine[pos];
-    float locale = livello * cs.attive - pos;
+    float locale = livello * attive - pos;
     locale = constrain(locale, 0.0f, 1.0f);
 
     uint16_t v = (uint16_t)(st.lum[i] * locale);
@@ -1249,6 +1310,24 @@ void mostraStelle(uint8_t k, float livello) {
       (uint8_t)((v * cs.colore.g) / 100U),
       (uint8_t)((v * cs.colore.b) / 100U)
     ));
+  }
+
+  // Costellazioni: tutte le loro stelle insieme, fisse, con la luminosita' della propria
+  // costellazione. Seguono la stessa curva delle stelle (livello da 0 a livello_notte):
+  // salgono piano nel CREPUSCOLO e scendono piano nell'ALBA, tutte nello stesso momento.
+  if (cfg.numCostellazioni && cs.livelloNotte) {
+    float forma = livello * 255.0f / cs.livelloNotte;
+    if (forma > 1.0f) forma = 1.0f;
+    for (uint8_t i = 0; i < cs.numero; i++) {
+      uint8_t n = cfg.costStella[k][i];
+      if (!n) continue;
+      uint16_t v = (uint16_t)(cfg.costLum[n - 1] * forma + 0.5f);
+      np.setPixelColor(i, np.Color(
+        (uint8_t)((v * cs.colore.r) / 100U),
+        (uint8_t)((v * cs.colore.g) / 100U),
+        (uint8_t)((v * cs.colore.b) / 100U)
+      ));
+    }
   }
   st.inSospeso = true;
   stelleFlush();
@@ -3251,6 +3330,20 @@ const char INI_PREDEFINITO[] PROGMEM =
   "scintillio_max = 12200\n"
   "; Tinta delle stelle in % per canale R, G, B (100 = pieno): 100,72,38 = bianco caldo.\n"
   "colore = 100,72,38\n"
+  "\n"
+  "; [COSTELLAZIONI]\n"
+  "; Gruppi di stelle sempre accese insieme, con luce fissa (non scintillano). Le loro stelle\n"
+  "; non sono mai fra quelle scelte a caso. Compaiono tutte insieme piano nel CREPUSCOLO,\n"
+  "; sono piene di NOTTE e si spengono tutte insieme piano nell'ALBA, come le altre stelle.\n"
+  "; Una riga \"costellazione\" per gruppo (massimo 8):\n"
+  ";   costellazione = luminosita' | stelle\n"
+  "; luminosita' a notte piena 0..255; stelle come catena:numero (catena 01 = STELLE_01,\n"
+  "; 02 = STELLE_02, numero da 1), separate da virgole; da:a con il trattino. Una stessa\n"
+  "; costellazione puo' avere stelle di tutte e due le catene; il colore e' quello della\n"
+  "; catena di ogni stella. Una stella sola in una costellazione sola.\n"
+  "; Per usarle togli il ; davanti a [COSTELLAZIONI] e alle righe che ti servono.\n"
+  "; costellazione = 80  | 01:3, 01:7, 01:12-14, 02:5      ; Orsa maggiore\n"
+  "; costellazione = 120 | 02:20-24                        ; Cassiopea\n"
   "\n"
   "[SISTEMA]\n"
   "; Avvio rapido. 1 = dopo la schermata iniziale \"by Vanni\" (3 s, sempre presente:\n"
