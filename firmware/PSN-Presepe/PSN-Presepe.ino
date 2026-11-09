@@ -214,6 +214,18 @@ struct CfgStelle {
   CfgRGB   colore;                        // tinta in % per canale (100,72,38 = bianco caldo)
 };
 
+// [COSTELLAZIONE]: una sezione per costellazione.
+enum CfgModoCost { COST_INSIEME, COST_UNA_ALLA_VOLTA, COST_SCINTILLA };
+struct CfgPunto { uint8_t fase, pct; };     // FASE (0..4) e % della fase
+struct CfgCostellazione {
+  uint8_t  lum;             // luminosita' piena 0..255
+  uint8_t  modo;            // CfgModoCost
+  bool     haColore;        // colore proprio, altrimenti quello della catena di ogni stella
+  CfgRGB   colore;          // tinta in % per canale
+  CfgPunto acc[2], sp[2];   // accensione da..a, spegnimento da..a (posizioni nel ciclo)
+  uint8_t  n0, n;           // stelle in STELLE_01 e in tutto (le conta cfgValida)
+};
+
 struct PresepeConfig {
   // [CICLO]
   uint32_t durataMs[3];      // 3 scaglioni selezionati dal potenziometro
@@ -236,11 +248,12 @@ struct PresepeConfig {
   uint8_t  gamma, pwmInvertito;
   // [STELLE_01] [STELLE_02]
   CfgStelle stelle[CFG_NUM_CATENE];
-  // [COSTELLAZIONI] gruppi di stelle (anche di catene diverse) accesi insieme e fissi,
-  // esclusi dalle stelle scelte a caso
+  // [COSTELLAZIONE] (una sezione per costellazione) gruppi di stelle, anche di catene
+  // diverse, esclusi dalle stelle scelte a caso
   uint8_t  numCostellazioni;
-  uint8_t  costLum[CFG_MAX_COSTELLAZIONI];              // luminosita' a notte piena 0..255
-  uint8_t  costStella[CFG_NUM_CATENE][CFG_MAX_STELLE];  // 0 = stella libera, n = costellazione n
+  CfgCostellazione cost[CFG_MAX_COSTELLAZIONI];
+  // costellazione di ogni stella, 4 bit per stella (0 = libera): cfgCost() / cfgSetCost()
+  uint8_t  costStella[CFG_NUM_CATENE][CFG_MAX_STELLE / 2];
   // [SISTEMA]
   uint8_t  buzzer, melodiaAvvio, autotestAvvio, oled;
   uint8_t  fastboot;                      // 1 = avvio rapido: niente schermata SD, autotest e melodia (lo splash di 3 s resta)
@@ -629,10 +642,23 @@ static bool sezStelle(CfgStelle &s, const char *k, char *v) {   // [STELLE_01] e
   }
   return false;
 }
-// [COSTELLAZIONI] "costellazione = lum | 01:3, 01:7, 01:12-14, 02:5": luminosita' (0..255),
-// poi le stelle come catena:numero (catena 01 o 02, numero da 1) o catena:da-a. La riga
-// si prende tutta o niente: una stella scritta male o gia' in un'altra costellazione la
-// scarta intera. I numeri oltre il "numero" della catena li toglie cfgValida().
+uint8_t cfgCost(const PresepeConfig &c, uint8_t k, uint8_t i) {
+  uint8_t b = c.costStella[k][i >> 1];
+  return (i & 1) ? (b >> 4) : (b & 15);
+}
+static void cfgSetCost(PresepeConfig &c, uint8_t k, uint8_t i, uint8_t n) {
+  uint8_t &b = c.costStella[k][i >> 1];
+  b = (i & 1) ? (uint8_t)((b & 15) | (n << 4)) : (uint8_t)((b & 0xF0) | n);
+}
+// Valori di una costellazione nuova: luminosita' 80, tutte insieme, colore della catena,
+// tempi come le stelle (appaiono in tutto il CREPUSCOLO, spariscono in tutta l'ALBA).
+static void costDefault(CfgCostellazione &x) {
+  memset(&x, 0, sizeof(x));
+  x.lum = 80; x.modo = COST_INSIEME;
+  x.acc[0] = { CFG_CREPUSCOLO, 0 }; x.acc[1] = { CFG_NOTTE, 0 };
+  x.sp[0]  = { CFG_ALBA, 0 };       x.sp[1]  = { CFG_ALBA, 100 };
+}
+// "catena:numero" o "catena:da-a" (catena 01 o 02, numero da 1)
 static bool stellaCost(char *t, uint8_t &k, uint8_t &da, uint8_t &a) {
   char *dp = strchr(t, ':');
   if (!dp) return false;
@@ -645,17 +671,61 @@ static bool stellaCost(char *t, uint8_t &k, uint8_t &da, uint8_t &a) {
   k = (uint8_t)(kk - 1); da = (uint8_t)(x - 1); a = (uint8_t)(y - 1);
   return true;
 }
-static bool sezCostellazioni(PresepeConfig &c, const char *k, char *v) {
-  if (!ugualeCI(k, "costellazione") || c.numCostellazioni >= CFG_MAX_COSTELLAZIONI) return false;
-  char *bar = strchr(v, '|');
-  if (!bar) return false;
-  *bar = 0;
-  long lum;
-  if (!leggiLong(trim(v), lum, 0, 255)) return false;
+// "FASE %" (anche "FASE, %"), % intero 0..100
+static bool puntoCost(char *t, CfgPunto &out) {
+  t = trim(t);
+  char *sp = t; while (*sp && *sp != ' ' && *sp != '\t' && *sp != ',') sp++;
+  if (!*sp) return false;
+  *sp = 0;
+  char *num = trim(sp + 1); if (*num == ',') num = trim(num + 1);
+  long n;
+  if (!leggiFase(t, out.fase) || !leggiLong(num, n, 0, 100)) return false;
+  out.pct = (uint8_t)n; return true;
+}
+// "FASE % - FASE %": da dove a dove sale (accendi) o scende (spegni)
+static bool trattoCost(char *v, CfgPunto out[2]) {
+  char *m = strchr(v, '-');
+  if (!m) return false;
+  *m = 0;
+  CfgPunto a, b;
+  if (!puntoCost(v, a) || !puntoCost(m + 1, b)) return false;
+  out[0] = a; out[1] = b; return true;
+}
+// [COSTELLAZIONE] (la sezione e' gia' stata aggiunta da cfgParseRiga: questa e' l'ultima)
+//   nome        = Orsa maggiore                  solo per l'editor
+//   stelle      = 01:3, 01:7, 01:12-14, 02:5     catena:numero o catena:da-a
+//   luminosita  = 80                             0..255
+//   accendi     = CREPUSCOLO 30 - NOTTE 0        sale da .. a
+//   spegni      = ALBA 10 - ALBA 60              scende da .. a
+//   colore      = 100,90,60                      facoltativo, % per canale
+//   modo        = insieme | una_alla_volta | scintilla
+// La riga "stelle" si prende tutta o niente: una stella scritta male o gia' in un'altra
+// costellazione la scarta intera. I numeri oltre il "numero" della catena li toglie cfgValida().
+static bool sezCostellazione(PresepeConfig &c, const char *k, char *v) {
+  if (!c.numCostellazioni) return false;
+  uint8_t n = c.numCostellazioni;                 // 1..8
+  CfgCostellazione &x = c.cost[n - 1];
+  long l;
+  if (ugualeCI(k, "nome")) return true;
+  if (ugualeCI(k, "luminosita")) { if (!leggiLong(v, l, 0, 255)) return false; x.lum = (uint8_t)l; return true; }
+  if (ugualeCI(k, "accendi")) return trattoCost(v, x.acc);
+  if (ugualeCI(k, "spegni")) return trattoCost(v, x.sp);
+  if (ugualeCI(k, "colore")) {
+    CfgRGB y; if (!leggiRGB(v, y) || y.r > 100 || y.g > 100 || y.b > 100) return false;
+    x.colore = y; x.haColore = true; return true;
+  }
+  if (ugualeCI(k, "modo")) {
+    if (ugualeCI(v, "insieme")) x.modo = COST_INSIEME;
+    else if (ugualeCI(v, "una_alla_volta")) x.modo = COST_UNA_ALLA_VOLTA;
+    else if (ugualeCI(v, "scintilla")) x.modo = COST_SCINTILLA;
+    else return false;
+    return true;
+  }
+  if (!ugualeCI(k, "stelle")) return false;
   // due giri sulla stessa lista: il primo controlla, il secondo assegna
   char copia[128];
   for (uint8_t giro = 0; giro < 2; giro++) {
-    strncpy(copia, bar + 1, sizeof(copia) - 1); copia[sizeof(copia) - 1] = 0;
+    strncpy(copia, v, sizeof(copia) - 1); copia[sizeof(copia) - 1] = 0;
     char *t = copia; uint8_t quante = 0;
     while (t) {
       char *virg = strchr(t, ',');
@@ -663,15 +733,15 @@ static bool sezCostellazioni(PresepeConfig &c, const char *k, char *v) {
       uint8_t kk, da, a;
       if (!stellaCost(t, kk, da, a)) return false;
       for (uint8_t i = da; i <= a; i++) {
-        if (!giro && c.costStella[kk][i]) return false;              // gia' in una costellazione
-        if (giro) c.costStella[kk][i] = (uint8_t)(c.numCostellazioni + 1);
+        uint8_t gia = cfgCost(c, kk, i);
+        if (!giro && gia && gia != n) return false;              // gia' in un'altra costellazione
+        if (giro) cfgSetCost(c, kk, i, n);
         quante++;
       }
       t = virg ? virg + 1 : 0;
     }
     if (!quante) return false;
   }
-  c.costLum[c.numCostellazioni++] = (uint8_t)lum;
   return true;
 }
 static bool sezSistema(PresepeConfig &c, const char *k, char *v) {
@@ -779,8 +849,12 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
     if (!(ugualeCI(n, "CICLO") || ugualeCI(n, "FASI") || ugualeCI(n, "RELE") || ugualeCI(n, "COLORI") ||
           ugualeCI(n, "GIORNO") || ugualeCI(n, "TRAMONTO") || ugualeCI(n, "CREPUSCOLO") ||
           ugualeCI(n, "NOTTE") || ugualeCI(n, "ALBA") ||
-          ugualeCI(n, "STELLE_01") || ugualeCI(n, "STELLE_02") || ugualeCI(n, "COSTELLAZIONI") || ugualeCI(n, "SISTEMA") ||
+          ugualeCI(n, "STELLE_01") || ugualeCI(n, "STELLE_02") || ugualeCI(n, "COSTELLAZIONE") || ugualeCI(n, "SISTEMA") ||
           ugualeCI(n, "WIFI") || ugualeCI(n, "ACCESS_POINT") || ugualeCI(n, "AUTENTICAZIONE"))) { errore(c, numeroRiga); sezione[0] = 0; }
+    else if (ugualeCI(n, "COSTELLAZIONE")) {        // ogni [COSTELLAZIONE] e' una costellazione nuova
+      if (c.numCostellazioni < CFG_MAX_COSTELLAZIONI) costDefault(c.cost[c.numCostellazioni++]);
+      else { errore(c, numeroRiga); sezione[0] = 0; }
+    }
     return;
   }
   char *uguale = strchr(s, '=');
@@ -794,7 +868,7 @@ void cfgParseLine(PresepeConfig &c, char *riga, char *sezione, uint16_t numeroRi
   else if (ugualeCI(sezione, "COLORI")) ok = sezColori(c, k, v);
   else if (ugualeCI(sezione, "STELLE_01")) ok = sezStelle(c.stelle[0], k, v);
   else if (ugualeCI(sezione, "STELLE_02")) ok = sezStelle(c.stelle[1], k, v);
-  else if (ugualeCI(sezione, "COSTELLAZIONI")) ok = sezCostellazioni(c, k, v);
+  else if (ugualeCI(sezione, "COSTELLAZIONE")) ok = sezCostellazione(c, k, v);
   else if (ugualeCI(sezione, "SISTEMA")) ok = sezSistema(c, k, v);
   else if (ugualeCI(sezione, "WIFI")) ok = sezWifi(c, k, v);
   else if (ugualeCI(sezione, "ACCESS_POINT")) ok = sezAccessPoint(c, k, v);
@@ -822,8 +896,26 @@ void cfgValida(PresepeConfig &c) {
     if (s.attive > s.numero) s.attive = (uint8_t)s.numero;
     // stelle di costellazione oltre la fine della catena: tolte (un errore solo)
     bool fuori = false;
-    for (uint8_t i = (uint8_t)s.numero; i < CFG_MAX_STELLE; i++) if (c.costStella[k][i]) { c.costStella[k][i] = 0; fuori = true; }
+    for (uint8_t i = (uint8_t)s.numero; i < CFG_MAX_STELLE; i++) if (cfgCost(c, k, i)) { cfgSetCost(c, k, i, 0); fuori = true; }
     if (fuori) errore(c, 0xFFFF);
+  }
+  // costellazioni: quante stelle (per "una_alla_volta") e tempi in ordine nel giro del ciclo
+  // (sale, resta, scende); se no tornano i tempi delle stelle
+  for (uint8_t q = 0; q < c.numCostellazioni; q++) {
+    CfgCostellazione &x = c.cost[q];
+    x.n0 = x.n = 0;
+    for (uint8_t k = 0; k < CFG_NUM_CATENE; k++)
+      for (uint8_t i = 0; i < CFG_MAX_STELLE; i++)
+        if (cfgCost(c, k, i) == q + 1) { x.n++; if (!k) x.n0++; }
+    float a1 = cfgPosizione(c, x.acc[0].fase, x.acc[0].pct);
+    float d[3] = { cfgPosizione(c, x.acc[1].fase, x.acc[1].pct), cfgPosizione(c, x.sp[0].fase, x.sp[0].pct),
+                   cfgPosizione(c, x.sp[1].fase, x.sp[1].pct) };
+    for (uint8_t j = 0; j < 3; j++) { d[j] -= a1; if (d[j] < 0.0f) d[j] += 100.0f; }
+    if (d[0] > d[1] || d[1] > d[2]) {
+      CfgCostellazione y; costDefault(y);
+      memcpy(x.acc, y.acc, sizeof(x.acc)); memcpy(x.sp, y.sp, sizeof(x.sp));
+      errore(c, 0xFFFF);
+    }
   }
 }
 
@@ -1038,7 +1130,9 @@ void setup();
 bool running = true;
 bool fermo = false;          // STOP: tutto spento (rele', strisce, stelle) fino a PLAY
 bool testInCorso = false;
-bool testMostraIP = false;   // [WIFI] abilitato: primo passo del test = indirizzo IP
+bool testMostraIP = false;   // [WIFI] abilitato: passo del test con l'indirizzo IP (dopo il potenziometro)
+bool testMostraPot = false;  // primo passo del test: lettura dal vivo del potenziometro
+unsigned long testPotMs = 0; // ultimo aggiornamento del passo potenziometro
 bool testWeb = false;        // test comandato dalla pagina web (strisce, pixel, rele' uno a uno)
 uint16_t releStato = 0;      // bit i = rele' i+1 acceso (per la pagina web)
 char wifiIp[16] = "none";    // indirizzo comunicato dall'ESP8266 ("none" = non collegato)
@@ -1228,7 +1322,7 @@ void generaCieloStellato(uint8_t k) {
   for (uint16_t i = 0; i < cs.numero; i++) {
     st.lum[i] = random(cs.lumMin, cs.lumMax + 1); // lum_min..lum_max (tenue)
     st.twinkle[i] = false;
-    if (!cfg.costStella[k][i]) st.ordine[st.liberi++] = (uint8_t)i;
+    if (!cfgCost(cfg, k, i)) st.ordine[st.liberi++] = (uint8_t)i;
   }
 
   // Fisher-Yates sulle stelle libere: le prime "attive" saranno quelle accese.
@@ -1246,6 +1340,45 @@ void generaCieloStellato(uint8_t k) {
 void generaTuttiICieli() {
   for (uint8_t k = 0; k < CFG_NUM_CATENE; k++) generaCieloStellato(k);
   cieloGenerato = true;
+}
+
+// Scintillio di una stella (0..100 %): livello pieno -> dissolvenza a zero -> pausa spenta ->
+// riaccensione. Durata pseudo-casuale e stabile per ogni pixel, fra scintillio_min e
+// scintillio_max (default 6400..12200 ms, 30 gradini); la seconda catena usa altri numeri
+// (j = i + 100), cosi' non ripete la prima.
+uint8_t fattoreScintillio(const CfgStelle &cs, uint8_t k, uint8_t i) {
+  const unsigned long j = i + 100UL * k;
+  const unsigned long passo = ((unsigned long)cs.scintillioMaxMs - cs.scintillioMinMs) / 29UL;
+  const unsigned long periodo = cs.scintillioMinMs + ((j * 37UL) % 30UL) * passo;
+  const unsigned long offset = ((j * 173UL) % 900UL);
+  const unsigned long faseMs = (millis() + offset) % periodo;
+  const unsigned long pTw = (faseMs * 100UL) / periodo;
+  if (pTw < 45) return 100;                              // piena luminosita'
+  if (pTw < 55) return (uint8_t)((55UL - pTw) * 10UL);   // 100 -> 0
+  if (pTw < 80) return 0;                                // SPENTA per il 25% del ciclo
+  if (pTw < 90) return (uint8_t)((pTw - 80UL) * 10UL);   // 0 -> 100
+  return 100;
+}
+
+// Posizione del ciclo (0..100) mentre aggiornaScena() disegna le stelle; -1 fuori dal ciclo
+// (test, avvio): allora le costellazioni seguono il livello delle stelle.
+float posStelle = -1.0f;
+
+static float morbida(float t) { return t * t * (3.0f - 2.0f * t); }
+// Livello (0..1) di una costellazione nella posizione p del ciclo: sale da acc[0] ad acc[1],
+// resta piena fino a sp[0], scende fino a sp[1] (curve morbide). Le distanze si contano da
+// acc[0] nel giro del ciclo, cosi' un tratto puo' anche scavalcare la fine del ciclo.
+float livelloCostellazione(const CfgCostellazione &x, float p) {
+  float a1 = cfgPosizione(cfg, x.acc[0].fase, x.acc[0].pct);
+  float d[4] = { p, cfgPosizione(cfg, x.acc[1].fase, x.acc[1].pct), cfgPosizione(cfg, x.sp[0].fase, x.sp[0].pct),
+                 cfgPosizione(cfg, x.sp[1].fase, x.sp[1].pct) };
+  for (uint8_t j = 0; j < 4; j++) { d[j] -= a1; while (d[j] < 0.0f) d[j] += 100.0f; while (d[j] >= 100.0f) d[j] -= 100.0f; }
+  if (d[3] == 0.0f && d[2] == 0.0f && d[1] == 0.0f) return 0.0f;
+  if (d[3] == 0.0f) d[3] = 100.0f;                      // finisce proprio dove comincia
+  if (d[0] < d[1]) return morbida(d[0] / d[1]);
+  if (d[0] < d[2]) return 1.0f;
+  if (d[0] < d[3]) return 1.0f - morbida((d[0] - d[2]) / (d[3] - d[2]));
+  return 0.0f;
 }
 
 void mostraStelle(uint8_t k, float livello) {
@@ -1273,36 +1406,7 @@ void mostraStelle(uint8_t k, float livello) {
     // livello pieno -> dissolvenza a zero -> pausa spenta -> riaccensione.
     // Durate e offset differenti evitano che le stelle si muovano insieme;
     // la seconda catena usa altri numeri (j = i + 100), cosi' non ripete la prima.
-    if (st.twinkle[i] && v > 5) {
-      // Durata pseudo-casuale e stabile per ogni pixel, fra scintillio_min e
-      // scintillio_max (default 6400..12200 ms, 30 gradini).
-      const unsigned long j = i + 100UL * k;
-      const unsigned long passo = ((unsigned long)cs.scintillioMaxMs - cs.scintillioMinMs) / 29UL;
-      const unsigned long periodo = cs.scintillioMinMs + ((j * 37UL) % 30UL) * passo;
-      const unsigned long offset = ((j * 173UL) % 900UL);
-      const unsigned long faseMs = (millis() + offset) % periodo;
-      const unsigned long pTw = (faseMs * 100UL) / periodo;
-      uint8_t fattore = 100;
-
-      if (pTw < 45) {
-        fattore = 100;                              // piena luminosita'
-      } else if (pTw < 55) {
-        fattore = (uint8_t)((55UL - pTw) * 10UL);  // 100 -> 0
-      } else if (pTw < 80) {
-        fattore = 0;                                // SPENTA per il 25% del ciclo
-      } else if (pTw < 90) {
-        fattore = (uint8_t)((pTw - 80UL) * 10UL);  // 0 -> 100
-      } else {
-        fattore = 100;
-      }
-
-      // A fattore zero scriviamo esplicitamente nero sul pixel.
-      if (fattore == 0) {
-        v = 0;
-      } else {
-        v = (v * fattore) / 100U;
-      }
-    }
+    if (st.twinkle[i] && v > 5) v = (v * fattoreScintillio(cs, k, i)) / 100U;   // 0 = nero
 
     // colore = tinta in % per canale (default 100,72,38 = bianco caldo).
     np.setPixelColor(i, np.Color(
@@ -1312,20 +1416,35 @@ void mostraStelle(uint8_t k, float livello) {
     ));
   }
 
-  // Costellazioni: tutte le loro stelle insieme, fisse, con la luminosita' della propria
-  // costellazione. Seguono la stessa curva delle stelle (livello da 0 a livello_notte):
-  // salgono piano nel CREPUSCOLO e scendono piano nell'ALBA, tutte nello stesso momento.
-  if (cfg.numCostellazioni && cs.livelloNotte) {
-    float forma = livello * 255.0f / cs.livelloNotte;
+  // Costellazioni, ognuna con i suoi tempi (accendi / spegni) e la sua luminosita'.
+  // Fuori dal ciclo (posStelle < 0) seguono il livello delle stelle.
+  //   insieme         tutte le stelle allo stesso livello
+  //   una_alla_volta  salendo entrano una dopo l'altra (prima STELLE_01, poi STELLE_02, in
+  //                   ordine di numero), scendendo escono al contrario
+  //   scintilla       come insieme, ma ogni stella scintilla come quelle scelte a caso
+  if (cfg.numCostellazioni) {
+    float forma = cs.livelloNotte ? livello * 255.0f / cs.livelloNotte : 0.0f;
     if (forma > 1.0f) forma = 1.0f;
+    float L[CFG_MAX_COSTELLAZIONI];
+    uint8_t rango[CFG_MAX_COSTELLAZIONI];
+    for (uint8_t q = 0; q < cfg.numCostellazioni; q++) {
+      L[q] = posStelle >= 0.0f ? livelloCostellazione(cfg.cost[q], posStelle) : forma;
+      rango[q] = k ? cfg.cost[q].n0 : 0;
+    }
     for (uint8_t i = 0; i < cs.numero; i++) {
-      uint8_t n = cfg.costStella[k][i];
+      uint8_t n = cfgCost(cfg, k, i);
       if (!n) continue;
-      uint16_t v = (uint16_t)(cfg.costLum[n - 1] * forma + 0.5f);
+      const CfgCostellazione &x = cfg.cost[n - 1];
+      float l = L[n - 1];
+      if (x.modo == COST_UNA_ALLA_VOLTA && x.n) l = constrain(l * x.n - rango[n - 1], 0.0f, 1.0f);
+      rango[n - 1]++;
+      uint16_t v = (uint16_t)(x.lum * l + 0.5f);
+      if (x.modo == COST_SCINTILLA && v > 5) v = (v * fattoreScintillio(cs, k, i)) / 100U;
+      const CfgRGB &col = x.haColore ? x.colore : cs.colore;
       np.setPixelColor(i, np.Color(
-        (uint8_t)((v * cs.colore.r) / 100U),
-        (uint8_t)((v * cs.colore.g) / 100U),
-        (uint8_t)((v * cs.colore.b) / 100U)
+        (uint8_t)((v * col.r) / 100U),
+        (uint8_t)((v * col.g) / 100U),
+        (uint8_t)((v * col.b) / 100U)
       ));
     }
   }
@@ -1578,6 +1697,18 @@ void mostraOledTest() {
     display.setCursor(0,18); display.print(F("TEST DA WEB"));
     display.setCursor(0,32); display.print(F("comandi dal telefono"));
     display.setCursor(0,48); display.print(F("TEST=passi START=esci"));
+    display.display();
+    return;
+  }
+  if (testMostraPot) {               // primo passo: il potenziometro letto dal vivo
+    int raw = analogRead(PIN_POT), lim = potLimita(raw);
+    int corsa = cfg.potMax - cfg.potMin;
+    int pct = corsa > 0 ? (int)((long)(lim - cfg.potMin) * 100L / corsa) : 0;
+    display.setCursor(0,14); display.print(F("POTENZIOMETRO"));
+    display.setCursor(0,24); display.print(F("A0: ")); display.print(raw); display.print(F("  ")); display.print(pct); display.print('%');
+    display.setCursor(0,34); display.print(F("corsa ")); display.print(cfg.potMin); display.print(F("..")); display.print(cfg.potMax);
+    display.setCursor(0,44); display.print(F("ciclo ")); stampaDurataOled(durataDaRaw(raw));
+    display.setCursor(0,54); display.print(F("TEST=avanti START=esci"));
     display.display();
     return;
   }
@@ -1936,7 +2067,9 @@ void aggiornaScena(float p) {
   setCielo(cielo.r, cielo.g, cielo.b);
   setTramonto(tram.r, tram.g, tram.b);
   setAlba(alba.r, alba.g, alba.b);
+  posStelle = p;                     // le costellazioni usano la posizione nel ciclo
   for (uint8_t k = 0; k < CFG_NUM_CATENE; k++) setStelle(k, livelloStelle[k]);
+  posStelle = -1.0f;
 }
 
 // ============================================================
@@ -1974,6 +2107,7 @@ void toggleStartStop() {
     testIndice = 0;
     testWeb = false;
     testMostraIP = false;
+    testMostraPot = false;
 
     // Il tempo passato in TEST non deve far avanzare il ciclo.
     if (testEraInMarcia) {
@@ -2048,7 +2182,7 @@ void spegniRele() {
 // rele' forzati con forzaN = on, e resta cosi' finche' non arriva PLAY.
 void fermaPresepe() {
   if (fermo) return;
-  if (testInCorso) { testInCorso = false; testWeb = false; testMostraIP = false; testIndice = 0; }
+  if (testInCorso) { testInCorso = false; testWeb = false; testMostraIP = false; testMostraPot = false; testIndice = 0; }
   fermo = true;
   running = false;
   pauseStartedMs = millis();
@@ -2094,6 +2228,12 @@ void applicaTestCorrente() {
   tuttoSpento();
   spegniRele();
 
+  if (testMostraPot) {
+    Serial.print(F("TEST - POTENZIOMETRO A0: "));
+    Serial.println(analogRead(PIN_POT));
+    mostraOledTest();
+    return;
+  }
   if (testMostraIP) {
     Serial.print(F("TEST - WIFI IP: "));
     Serial.println(wifiIp);
@@ -2181,7 +2321,8 @@ void entraTest() {
   testInCorso = true;
   testIndice = 0;
   testWeb = false;
-  testMostraIP = cfg.wifiAbilitato != 0;   // con il WiFi il primo passo mostra l'IP
+  testMostraPot = true;                    // primo passo: il potenziometro
+  testMostraIP = cfg.wifiAbilitato != 0;   // poi, con il WiFi, l'indirizzo IP
   testEraInMarcia = running;
   testPausaMs = millis();
   running = false;
@@ -2198,12 +2339,17 @@ void testUscite() {
   } else if (testWeb) {              // TEST durante il test da web: torna ai passi
     testWeb = false;
     testMostraIP = false;
+    testMostraPot = false;
+    testIndice = 0;
+  } else if (testMostraPot) {        // dal potenziometro all'IP (se c'e' il WiFi) o al passo 1
+    testMostraPot = false;
     testIndice = 0;
   } else if (testMostraIP) {
     testMostraIP = false;
     testIndice = 0;
-  } else if (testIndice >= 33) {     // dopo l'ultimo passo: da capo (dall'IP se c'e' il WiFi)
+  } else if (testIndice >= 33) {     // dopo l'ultimo passo: da capo (potenziometro, IP, passi)
     testIndice = 0;
+    testMostraPot = true;
     testMostraIP = cfg.wifiAbilitato != 0;
   } else {
     testIndice++;
@@ -2217,6 +2363,7 @@ void entraTestWeb() {
   if (!testInCorso) entraTest();
   testWeb = true;
   testMostraIP = false;
+  testMostraPot = false;
   tuttoSpento();
   spegniRele();
   Serial.println(F("TEST DA WEB"));
@@ -2788,7 +2935,7 @@ void lnkInviaStato() {
   const uint8_t v[9] = { rgbCieloR, rgbCieloG, rgbCieloB, rgbTramontoR, rgbTramontoG, rgbTramontoB,
                          rgbAlbaR, rgbAlbaG, rgbAlbaB };
   for (uint8_t i = 0; i < 9; i++) { LNK_SERIAL.print(v[i]); LNK_SERIAL.print(' '); }
-  LNK_SERIAL.print(testMostraIP ? 0 : testIndice + 1);
+  LNK_SERIAL.print(testMostraIP || testMostraPot ? 0 : testIndice + 1);
   LNK_SERIAL.println();
 }
 
@@ -3331,19 +3478,40 @@ const char INI_PREDEFINITO[] PROGMEM =
   "; Tinta delle stelle in % per canale R, G, B (100 = pieno): 100,72,38 = bianco caldo.\n"
   "colore = 100,72,38\n"
   "\n"
-  "; [COSTELLAZIONI]\n"
-  "; Gruppi di stelle sempre accese insieme, con luce fissa (non scintillano). Le loro stelle\n"
-  "; non sono mai fra quelle scelte a caso. Compaiono tutte insieme piano nel CREPUSCOLO,\n"
-  "; sono piene di NOTTE e si spengono tutte insieme piano nell'ALBA, come le altre stelle.\n"
-  "; Una riga \"costellazione\" per gruppo (massimo 8):\n"
-  ";   costellazione = luminosita' | stelle\n"
-  "; luminosita' a notte piena 0..255; stelle come catena:numero (catena 01 = STELLE_01,\n"
-  "; 02 = STELLE_02, numero da 1), separate da virgole; da:a con il trattino. Una stessa\n"
-  "; costellazione puo' avere stelle di tutte e due le catene; il colore e' quello della\n"
-  "; catena di ogni stella. Una stella sola in una costellazione sola.\n"
-  "; Per usarle togli il ; davanti a [COSTELLAZIONI] e alle righe che ti servono.\n"
-  "; costellazione = 80  | 01:3, 01:7, 01:12-14, 02:5      ; Orsa maggiore\n"
-  "; costellazione = 120 | 02:20-24                        ; Cassiopea\n"
+  "; COSTELLAZIONI - gruppi di stelle con tempi propri, mai fra quelle scelte a caso.\n"
+  "; Una sezione [COSTELLAZIONE] per costellazione (massimo 8). Chiavi:\n"
+  ";   nome        nome per l'editor (il presepe lo ignora)\n"
+  ";   stelle      catena:numero separati da virgole, catena:da-a per una serie\n"
+  ";               (01 = STELLE_01, 02 = STELLE_02, numeri da 1). Una costellazione puo'\n"
+  ";               mescolare le due catene; ogni stella sta in una costellazione sola.\n"
+  ";   luminosita  luminosita' piena 0..255 (predefinita 80)\n"
+  ";   accendi     FASE % - FASE %: da dove a dove sale (predefinito CREPUSCOLO 0 - NOTTE 0)\n"
+  ";   spegni      FASE % - FASE %: da dove a dove scende (predefinito ALBA 0 - ALBA 100)\n"
+  ";               Accendi e spegni si possono anche trascinare nell'editor grafico.\n"
+  ";   colore      tinta in % per canale R, G, B; se manca, quella della catena di ogni stella\n"
+  ";   modo        insieme        tutte le stelle insieme, luce fissa (predefinito)\n"
+  ";               una_alla_volta salendo entrano una dopo l'altra (prima STELLE_01 poi\n"
+  ";                              STELLE_02, in ordine di numero), scendendo escono al contrario\n"
+  ";               scintilla      tutte insieme, e ogni stella scintilla come le altre\n"
+  "; Per usarle togli il ; davanti alle righe di una costellazione. Gli esempi sono teorici:\n"
+  "; metti i numeri delle stelle del tuo cielo.\n"
+  ";\n"
+  "; [COSTELLAZIONE]\n"
+  "; nome       = Orsa maggiore\n"
+  "; stelle     = 01:3, 01:7, 01:12-14, 02:5, 02:9\n"
+  "; luminosita = 90\n"
+  "; accendi    = CREPUSCOLO 40 - NOTTE 10\n"
+  "; spegni     = ALBA 20 - ALBA 70\n"
+  "; modo       = una_alla_volta\n"
+  ";\n"
+  "; [COSTELLAZIONE]\n"
+  "; nome       = Cometa\n"
+  "; stelle     = 02:20-24\n"
+  "; luminosita = 140\n"
+  "; colore     = 100,90,60\n"
+  "; accendi    = NOTTE 0 - NOTTE 30\n"
+  "; spegni     = ALBA 0 - ALBA 40\n"
+  "; modo       = scintilla\n"
   "\n"
   "[SISTEMA]\n"
   "; Avvio rapido. 1 = dopo la schermata iniziale \"by Vanni\" (3 s, sempre presente:\n"
@@ -3451,7 +3619,7 @@ void riavviaSoftware() {
   if (lnkAttivo) LNK_SERIAL.flush();
   noTone(PIN_BUZZER);
   buzzerAttivo = false;
-  running = true; fermo = false; testInCorso = false; testWeb = false; testMostraIP = false; testIndice = 0;
+  running = true; fermo = false; testInCorso = false; testWeb = false; testMostraIP = false; testMostraPot = false; testIndice = 0;
   modalitaColore = false;
   oledPopup = OLED_NESSUNO;
   cieloGenerato = false; ultimaFaseStelle = GIORNO;
@@ -3632,6 +3800,12 @@ void loop() {
       Serial.println(F("STOP (START breve = PLAY)"));
     }
     return;
+  }
+
+  // ----- passo "potenziometro" del test: il display segue la manopola -----
+  if (testInCorso && testMostraPot && !testWeb && millis() - testPotMs >= 150UL) {
+    testPotMs = millis();
+    mostraOledTest();
   }
 
   // ----- ciclo scenografico -----

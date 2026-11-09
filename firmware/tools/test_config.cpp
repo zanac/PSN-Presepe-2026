@@ -35,6 +35,16 @@ int main(int argc, char **argv) {
     // bit = phase: CIELO in GIORNO, TRAMONTO, ALBA; tramonto strip in TRAMONTO; alba strip in ALBA
     CHECK(c.tappeDaFile[CFG_S_CIELO] == ((1 << CFG_GIORNO) | (1 << CFG_TRAMONTO) | (1 << CFG_ALBA)));
     CHECK(c.tappeDaFile[CFG_S_TRAMONTO] == (1 << CFG_TRAMONTO) && c.tappeDaFile[CFG_S_ALBA] == (1 << CFG_ALBA));
+    // the two commented-out constellation examples are valid once uncommented
+    std::string t = ss.str(), u; std::istringstream in(t); std::string l; bool dentro = false;
+    while (std::getline(in, l)) {
+      if (l.rfind("; [COSTELLAZIONE]", 0) == 0) dentro = true;
+      else if (!l.empty() && l[0] == '[') dentro = false;
+      u += (dentro && l.rfind("; ", 0) == 0 && (l[2] == '[' || l.find('=') != std::string::npos) ? l.substr(2) : l) + "\n";
+    }
+    PresepeConfig e; cfgDefault(e); cfgParseBuffer(e, u.c_str());
+    CHECK(e.errori == 0 && e.numCostellazioni == 2 && e.cost[0].n == 7 && e.cost[0].modo == COST_UNA_ALLA_VOLTA &&
+          e.cost[1].n == 5 && e.cost[1].haColore && e.cost[1].modo == COST_SCINTILLA);
   }
 
   // 3. custom values, CRLF, case, names, Grp_ syntax, forcing, both star chains
@@ -124,37 +134,63 @@ int main(int argc, char **argv) {
     CHECK(c.stelle[0].numero == 30 && c.stelle[1].numero == d.stelle[1].numero);
   }
 
-  // 5c. [COSTELLAZIONI]: luminosity per line, stars of both chains, ranges, all-or-nothing lines
+  // 5c. [COSTELLAZIONE] sections: stars of both chains, ranges, all-or-nothing "stelle" lines,
+  //     times, colour, mode; up to 8 sections
   {
     PresepeConfig c; cfgDefault(c);
     CHECK(c.numCostellazioni == 0);
     cfgParseBuffer(c,
-      "[COSTELLAZIONI]\n"
-      "costellazione = 70 | 01:3, 01:7, 01:12-14, 02:5   ; Orsa maggiore\n"     // line 2
-      "costellazione = 120 | 2:20 - 24\n"                                      // line 3
-      "costellazione = 90 | 01:7, 01:30\n"                                     // 4: 01:7 already used -> whole line out
-      "costellazione = 300 | 01:40\n"                                          // 5: luminosity out of range
-      "costellazione = 01:41\n"                                                // 6: no luminosity
-      "costellazione = 50 | 03:1\n"                                            // 7: no chain 03
-      "costellazione = 50 | 01:0\n"                                            // 8: stars count from 1
-      "costellazione = 50 | 01:9-8\n"                                          // 9: reversed range
-      "costellazione = 50 | \n"                                                // 10: no stars
-      "stelle = 1\n"                                                           // 11: unknown key
-      "costellazione = 40 | 02:50, 01:60\n"                                    // 12: 01:60 is beyond numero=50
+      "[COSTELLAZIONE]\n"                                                      // line 1
+      "nome = Orsa maggiore\n"
+      "stelle = 01:3, 01:7, 01:12-14, 02:5\n"
+      "luminosita = 70\n"
+      "accendi = CREPUSCOLO 30 - NOTTE 0\n"                                    // 5
+      "spegni = ALBA, 10 - ALBA, 60\n"
+      "colore = 100,90,60\n"
+      "modo = una_alla_volta\n"
+      "[COSTELLAZIONE]\n"
+      "stelle = 2:20 - 24\n"                                                   // 10
+      "stelle = 01:7, 01:30\n"                                                 // 11: 01:7 is in the first one -> line out
+      "luminosita = 300\n"                                                     // 12: out of range
+      "stelle = 03:1\n"                                                        // 13: no chain 03
+      "stelle = 01:0\n"                                                        // 14: stars count from 1
+      "stelle = 01:9-8\n"                                                      // 15: reversed range
+      "stelle = \n"                                                            // 16: no stars
+      "accendi = CREPUSCOLO 30\n"                                              // 17: needs from - to
+      "spegni = MEZZANOTTE 1 - ALBA 2\n"                                       // 18: unknown phase
+      "modo = lampeggia\n"                                                     // 19: unknown mode
+      "colore = 120,0,0\n"                                                     // 20: tint over 100
+      "chiave = 1\n"                                                           // 21: unknown key
+      "modo = scintilla\n"
+      "[COSTELLAZIONE]\n"
+      "stelle = 02:50, 01:60\n"                                                // 24: 01:60 beyond numero=50
+      "accendi = NOTTE 50 - NOTTE 60\n"
+      "spegni = NOTTE 55 - NOTTE 58\n"                                         // goes down before it is fully up -> star times
     );
     CHECK(c.numCostellazioni == 3);
-    CHECK(c.costLum[0] == 70 && c.costLum[1] == 120 && c.costLum[2] == 40);
-    CHECK(c.costStella[0][2] == 1 && c.costStella[0][6] == 1 && c.costStella[0][11] == 1 && c.costStella[0][12] == 1 && c.costStella[0][13] == 1 && c.costStella[1][4] == 1);
-    CHECK(c.costStella[0][14] == 0 && c.costStella[0][29] == 0 && c.costStella[0][39] == 0);
-    CHECK(c.costStella[1][19] == 2 && c.costStella[1][23] == 2 && c.costStella[1][24] == 0);
-    CHECK(c.costStella[1][49] == 3 && c.costStella[0][59] == 0);      // 01:60 dropped by the final check
-    CHECK(c.errori == 9 && c.primaRigaErrata == 4);              // lines 4..11 plus the final check
-    // capacity: 8 lines
+    const CfgCostellazione &a = c.cost[0], &b = c.cost[1], &d = c.cost[2];
+    CHECK(a.lum == 70 && a.modo == COST_UNA_ALLA_VOLTA && a.haColore && a.colore.r == 100 && a.colore.g == 90 && a.colore.b == 60);
+    CHECK(a.acc[0].fase == CFG_CREPUSCOLO && a.acc[0].pct == 30 && a.acc[1].fase == CFG_NOTTE && a.acc[1].pct == 0);
+    CHECK(a.sp[0].fase == CFG_ALBA && a.sp[0].pct == 10 && a.sp[1].fase == CFG_ALBA && a.sp[1].pct == 60);
+    CHECK(a.n0 == 5 && a.n == 6);
+    CHECK(cfgCost(c, 0, 2) == 1 && cfgCost(c, 0, 6) == 1 && cfgCost(c, 0, 11) == 1 && cfgCost(c, 0, 13) == 1 && cfgCost(c, 1, 4) == 1);
+    CHECK(cfgCost(c, 0, 14) == 0 && cfgCost(c, 0, 29) == 0 && cfgCost(c, 0, 3) == 0);
+    CHECK(b.lum == 80 && b.modo == COST_SCINTILLA && !b.haColore && b.n0 == 0 && b.n == 5);
+    CHECK(b.acc[0].fase == CFG_CREPUSCOLO && b.acc[0].pct == 0 && b.acc[1].fase == CFG_NOTTE && b.sp[0].fase == CFG_ALBA && b.sp[1].pct == 100);
+    CHECK(cfgCost(c, 1, 19) == 2 && cfgCost(c, 1, 23) == 2 && cfgCost(c, 1, 24) == 0);
+    CHECK(cfgCost(c, 1, 49) == 3 && cfgCost(c, 0, 59) == 0 && d.n == 1);    // 01:60 dropped by the final check
+    CHECK(d.acc[0].fase == CFG_CREPUSCOLO && d.acc[1].fase == CFG_NOTTE && d.acc[1].pct == 0 && d.sp[0].fase == CFG_ALBA);
+    CHECK(c.errori == 13 && c.primaRigaErrata == 11);           // lines 11..21, plus 01:60, plus the order of times
+    // capacity: 8 sections; the 9th header and its lines are errors
     PresepeConfig e; cfgDefault(e);
-    std::string t = "[COSTELLAZIONI]\n";
-    for (int i = 1; i <= 9; i++) t += "costellazione = 10 | 01:" + std::to_string(i) + "\n";
+    std::string t;
+    for (int i = 1; i <= 9; i++) t += "[COSTELLAZIONE]\nstelle = 01:" + std::to_string(i) + "\n";
     cfgParseBuffer(e, t.c_str());
-    CHECK(e.numCostellazioni == 8 && e.errori == 1 && e.costStella[0][8] == 0 && e.costStella[0][7] == 8);
+    CHECK(e.numCostellazioni == 8 && e.errori == 2 && cfgCost(e, 0, 8) == 0 && cfgCost(e, 0, 7) == 8);
+    // the old one-line section is not read any more
+    PresepeConfig o; cfgDefault(o);
+    cfgParseBuffer(o, "[COSTELLAZIONI]\ncostellazione = 70 | 01:3\n");
+    CHECK(o.numCostellazioni == 0 && o.errori == 2);
   }
 
   // 6. event table capacity (64) and over-long line

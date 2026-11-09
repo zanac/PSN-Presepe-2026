@@ -73,7 +73,7 @@ Adafruit_NeoPixel *const catena[2] = { &stelle01, &stelle02 };
 enum Fase { GIORNO, TRAMONTO, CREPUSCOLO, NOTTE, ALBA };
 char wifiIp[16] = "none";
 bool wifiAp = false;
-bool testInCorso = false, testWeb = false, testMostraIP = false, modalitaColore = false, running = true;
+bool testInCorso = false, testWeb = false, testMostraIP = false, testMostraPot = false, modalitaColore = false, running = true;
 uint8_t testIndice = 0;
 uint16_t releStato = 0;
 uint8_t rgbCieloR, rgbCieloG, rgbCieloB, rgbTramontoR, rgbTramontoG, rgbTramontoB, rgbAlbaR, rgbAlbaG, rgbAlbaB;

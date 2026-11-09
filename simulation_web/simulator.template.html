@@ -80,6 +80,10 @@ button:hover, select:hover { border-color: var(--accent); }
 .clock .meta { font-family: var(--f-mono); font-size: 13px; font-variant-numeric: tabular-nums; color: #aeb6c8; }
 .tlwrap { position: relative; }
 canvas#tl { width: 100%; height: 150px; display: block; border-radius: 6px; cursor: pointer; touch-action: none; }
+.cielo { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 16px; }
+.cielo figure { margin: 0; }
+.cielo figcaption { font-size: 12px; color: #aeb6c8; margin-bottom: 4px; }
+.cielo canvas { width: 100%; height: 64px; display: block; background: #05070d; border-radius: 6px; }
 .extras { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font-size: 13px; color: #aeb6c8; }
 .meter { width: 120px; height: 8px; background: #1b2130; border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-left: 6px; }
 .meter i { display: block; height: 100%; background: #dfe6ff; }
@@ -127,6 +131,10 @@ button:disabled { opacity: .55; cursor: wait; }
 .dot.r { width: 26px; height: 22px; margin: -11px 0 0 -13px; border-radius: 5px; background: #3fbf7f; color: #04140b; font: 600 11px var(--f-mono); border-color: #c9f2dc; }
 .dot.r.off { background: #2a3040; color: #c9d0e0; border-color: #7d869b; }
 .dot.r.sel { border-color: var(--accent); }
+.dot.c { width: 22px; height: 22px; margin: -11px 0 0 -11px; background: #e9eefc; color: #0b0f1a; font: 700 12px var(--f-mono); line-height: 18px; border-color: #9fb0e0; }
+.dot.c.giu { background: #2a3040; color: #e9eefc; }
+.dot.c.sel { border-color: var(--accent); }
+.track.cost { height: 30px; }
 .ed { border: 1px solid var(--accent); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 12px; background: var(--code-bg); }
 .edhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .edhead b { font-family: var(--f-display); font-size: 1.15rem; letter-spacing: .02em; }
@@ -226,6 +234,10 @@ button.danger { color: var(--err); border-color: var(--err); }
           <div class="strip" id="s2"><div class="slabel">Alba <small>destra</small></div><div class="glow"><div class="halo"></div><div class="bar"></div></div><div class="rgb"></div></div>
         </div>
         <div class="tlwrap"><canvas id="tl" aria-label="Linea del ciclo: clicca o trascina per spostarti"></canvas></div>
+        <div class="cielo" aria-label="Le stelle una per una">
+          <figure><figcaption id="cieloT0">STELLE_01</figcaption><canvas id="cielo0"></canvas></figure>
+          <figure><figcaption id="cieloT1">STELLE_02</figcaption><canvas id="cielo1"></canvas></figure>
+        </div>
         <div class="extras">
           <span>Stelle 01 <span class="meter"><i id="stars0"></i></span> <span id="starsv0"></span></span>
           <span>Stelle 02 <span class="meter"><i id="stars1"></i></span> <span id="starsv1"></span></span>
@@ -269,7 +281,7 @@ function defaults() {
     lum: [100, 100, 100], gamma: 1,
     // [STELLE_01] [STELLE_02]: stessi valori predefiniti
     stelle: [0, 1].map(() => ({ numero: 50, attive: 20, lum_min: 22, lum_max: 75, livello_notte: 235, scintillio_min: 6400, scintillio_max: 12200, colore: [100, 72, 38] })),
-    costellazioni: [],                                      // luminosita' di ogni riga "costellazione"
+    costellazioni: [],                                      // una per sezione [COSTELLAZIONE] (costDefault)
     costStella: [0, 1].map(() => new Array(100).fill(0)),  // 0 = stella libera, n = costellazione n
   };
 }
@@ -321,9 +333,14 @@ function parse(text) {
     if (s[0] === "[") {
       const m = /^\[([^\]]*)\]$/.exec(s); if (!m) { sez = ""; return err(n, s, "sezione scritta male"); }
       const name = m[1].trim();
-      const known = ["CICLO","FASI","RELE","COLORI","STELLE_01","STELLE_02","COSTELLAZIONI","SISTEMA","WIFI","ACCESS_POINT","AUTENTICAZIONE", ...FASI];
+      const known = ["CICLO","FASI","RELE","COLORI","STELLE_01","STELLE_02","COSTELLAZIONE","SISTEMA","WIFI","ACCESS_POINT","AUTENTICAZIONE", ...FASI];
       if (name.length > 15 || !known.some(k => ci(k, name))) { sez = ""; return err(n, s, "sezione sconosciuta"); }
-      sez = name.toUpperCase(); return;
+      sez = name.toUpperCase();
+      if (sez === "COSTELLAZIONE") {                 // ogni [COSTELLAZIONE] e' una costellazione nuova
+        if (c.costellazioni.length < MAX_COSTELLAZIONI) c.costellazioni.push(costDefault());
+        else { sez = ""; return err(n, s, `al massimo ${MAX_COSTELLAZIONI} costellazioni`); }
+      }
+      return;
     }
     const eq = s.indexOf("="); if (eq < 0 || !sez) return err(n, s, eq < 0 ? "manca il segno =" : "chiave fuori da una sezione valida");
     const k = s.slice(0, eq).trim(), v = s.slice(eq + 1).trim(), kl = k.toLowerCase();
@@ -351,21 +368,24 @@ function parse(text) {
       const lim = { numero: [0,100], attive: [0,100], lum_min: [0,255], lum_max: [0,255], livello_notte: [0,255], scintillio_min: [500,60000], scintillio_max: [500,60000] }[kl];
       if (lim) { const x = intIn(v, lim[0], lim[1]); if (x !== null) { ok = true; S[kl] = x; } }
       else if (kl === "colore") { const x = rgb(v, 100); if (x) { S.colore = x; ok = true; } }
-    } else if (sez === "COSTELLAZIONI") {
-      // "costellazione = lum | 01:3, 01:7, 01:12-14, 02:5": tutta la riga o niente, come il firmware
-      const bar = v.indexOf("|");
-      if (kl === "costellazione" && bar >= 0 && c.costellazioni.length < MAX_COSTELLAZIONI) {
-        const lum = intIn(v.slice(0, bar), 0, 255), st = [];
-        let buona = lum !== null;
-        for (const t of v.slice(bar + 1).split(",")) {
+    } else if (sez === "COSTELLAZIONE") {
+      const nq = c.costellazioni.length, x = c.costellazioni[nq - 1];
+      if (kl === "nome") { x.nome = v; ok = true; }
+      else if (kl === "luminosita") { const l = intIn(v, 0, 255); if (l !== null) { x.lum = l; ok = true; } }
+      else if (kl === "accendi" || kl === "spegni") { const t = trattoCost(v); if (t) { x[kl === "accendi" ? "acc" : "sp"] = t; x[kl === "accendi" ? "haAcc" : "haSp"] = true; ok = true; } }
+      else if (kl === "colore") { const f = fields(v).map(z => intIn(z, 0, 100)); if (f.length === 3 && !f.includes(null)) { x.col = f; ok = true; } }
+      else if (kl === "modo") { const m = MODI_COST.findIndex(z => ci(z, v)); if (m >= 0) { x.modo = m; ok = true; } }
+      else if (kl === "stelle") {
+        // tutta la riga o niente, come il firmware
+        const st = []; let buona = true;
+        for (const t of v.split(",")) {
           const m = /^\s*0*([12])\s*:\s*(\d+)\s*(?:-\s*(\d+)\s*)?$/.exec(t);
           const a = m ? +m[2] : 0, b = m && m[3] !== undefined ? +m[3] : a;
           if (!m || a < 1 || b < a || b > 100) { buona = false; break; }
           for (let i = a; i <= b; i++) st.push([+m[1] - 1, i - 1]);
         }
-        if (buona && st.length && st.every(([k, i]) => !c.costStella[k][i])) {
-          const n = c.costellazioni.push(lum);
-          st.forEach(([k, i]) => { c.costStella[k][i] = n; });
+        if (buona && st.length && st.every(([k, i]) => !c.costStella[k][i] || c.costStella[k][i] === nq)) {
+          st.forEach(([k, i]) => { c.costStella[k][i] = nq; });
           ok = true;
         }
       }
@@ -435,10 +455,35 @@ function parse(text) {
     if (S.attive > S.numero) S.attive = S.numero;
     if (c.costStella[k].some((n, i) => n && i >= S.numero)) {
       c.costStella[k] = c.costStella[k].map((n, i) => i < S.numero ? n : 0);
-      errors.push({ n: 0, line: "[COSTELLAZIONI]", msg: `stelle oltre il numero di STELLE_0${k + 1} (${S.numero}): tolte` });
+      errors.push({ n: 0, line: "[COSTELLAZIONE]", msg: `stelle oltre il numero di STELLE_0${k + 1} (${S.numero}): tolte` });
+    }
+  });
+  // costellazioni: quante stelle e tempi in ordine nel giro del ciclo (sale, resta, scende)
+  c.costellazioni.forEach((x, q) => {
+    x.n0 = c.costStella[0].filter(v => v === q + 1).length;
+    x.n = x.n0 + c.costStella[1].filter(v => v === q + 1).length;
+    const a1 = posizione(c, x.acc[0][0], x.acc[0][1]);
+    const d = [x.acc[1], x.sp[0], x.sp[1]].map(([f, pc]) => { let v = posizione(c, f, pc) - a1; if (v < 0) v += 100; return v; });
+    if (d[0] > d[1] || d[1] > d[2]) {
+      const y = costDefault(); x.acc = y.acc; x.sp = y.sp; x.haAcc = x.haSp = false;
+      errors.push({ n: 0, line: "[COSTELLAZIONE]", msg: `${x.nome || "costellazione " + (q + 1)}: spegni prima di essere accesa del tutto, uso i tempi delle stelle` });
     }
   });
   return { c, errors };
+}
+// [COSTELLAZIONE]: valori di una costellazione nuova (come costDefault del firmware)
+const MODI_COST = ["insieme", "una_alla_volta", "scintilla"];
+function costDefault() { return { nome: "", lum: 80, modo: 0, col: null, acc: [[2, 0], [3, 0]], sp: [[4, 0], [4, 100]], n0: 0, n: 0 }; }
+// "FASE % - FASE %" (anche "FASE, %") -> [[fase, pct], [fase, pct]] o null
+function trattoCost(v) {
+  const m = v.indexOf("-"); if (m < 0) return null;
+  const punto = t => {
+    const r = /^\s*([A-Za-z]+)\s*[\s,]\s*(\d+)\s*$/.exec(t); if (!r) return null;
+    const f = FASI.findIndex(z => ci(z, r[1])), pc = +r[2];
+    return f >= 0 && pc <= 100 ? [f, pc] : null;
+  };
+  const a = punto(v.slice(0, m)), b = punto(v.slice(m + 1));
+  return a && b ? [a, b] : null;
 }
 
 // ---------------------------------------------------------------- motore (stessa aritmetica del firmware)
@@ -467,8 +512,79 @@ function stelle(c, k, p) {
   if (fa === 4) { const t = prog(c.fasi[3], 100); return interp8(notte, 0, t * t * (3 - 2 * t)); }
   return 0;
 }
-// stelle della catena k che fanno parte di una costellazione (sempre accese insieme, fisse)
+// stelle della catena k che fanno parte di una costellazione
 const inCostellazioni = (c, k) => c.costStella[k].filter(n => n).length;
+// livello (0..1) di una costellazione nella posizione q del ciclo, come livelloCostellazione()
+// del firmware: sale da acc[0] ad acc[1], piena fino a sp[0], scende fino a sp[1] (curve morbide)
+const morbida = t => t * t * (3 - 2 * t);
+function livelloCost(c, x, q) {
+  const a1 = posizione(c, x.acc[0][0], x.acc[0][1]);
+  const d = [q, posizione(c, ...x.acc[1]), posizione(c, ...x.sp[0]), posizione(c, ...x.sp[1])].map(v => { v -= a1; while (v < 0) v += 100; while (v >= 100) v -= 100; return v; });
+  if (!d[1] && !d[2] && !d[3]) return 0;
+  if (!d[3]) d[3] = 100;
+  if (d[0] < d[1]) return morbida(d[0] / d[1]);
+  if (d[0] < d[2]) return 1;
+  if (d[0] < d[3]) return 1 - morbida((d[0] - d[2]) / (d[3] - d[2]));
+  return 0;
+}
+// scintillio di una stella (0..100), come fattoreScintillio() del firmware
+function scintillio(S, k, i, ms) {
+  const j = i + 100 * k, passo = Math.floor((S.scintillio_max - S.scintillio_min) / 29);
+  const periodo = S.scintillio_min + ((j * 37) % 30) * passo, off = (j * 173) % 900;
+  const pTw = Math.floor(((ms + off) % periodo) * 100 / periodo);
+  return pTw < 45 ? 100 : pTw < 55 ? (55 - pTw) * 10 : pTw < 80 ? 0 : pTw < 90 ? (pTw - 80) * 10 : 100;
+}
+// Cielo stellato di una catena come mostraStelle() del firmware: le "attive" scelte a caso fra
+// le stelle libere (nuova scelta a ogni CREPUSCOLO) e le costellazioni con i loro tempi.
+// Ritorna il valore 0..255 e la tinta % di ogni pixel.
+const cieli = [null, null];
+function generaCielo(c, k) {
+  const S = c.stelle[k], ordine = [], lum = [];
+  for (let i = 0; i < S.numero; i++) { lum.push(S.lum_min + Math.floor(Math.random() * (S.lum_max - S.lum_min + 1))); if (!c.costStella[k][i]) ordine.push(i); }
+  for (let i = ordine.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ordine[i], ordine[j]] = [ordine[j], ordine[i]]; }
+  cieli[k] = { ordine, lum };
+}
+function pixelStelle(c, k, q, ms) {
+  const S = c.stelle[k], out = [];
+  if (!cieli[k] || cieli[k].lum.length !== S.numero) generaCielo(c, k);
+  const { ordine, lum } = cieli[k];
+  for (let i = 0; i < S.numero; i++) out.push({ v: 0, col: S.colore });
+  const livello = stelle(c, k, q) / 255, attive = Math.min(S.attive, ordine.length);
+  const visibili = Math.min(attive, Math.round(livello * attive));
+  for (let pos = 0; pos < visibili; pos++) {
+    const i = ordine[pos]; let v = Math.floor(lum[i] * Math.min(1, Math.max(0, livello * attive - pos)));
+    if (v > 5) v = Math.floor(v * scintillio(S, k, i, ms) / 100);
+    out[i].v = v;
+  }
+  const L = c.costellazioni.map(x => livelloCost(c, x, q)), rango = c.costellazioni.map(x => k ? x.n0 : 0);
+  for (let i = 0; i < S.numero; i++) {
+    const n = c.costStella[k][i]; if (!n) continue;
+    const x = c.costellazioni[n - 1]; let l = L[n - 1];
+    if (x.modo === 1 && x.n) l = Math.min(1, Math.max(0, l * x.n - rango[n - 1]));
+    rango[n - 1]++;
+    let v = Math.floor(x.lum * l + 0.5);
+    if (x.modo === 2 && v > 5) v = Math.floor(v * scintillio(S, k, i, ms) / 100);
+    out[i] = { v, col: x.col || S.colore, cost: n };
+  }
+  return out;
+}
+function disegnaCielo(k) {
+  const cv = $("cielo" + k), w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
+  const dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const S = cfg.stelle[k], px = pixelStelle(cfg, k, p, performance.now());
+  $("cieloT" + k).textContent = S.numero ? `STELLE_0${k + 1} · ${S.numero} pixel, 10 per riga · cerchiate: costellazioni` : `STELLE_0${k + 1} · non usata`;
+  const col = 10, righe = Math.max(1, Math.ceil(S.numero / col)), dx = w / col, dy = h / righe;
+  px.forEach((s, i) => {
+    const x = (i % col + 0.5) * dx, y = (Math.floor(i / col) + 0.5) * dy;
+    // sullo schermo un po' piu' chiare dei LED (0..255 -> luminosita' percepita)
+    const f = Math.pow(s.v / 255, 1 / 2.2), rgb = s.col.map(t => Math.round(255 * f * t / 100));
+    g.beginPath(); g.arc(x, y, Math.min(dx, dy) * (s.cost ? 0.3 : 0.22), 0, 7);
+    g.fillStyle = s.v ? `rgb(${rgb})` : "#1b2130"; g.fill();
+    if (s.cost) { g.lineWidth = 1; g.strokeStyle = "rgba(170,190,255,.35)"; g.stroke(); }
+  });
+}
 // colore a schermo di una catena al livello l (tinta in % per canale, come il firmware)
 const tintaStelle = (c, k, l) => c.stelle[k].colore.map(x => Math.round(l * x / 100));
 function rele(c, p) {
@@ -514,7 +630,7 @@ function fillSpeed() {
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 function rebuild() {
-  const { c, errors } = parse(ta.value); cfg = c;
+  const { c, errors } = parse(ta.value); cfg = c; cieli[0] = cieli[1] = null;
   const st = $("status"), ul = $("errors");
   ul.innerHTML = "";
   const nt = cfg.tappe.map(t => t.length).join(" / ");
@@ -551,6 +667,7 @@ function drawTimeline() {
   });
 }
 
+const faseCielo = [-1, -1];
 function render() {
   const fa = faseDi(cfg, p), a = inizio(cfg, fa), b = fine(cfg, fa), pf = b > a ? (p - a) * 100 / (b - a) : 0;
   $("phase").textContent = FASI[fa];
@@ -567,6 +684,10 @@ function render() {
     bar.style.width = (lv / 255 * 100) + "%"; bar.style.background = `rgb(${tintaStelle(cfg, k, 255)})`;
     const nc = inCostellazioni(cfg, k);
     $("starsv" + k).textContent = cfg.stelle[k].numero ? lv + (nc ? ` · ${nc} in costellazioni` : "") : "non usata";
+    // nuovo cielo a caso a ogni ingresso nel CREPUSCOLO, come il firmware
+    if (fa === 2 && faseCielo[k] !== 2) generaCielo(cfg, k);
+    faseCielo[k] = fa;
+    disegnaCielo(k);
   }
   const rs = rele(cfg, p); [...$("relays").children].forEach((d, i) => { d.classList.toggle("on", rs[i]); d.title = cfg.nomi[i] || `relè ${i + 1}`; });
   drawCursor();
@@ -846,7 +967,7 @@ function aggiungi(k) {
     L.push(it); return it;
   });
 }
-const selItem = () => sel ? lista(rFase, sel.k)[sel.i] || null : null;
+const selItem = () => sel && sel.k[0] !== "c" ? lista(rFase, sel.k)[sel.i] || null : null;
 function segui() { const it = selItem(); if (it) vaiA(posizione(cfg, rFase, it.pct)); }
 function vaiA(q) {
   p = Math.min(99.999, Math.max(0, q));
@@ -922,10 +1043,12 @@ function disegnaRegia() {
   if (vista !== "grafico") return;
   [...$("rFasi").children].forEach((b, i) => { b.classList.toggle("on", i === rFase); b.setAttribute("aria-selected", String(i === rFase)); });
   const Ls = LANE.map(l => lista(rFase, l.k));
-  if (sel && !Ls[LANE.findIndex(l => l.k === sel.k)][sel.i]) sel = null;
-  const f = rFase + ":" + Ls.map(x => x.length).join(",");
+  if (sel && sel.k[0] !== "c" && !Ls[LANE.findIndex(l => l.k === sel.k)][sel.i]) sel = null;
+  if (sel && sel.k[0] === "c" && !puntiCost(+sel.k.slice(1)).some(t => t.j === sel.i)) sel = null;
+  const f = rFase + ":" + Ls.map(x => x.length).join(",") + "|" + cfg.costellazioni.map((x, q) => puntiCost(q).map(t => t.j).join("")).join(",");
   if (f !== firma) { firma = f; costruisci(Ls); }
   Ls.forEach((L, li) => aggiornaCorsia(li, L));
+  cfg.costellazioni.forEach((x, q) => aggiornaCorsiaCost(q));
   editor(Ls); elenco(Ls); playhead();
   etichettaProva();
 }
@@ -947,6 +1070,149 @@ function costruisci(Ls) {
     corsiaEventi(tr, l.k);
     row.append(hd, tr); box.appendChild(row);
   });
+  // una corsia per ogni [COSTELLAZIONE] del file: i quattro momenti (inizia ad accendersi,
+  // accesa del tutto, inizia a spegnersi, spenta) che cadono in questa fase
+  cfg.costellazioni.forEach((x, q) => {
+    const row = document.createElement("div"); row.className = "lane"; row.dataset.cost = q;
+    const hd = document.createElement("div"); hd.className = "lhead";
+    hd.innerHTML = "<span></span><small></small>";
+    const tr = document.createElement("div"); tr.className = "track cost";
+    tr.innerHTML = '<div class="grad"></div><div class="ph"></div>';
+    puntiCost(q).forEach(t => { const d = document.createElement("button"); d.type = "button"; d.className = "dot c"; d.dataset.j = t.j; tr.appendChild(d); });
+    corsiaCost(tr, q);
+    row.append(hd, tr); box.appendChild(row);
+  });
+}
+// ------------------------------------------------ costellazioni nella regia
+const MOMENTI = ["inizia ad accendersi", "accesa del tutto", "inizia a spegnersi", "spenta"];
+const nomeCost = q => cfg.costellazioni[q].nome || `Costellazione ${q + 1}`;
+// i quattro momenti (j 0..3) della costellazione q che cadono nella fase della regia
+function puntiCost(q) {
+  const x = cfg.costellazioni[q]; if (!x) return [];
+  return [x.acc[0], x.acc[1], x.sp[0], x.sp[1]].map(([fase, pct], j) => ({ j, fase, pct, pred: !(j < 2 ? x.haAcc : x.haSp) }))
+    .filter(t => t.fase === rFase);
+}
+// tinta a schermo della costellazione al livello l (0..1): colore proprio o della catena della prima stella
+function tintaCost(x, q, l) {
+  const k = cfg.costStella[0].includes(q + 1) || !cfg.costStella[1].includes(q + 1) ? 0 : 1, col = x.col || cfg.stelle[k].colore;
+  const f = Math.pow(x.lum * l / 255, 1 / 2.2);
+  return col.map(t => Math.round(255 * f * t / 100));
+}
+// riga di una sezione [COSTELLAZIONE] (la q-esima del file): sostituisce la chiave, la
+// aggiunge in fondo alla sezione, o la toglie con v === null
+function chiaveCost(q, chiave, v) {
+  const L = righe(); let n = -1, h = -1, e = L.length;
+  for (let i = 0; i < L.length; i++) {
+    const t = spezza(L[i]).cod.trim(); if (t[0] !== "[") continue;
+    if (h >= 0) { e = i; break; }
+    if (/^\[\s*COSTELLAZIONE\s*\]$/i.test(t) && ++n === q) h = i;
+  }
+  if (h < 0) return;
+  let dove = -1, ultima = h;
+  for (let i = h + 1; i < e; i++) {
+    const { cod } = spezza(L[i]), eq = cod.indexOf("=");
+    if (cod.trim()) ultima = i;
+    if (eq >= 0 && cod.slice(0, eq).trim().toLowerCase() === chiave) dove = i;
+  }
+  const nuova = `${chiave.padEnd(10)} = ${v}`;
+  if (dove >= 0) {
+    if (v === null) L.splice(dove, 1);
+    else { const { nota } = spezza(L[dove]); L[dove] = nota ? nuova.padEnd(37) + " ; " + nota : nuova; }
+  } else if (v !== null) L.splice(ultima + 1, 0, nuova);
+  impostaTesto(L.join(EOL()));
+}
+const testoPunto = ([f, pc]) => `${FASI[f]} ${pc}`;
+// sposta il momento j della costellazione q; rifiuta un ordine impossibile (si spegne prima
+// di essere accesa del tutto), come il controllo del firmware
+function spostaCost(q, j, fase, pct) {
+  const x = cfg.costellazioni[q], pts = [x.acc[0], x.acc[1], x.sp[0], x.sp[1]].map(t => t.slice());
+  pts[j] = [fase, Math.min(100, Math.max(0, Math.round(pct)))];
+  const a1 = posizione(cfg, ...pts[0]);
+  const d = pts.slice(1).map(t => { let v = posizione(cfg, ...t) - a1; if (v < 0) v += 100; return v; });
+  if (d[0] > d[1] || d[1] > d[2]) return false;
+  if (pts[j][0] === (j < 2 ? x.acc : x.sp)[j & 1][0] && pts[j][1] === (j < 2 ? x.acc : x.sp)[j & 1][1]) return true;
+  if (j < 2) chiaveCost(q, "accendi", `${testoPunto(pts[0])} - ${testoPunto(pts[1])}`);
+  else chiaveCost(q, "spegni", `${testoPunto(pts[2])} - ${testoPunto(pts[3])}`);
+  return true;
+}
+function corsiaCost(tr, q) {
+  let modo = null, x0 = 0, mosso = false, j = -1;
+  const pctDa = e => { const r = tr.getBoundingClientRect(); return Math.min(100, Math.max(0, (e.clientX - r.left) / r.width * 100)); };
+  tr.addEventListener("pointerdown", e => {
+    if (e.button > 0) return;
+    const d = e.target.closest(".dot");
+    tr.setPointerCapture(e.pointerId); x0 = e.clientX; mosso = false;
+    if (d) { modo = "drag"; j = +d.dataset.j; sel = { k: "c" + q, i: j }; fermaProva(); disegnaRegia(); vaiA(posizione(cfg, rFase, puntiCost(q).find(t => t.j === j).pct)); }
+    else { modo = "scrub"; fermaProva(); vaiA(posizione(cfg, rFase, pctDa(e))); }
+  });
+  tr.addEventListener("pointermove", e => {
+    if (!modo) return;
+    if (modo === "scrub") return vaiA(posizione(cfg, rFase, pctDa(e)));
+    if (!mosso && Math.abs(e.clientX - x0) < 4) return;
+    mosso = true;
+    const v = Math.round(pctDa(e));
+    presto(() => { if (spostaCost(q, j, rFase, v)) vaiA(posizione(cfg, rFase, v)); });
+  });
+  const stop = () => { modo = null; };
+  tr.addEventListener("pointerup", stop); tr.addEventListener("pointercancel", stop);
+  tr.addEventListener("keydown", e => {
+    const d = e.target.closest(".dot"); if (!d || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+    const jj = +d.dataset.j, t = puntiCost(q).find(z => z.j === jj); if (!t) return;
+    sel = { k: "c" + q, i: jj }; spostaCost(q, jj, rFase, t.pct + (e.key === "ArrowRight" ? 1 : -1));
+    const nd = $("rLanes").querySelector(`[data-cost="${q}"] .dot[data-j="${jj}"]`); if (nd) nd.focus();
+    e.preventDefault();
+  });
+}
+function aggiornaCorsiaCost(q) {
+  const row = $("rLanes").querySelector(`[data-cost="${q}"]`); if (!row) return;
+  const x = cfg.costellazioni[q], tr = row.querySelector(".track");
+  row.querySelector(".lhead span").textContent = "✦ " + nomeCost(q);
+  row.querySelector(".lhead small").textContent = `${x.n} stelle · ${MODI_COST[x.modo].replace(/_/g, " ")} · lum ${x.lum}`;
+  const st = [];
+  for (let i = 0; i <= 48; i++) { const t = i / 48 * 100; st.push(`rgb(${tintaCost(x, q, livelloCost(cfg, x, Math.min(99.999, posizione(cfg, rFase, t))))}) ${t.toFixed(2)}%`); }
+  tr.querySelector(".grad").style.background = `linear-gradient(90deg, ${st.join(",")})`;
+  const P = puntiCost(q);
+  tr.querySelectorAll(".dot").forEach(d => {
+    const t = P.find(z => z.j === +d.dataset.j); if (!t) return;
+    d.style.left = t.pct + "%"; d.textContent = t.j < 2 ? "↑" : "↓";
+    d.className = "dot c" + (t.j >= 2 ? " giu" : "") + (t.pred ? " pred" : "") + (sel && sel.k === "c" + q && sel.i === t.j ? " sel" : "");
+    d.title = `${nomeCost(q)}: ${MOMENTI[t.j]} al ${t.pct} % di ${FASI[t.fase]}` + (t.pred ? " (come le stelle: spostandolo entra nel file)" : "");
+    d.setAttribute("aria-label", d.title);
+  });
+}
+function editorCost(q, j) {
+  const ed = $("rEd"), x = cfg.costellazioni[q], pt = [x.acc[0], x.acc[1], x.sp[0], x.sp[1]][j], key = `c${q}:${j}`;
+  if (edKey !== key) {
+    edKey = key;
+    ed.innerHTML = `<div class="edhead"><b id="eTit"></b><span class="note" id="eIdx"></span><button type="button" id="eX" aria-label="Chiudi">✕</button></div>
+    <div class="row"><label class="lbl">Fase <select id="cFase">${FASI.map((f, i) => `<option value="${i}">${f}</option>`).join("")}</select></label></div>
+    <div class="rowp"><span class="lbl">Posizione</span><button type="button" id="cPm" aria-label="indietro">−</button><input type="range" id="cP" min="0" max="100" step="1" aria-label="percentuale della fase"><input type="number" id="cPn" min="0" max="100" step="1" aria-label="percentuale"><button type="button" id="cPp" aria-label="avanti">+</button></div>
+    <div class="rowp"><span class="lbl">Luminosità</span><input type="range" id="cL" min="0" max="255" aria-label="luminosità piena"><input type="number" id="cLn" min="0" max="255" aria-label="luminosità"></div>
+    <div class="row"><span class="lbl">Modo</span><div class="seg" id="cModo"><button type="button" data-v="0">Insieme</button><button type="button" data-v="1">Una alla volta</button><button type="button" data-v="2">Scintilla</button></div></div>
+    <div class="row"><button type="button" id="cStelle">Tempi come le stelle</button></div>
+    <p class="note" id="eHint"></p>`;
+    $("eX").addEventListener("click", () => { sel = null; disegnaRegia(); });
+    const sposta = (f, v) => { if (!spostaCost(q, j, f, v)) { rSay("Così si spegnerebbe prima di essere accesa del tutto: sposta prima gli altri momenti.", true); const c = cur(); $("cFase").value = c[0]; $("cP").value = $("cPn").value = c[1]; } else { if (f !== rFase) { rFase = f; firma = ""; } disegnaRegia(); vaiA(posizione(cfg, f, Math.min(100, Math.max(0, v)))); } };
+    const cur = () => { const y = cfg.costellazioni[q]; return [y.acc[0], y.acc[1], y.sp[0], y.sp[1]][j]; };
+    $("cFase").addEventListener("change", e => sposta(+e.target.value, cur()[1]));
+    $("cP").addEventListener("input", e => { const v = +e.target.value; presto(() => sposta(cur()[0], v)); });
+    $("cPn").addEventListener("change", e => sposta(cur()[0], +e.target.value));
+    $("cPm").addEventListener("click", () => sposta(cur()[0], cur()[1] - 1));
+    $("cPp").addEventListener("click", () => sposta(cur()[0], cur()[1] + 1));
+    const lum = v => { v = Math.min(255, Math.max(0, Math.round(v) || 0)); if (v !== cfg.costellazioni[q].lum) chiaveCost(q, "luminosita", v); };
+    $("cL").addEventListener("input", e => { const v = +e.target.value; presto(() => lum(v)); });
+    $("cLn").addEventListener("change", e => lum(+e.target.value));
+    $("cModo").addEventListener("click", e => { const b = e.target.closest("button"); if (b) chiaveCost(q, "modo", MODI_COST[+b.dataset.v]); });
+    $("cStelle").addEventListener("click", () => { chiaveCost(q, "accendi", null); chiaveCost(q, "spegni", null); sel = null; disegnaRegia(); });
+  }
+  ed.hidden = false;
+  const set = (id, v) => { const e = $(id); if (e && document.activeElement !== e) e.value = v; };
+  $("eTit").textContent = `✦ ${nomeCost(q)} · ${MOMENTI[j]}`;
+  $("eIdx").textContent = (j < 2 ? x.haAcc : x.haSp) ? "" : "valore predefinito (come le stelle): cambiandolo entra nel file";
+  set("cFase", pt[0]); set("cP", pt[1]); set("cPn", pt[1]); set("cL", x.lum); set("cLn", x.lum);
+  $("cModo").querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.v === x.modo));
+  $("eHint").textContent = `${x.n} stelle. Le stelle che la compongono, il nome e il colore si cambiano nel testo del file ([COSTELLAZIONE] ${q + 1}). ` +
+    (live ? "Sul presepe vero le costellazioni si vedono nel ciclo: qui l'anteprima è la sfumatura della corsia." : "Il palco mostra le stelle una per una.");
 }
 function corsiaEventi(tr, k) {
   let modo = null, delta = 0, x0 = 0, mosso = false;
@@ -1019,6 +1285,7 @@ function elenco(Ls) {
   const ol = $("rList"); ol.innerHTML = "";
   const all = [];
   LANE.forEach((l, li) => Ls[li].forEach((it, i) => all.push({ l, it, i })));
+  cfg.costellazioni.forEach((x, q) => puntiCost(q).forEach(t => all.push({ l: { k: "c" + q, n: "✦ " + nomeCost(q) }, it: t, i: t.j, cost: q })));
   all.sort((a, b) => a.it.pct - b.it.pct);
   if (!all.length) {
     const li = document.createElement("li"); li.className = "empty";
@@ -1026,16 +1293,21 @@ function elenco(Ls) {
     ol.appendChild(li); return;
   }
   const span = (c, t) => { const s = document.createElement("span"); s.className = c; s.textContent = t; return s; };
-  all.forEach(({ l, it, i }) => {
+  all.forEach(({ l, it, i, cost }) => {
     const li = document.createElement("li"), b = document.createElement("button"); b.type = "button";
     if (sel && sel.k === l.k && sel.i === i) b.classList.add("sel");
     const sq = span("sq", ""); let v;
-    if (l.k === "rele") { sq.className = "sq r" + (it.acceso ? " on" : ""); v = `relè ${it.rele + 1}${cfg.nomi[it.rele] ? " " + cfg.nomi[it.rele] : ""} ${it.acceso ? "ON" : "OFF"}`; }
+    if (cost !== undefined) { sq.style.background = `rgb(${tintaCost(cfg.costellazioni[cost], cost, 1)})`; v = MOMENTI[it.j]; }
+    else if (l.k === "rele") { sq.className = "sq r" + (it.acceso ? " on" : ""); v = `relè ${it.rele + 1}${cfg.nomi[it.rele] ? " " + cfg.nomi[it.rele] : ""} ${it.acceso ? "ON" : "OFF"}`; }
     else { sq.style.background = `rgb(${schermo(cfg, l.s, it.col)})`; v = it.col.join(", ") + (it.curva ? " · lineare" : ""); }
     if (it.nota) v += " — " + it.nota;
     if (it.pred) v += " (predefinita)";
     b.append(span("pc", fmtP(it.pct) + " %"), span("", l.n), sq, span("vv", v));
-    b.addEventListener("click", () => { sel = { k: l.k, i }; fermaProva(); disegnaRegia(); segui(); $("rEd").scrollIntoView({ block: "nearest", behavior: "smooth" }); });
+    b.addEventListener("click", () => {
+      sel = { k: l.k, i }; fermaProva(); disegnaRegia();
+      if (cost !== undefined) vaiA(posizione(cfg, rFase, it.pct)); else segui();
+      $("rEd").scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
     li.appendChild(b); ol.appendChild(li);
   });
 }
@@ -1102,6 +1374,7 @@ function costruisciEd(l) {
 function editor(Ls) {
   const ed = $("rEd");
   if (!sel) { ed.hidden = true; return; }
+  if (sel.k[0] === "c") return editorCost(+sel.k.slice(1), sel.i);
   const li = LANE.findIndex(l => l.k === sel.k), l = LANE[li], L = Ls[li], it = L[sel.i];
   const key = rFase + ":" + l.k;
   if (key !== edKey) { edKey = key; costruisciEd(l); }
