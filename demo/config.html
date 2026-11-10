@@ -112,6 +112,19 @@ button:disabled { opacity: .55; cursor: wait; }
 /* regia: editor grafico delle fasi */
 .vtabs { display: inline-flex; align-self: flex-start; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .vtabs button { border: 0; border-radius: 0; padding: 6px 16px; }
+.cbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cchip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; }
+.cchip i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+.cchip.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); font-weight: 600; }
+.cform { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.cform input[type=text] { min-width: 0; }
+.ccielo { display: grid; gap: 14px; }
+.ccatena h3 { margin: 0 0 6px; font: 600 12px var(--f-display); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.cgriglia { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 5px; max-width: 460px; }
+.cstella { aspect-ratio: 1; padding: 0; min-width: 0; border-radius: 50%; font: 600 11px var(--f-mono); background: #12161f; color: #8790a6; border: 2px solid #2a3040; }
+.cstella.altra { opacity: .75; }
+.cstella.mia { color: #0b0f1a; border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+.cstella.prova { outline: 2px dashed var(--accent); outline-offset: 2px; }
 .vtabs button.on { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .rtabs { display: flex; flex-wrap: wrap; gap: 6px; }
 .rtabs button { font-family: var(--f-display); font-weight: 600; letter-spacing: .06em; font-size: .9rem; padding: 6px 10px; }
@@ -204,7 +217,7 @@ button.danger { color: var(--err); border-color: var(--err); }
     <section class="card" aria-label="File INI">
       <h2>File INI</h2>
       <div class="vtabs" role="tablist" aria-label="Vista del file">
-        <button type="button" id="vGrafico" role="tab">Grafico</button><button type="button" id="vTesto" role="tab">Testo</button>
+        <button type="button" id="vGrafico" role="tab">Grafico</button><button type="button" id="vCost" role="tab">Costellazioni</button><button type="button" id="vTesto" role="tab">Testo</button>
       </div>
       <div id="regia" class="card" style="border:0;padding:0" hidden>
         <div class="rtabs" id="rFasi" role="tablist" aria-label="Fase da modificare"></div>
@@ -219,6 +232,20 @@ button.danger { color: var(--err); border-color: var(--err); }
         <div class="ed" id="rEd" hidden></div>
         <ol class="rlist" id="rList" aria-label="Cambiamenti della fase"></ol>
         <p class="note">Tocca o trascina una corsia per spostare l'anteprima. Trascina un pallino per cambiarne il %, toccalo per modificarlo (colore, curva, nota). Pallini tratteggiati: valori predefiniti del firmware, entrano nel file appena li cambi. Ogni modifica aggiorna subito il testo del file.</p>
+      </div>
+      <div id="vCostBox" class="card" style="border:0;padding:0" hidden>
+        <div class="cbar" id="cElenco" role="tablist" aria-label="Costellazioni del file"></div>
+        <div id="cMsg" class="status" role="status" hidden></div>
+        <div class="cform" id="cForm" hidden>
+          <div class="row"><label class="lbl" for="cNome">Nome</label><input type="text" id="cNome" maxlength="40" placeholder="per esempio Orsa maggiore"></div>
+          <div class="rowp"><span class="lbl">Luminosità</span><input type="range" id="kL" min="0" max="255" aria-label="luminosità piena"><input type="number" id="kLn" min="0" max="255" aria-label="luminosità"></div>
+          <div class="row"><span class="lbl">Modo</span><div class="seg" id="kModo"><button type="button" data-v="0">Insieme</button><button type="button" data-v="1">Una alla volta</button><button type="button" data-v="2">Scintilla</button></div></div>
+          <div class="row"><label class="lbl"><input type="checkbox" id="kHaCol"> Colore proprio</label><input type="color" id="kCol" aria-label="colore della costellazione"><span class="note" id="kColNota"></span></div>
+          <div class="row"><span class="lbl">Tocca una stella per</span><div class="seg" id="kTocco"><button type="button" data-v="0">Agganciarla o sganciarla</button><button type="button" data-v="1">Solo vederla accesa</button></div></div>
+          <div class="row"><button type="button" id="kElimina">Elimina la costellazione</button><button type="button" id="kCiclo" hidden>↺ Torna al ciclo</button></div>
+        </div>
+        <div class="ccielo" id="cCielo"></div>
+        <p class="note" id="cNota"></p>
       </div>
       <div id="vTestoBox" class="card" style="border:0;padding:0">
       <textarea id="ini" spellcheck="false" aria-label="Contenuto di PRESEPE.INI"></textarea>
@@ -1176,7 +1203,7 @@ function rebuild() {
   } else {
     st.className = "status ok"; st.textContent = `File letto senza errori. Tappe cielo / tramonto / alba: ${nt}; eventi relè: ${cfg.eventi.length}.`;
   }
-  fillSpeed(); drawTimeline(); render(); disegnaRegia();
+  fillSpeed(); drawTimeline(); render(); disegnaRegia(); disegnaCost();
 }
 
 function drawTimeline() {
@@ -1394,7 +1421,7 @@ if (DEVICE) {
 const LANE = [{ k: "tramonto", s: 1, n: "Tramonto" }, { k: "cielo", s: 0, n: "Cielo" }, { k: "alba", s: 2, n: "Alba" }, { k: "rele", n: "Relè" }];
 const PRESET = [["Spento", [0, 0, 0]], ["Tenue", [16, 16, 16]], ["Caldo", [210, 82, 18]], ["Arancio", [155, 92, 16]],
   ["Quasi bianco", [246, 220, 208]], ["Bianco", [255, 255, 255]], ["Rosa", [200, 60, 70]], ["Blu notte", [0, 8, 40]]];
-let rFase = 0, sel = null, vista = store.get("presepe-vista") === "testo" ? "testo" : "grafico";
+let rFase = 0, sel = null, vista = ["testo", "cost"].includes(store.get("presepe-vista")) ? store.get("presepe-vista") : "grafico";
 const fmtP = v => String(Math.round(v * 100) / 100);
 const righe = () => ta.value.split(/\r?\n/);
 const EOL = () => ta.value.includes("\r\n") ? "\r\n" : "\n";
@@ -1933,14 +1960,193 @@ function editor(Ls) {
   }
   $("eHint").textContent = hint;
 }
+// ------------------------------------------------ vista Costellazioni
+// Censisce le costellazioni (sezioni [COSTELLAZIONE] del file) e le loro stelle: tocchi le
+// stelle per agganciarle. Sul presepe la costellazione scelta si accende davvero (test da web:
+// PC colore, PA spegne una catena, P accende un pixel), cosi' si vede quale stella e' quale.
+// I tempi si danno nella vista Grafico.
+let cSel = 0, cTocco = 0, cProva = null, cKey = "";
+const TINTE_UI = [[255, 196, 90], [120, 190, 255], [255, 120, 160], [140, 230, 150], [200, 150, 255], [255, 160, 90], [110, 220, 220], [230, 230, 120]];
+// colore con cui la costellazione q appare sullo schermo (il suo colore, o uno per riconoscerla)
+const tintaUi = q => { const x = cfg.costellazioni[q]; return x && x.col ? x.col.map(v => Math.round(v * 2.55)) : TINTE_UI[q % TINTE_UI.length]; };
+function cSay(t, bad) {
+  const m = $("cMsg"); m.hidden = !t; m.textContent = t; m.className = "status " + (bad ? "bad" : "ok");
+  clearTimeout(cSay.t); if (t) cSay.t = setTimeout(() => { m.hidden = true; }, 5000);
+}
+// intestazioni [COSTELLAZIONE] del testo: [{h, e}] (e = inizio della sezione dopo)
+function sezioniCost(L) {
+  const out = []; let cur = null;
+  L.forEach((l, i) => {
+    const t = spezza(l).cod.trim(); if (t[0] !== "[") return;
+    if (cur) { cur.e = i; cur = null; }
+    if (/^\[\s*COSTELLAZIONE\s*\]$/i.test(t)) { cur = { h: i, e: L.length }; out.push(cur); }
+  });
+  return out;
+}
+// "01:3-5, 01:7, 02:1" delle stelle della costellazione q (con le serie), a righe di al massimo
+// 100 caratteri (le righe del file sono al massimo 127)
+function righeStelle(q) {
+  const t = [];
+  for (let k = 0; k < 2; k++) {
+    const v = cfg.costStella[k], m = cfg.stelle[k].numero;
+    for (let i = 0; i < m; i++) {
+      if (v[i] !== q + 1) continue;
+      let j = i; while (j + 1 < m && v[j + 1] === q + 1) j++;
+      t.push(`0${k + 1}:${i + 1}${j > i ? "-" + (j + 1) : ""}`); i = j;
+    }
+  }
+  const r = []; let cur = "";
+  t.forEach(x => { if (cur && cur.length + x.length + 2 > 100) { r.push(cur); cur = ""; } cur += (cur ? ", " : "") + x; });
+  if (cur) r.push(cur);
+  return r;
+}
+// riscrive le righe "stelle" della costellazione q (tutte, al posto di quelle che c'erano)
+function scriviStelle(q) {
+  const L = righe(), S = sezioniCost(L)[q]; if (!S) return;
+  const nuove = righeStelle(q).map(v => `stelle     = ${v}`);
+  let pos = -1, ultima = S.h;
+  const out = [];
+  L.forEach((l, i) => {
+    if (i > S.h && i < S.e) {
+      const { cod } = spezza(l), eq = cod.indexOf("=");
+      if (eq >= 0 && cod.slice(0, eq).trim().toLowerCase() === "stelle") { if (pos < 0) pos = out.length; return; }
+      if (cod.trim()) ultima = out.length;
+    } else if (i === S.h) ultima = out.length;
+    out.push(l);
+  });
+  out.splice(pos >= 0 ? pos : ultima + 1, 0, ...nuove);
+  impostaTesto(out.join(EOL()));
+}
+function nuovaCost() {
+  if (cfg.costellazioni.length >= MAX_COSTELLAZIONI) return cSay(`Ci sono già ${MAX_COSTELLAZIONI} costellazioni: il massimo.`, true);
+  const L = righe(), S = sezioniCost(L), nome = `Costellazione ${cfg.costellazioni.length + 1}`;
+  const blocco = ["[COSTELLAZIONE]", `nome       = ${nome}`, "luminosita = 80", "modo       = insieme"];
+  let at;
+  if (S.length) {                        // dopo l'ultima costellazione (prima dei commenti della sezione dopo)
+    at = S[S.length - 1].e; while (at > S[S.length - 1].h + 1 && (!L[at - 1].trim() || /^\s*[;#]/.test(L[at - 1]))) at--;
+    blocco.unshift("");
+  } else {                               // prima di [SISTEMA], o in fondo
+    at = L.findIndex(l => /^\s*\[\s*SISTEMA\s*\]/i.test(l)); if (at < 0) at = L.length;
+    blocco.push("");
+  }
+  L.splice(at, 0, ...blocco);
+  cSel = cfg.costellazioni.length;
+  impostaTesto(L.join(EOL()));
+  cSay(`Aggiunta «${nome}»: ora tocca le sue stelle. I tempi si danno nella vista Grafico.`);
+}
+function eliminaCost(q) {
+  const L = righe(), S = sezioniCost(L)[q]; if (!S) return;
+  let e = S.e; while (e > S.h + 1 && (!L[e - 1].trim() || /^\s*[;#]/.test(L[e - 1]))) e--;   // i commenti della sezione dopo restano
+  L.splice(S.h, e - S.h);
+  if (L[S.h - 1] !== undefined && !L[S.h - 1].trim() && L[S.h] !== undefined && !L[S.h].trim()) L.splice(S.h, 1);
+  cSel = Math.max(0, q - 1);
+  impostaTesto(L.join(EOL()));
+}
+function toccaStella(k, i) {
+  const q = cSel, x = cfg.costellazioni[q];
+  if (cTocco === 1 || !x) { cProva = { k, i }; disegnaCost(); mostraCostDalVivo(); return; }
+  const v = cfg.costStella[k][i];
+  if (v && v !== q + 1) return cSay(`La stella 0${k + 1}:${i + 1} è già in «${nomeCost(v - 1)}»: toglila prima da lì.`, true);
+  cfg.costStella[k][i] = v ? 0 : q + 1;   // provvisorio: scriviStelle legge da qui e poi rilegge il file
+  cProva = null;
+  scriviStelle(q); mostraCostDalVivo();
+}
+// sul presepe: la costellazione scelta accesa nel suo colore (o la stella da provare), tutto il resto spento
+function mostraCostDalVivo() {
+  if (!live || vista !== "cost") return;
+  if (!inTest) { inTest = true; lastRele = null; $("rCiclo").hidden = false; }
+  $("kCiclo").hidden = false;
+  for (const k of [...lq.keys()]) if (/^P/.test(k)) lq.delete(k);   // i pixel di prima in coda non servono piu'
+  const x = cfg.costellazioni[cSel];
+  const col = cProva || !x ? [255, 255, 255] : (x.col || cfg.stelle[cfg.costStella[0].includes(cSel + 1) ? 0 : 1].colore).map(v => Math.round(v * 2.55 * Math.max(x.lum, 30) / 255));
+  lsend("PC", `PC ${col.join(" ")}`);
+  for (let k = 0; k < 2; k++) {
+    if (!cfg.stelle[k].numero) continue;
+    lsend("PA" + k, `PA ${k} 0`);
+    for (let i = 0; i < cfg.stelle[k].numero; i++) {
+      const on = cProva ? cProva.k === k && cProva.i === i : x && cfg.costStella[k][i] === cSel + 1;
+      if (on) lsend(`P${k}_${i}`, `P ${k} ${i} 1`);
+    }
+  }
+}
+function disegnaCost() {
+  if (vista !== "cost") return;
+  const C = cfg.costellazioni;
+  if (cSel >= C.length) cSel = Math.max(0, C.length - 1);
+  // elenco
+  const el = $("cElenco"); el.innerHTML = "";
+  C.forEach((x, q) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "cchip" + (q === cSel ? " on" : ""); b.setAttribute("role", "tab");
+    b.innerHTML = "<i></i><span></span><small class=\"note\"></small>";
+    b.querySelector("i").style.background = `rgb(${tintaUi(q)})`;
+    b.querySelector("span").textContent = nomeCost(q); b.querySelector("small").textContent = `${x.n}`;
+    b.addEventListener("click", () => { cSel = q; cProva = null; disegnaCost(); mostraCostDalVivo(); });
+    el.appendChild(b);
+  });
+  const nb = document.createElement("button"); nb.type = "button"; nb.className = "add"; nb.textContent = "+ Nuova costellazione";
+  nb.disabled = C.length >= MAX_COSTELLAZIONI; nb.addEventListener("click", nuovaCost); el.appendChild(nb);
+  // scheda della costellazione scelta
+  const x = C[cSel]; $("cForm").hidden = !x;
+  if (x) {
+    const set = (id, v) => { const e = $(id); if (document.activeElement !== e) e.value = v; };
+    set("cNome", x.nome); set("kL", x.lum); set("kLn", x.lum);
+    $("kModo").querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.v === x.modo));
+    $("kHaCol").checked = !!x.col; $("kCol").disabled = !x.col;
+    set("kCol", hex(tintaUi(cSel)));
+    $("kColNota").textContent = x.col ? `${x.col.join(", ")} %` : "colore della catena di ogni stella";
+  }
+  $("kTocco").querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.v === cTocco));
+  // il cielo: un pulsante per stella, 10 per riga
+  const cc = $("cCielo"); cc.innerHTML = "";
+  for (let k = 0; k < 2; k++) {
+    const m = cfg.stelle[k].numero; if (!m) continue;
+    const box = document.createElement("div"); box.className = "ccatena";
+    box.innerHTML = `<h3>STELLE_0${k + 1} · ${m} stelle</h3>`;
+    const g = document.createElement("div"); g.className = "cgriglia";
+    for (let i = 0; i < m; i++) {
+      const v = cfg.costStella[k][i], b = document.createElement("button"); b.type = "button"; b.className = "cstella"; b.textContent = i + 1;
+      if (v) { b.style.background = `rgb(${tintaUi(v - 1)})`; b.style.color = "#0b0f1a"; b.classList.add(v === cSel + 1 ? "mia" : "altra"); }
+      if (cProva && cProva.k === k && cProva.i === i) b.classList.add("prova");
+      b.title = `0${k + 1}:${i + 1}` + (v ? ` · ${nomeCost(v - 1)}` : " · libera (fra quelle scelte a caso)");
+      b.setAttribute("aria-label", b.title);
+      b.addEventListener("click", () => toccaStella(k, i));
+      g.appendChild(b);
+    }
+    box.appendChild(g); cc.appendChild(box);
+  }
+  $("cNota").textContent = !C.length ? "Nessuna costellazione nel file: «+ Nuova costellazione» ne aggiunge una, poi tocca le sue stelle."
+    : (live ? "Sul presepe si accende la costellazione scelta (con «Solo vederla accesa» la stella che tocchi): così vedi quale stella è quale. " : "") +
+      "Le stelle colorate sono già in una costellazione (il colore dice quale), le grigie sono libere e restano fra quelle scelte a caso. I tempi (quando si accende e si spegne) si danno nella vista Grafico.";
+}
+$("cNome").addEventListener("change", e => { const v = e.target.value.trim(); if (cfg.costellazioni[cSel]) chiaveCost(cSel, "nome", v || null); });
+$("kL").addEventListener("input", e => { const v = +e.target.value; presto(() => { if (cfg.costellazioni[cSel] && v !== cfg.costellazioni[cSel].lum) { chiaveCost(cSel, "luminosita", v); mostraCostDalVivo(); } }); });
+$("kLn").addEventListener("change", e => { const v = Math.min(255, Math.max(0, Math.round(+e.target.value) || 0)); chiaveCost(cSel, "luminosita", v); mostraCostDalVivo(); });
+$("kModo").addEventListener("click", e => { const b = e.target.closest("button"); if (b && cfg.costellazioni[cSel]) chiaveCost(cSel, "modo", MODI_COST[+b.dataset.v]); });
+$("kHaCol").addEventListener("change", e => {
+  if (!cfg.costellazioni[cSel]) return;
+  chiaveCost(cSel, "colore", e.target.checked ? tintaUi(cSel).map(v => Math.round(v / 2.55)).join(",") : null); mostraCostDalVivo();
+});
+$("kCol").addEventListener("input", e => {
+  const h = e.target.value, c = [1, 3, 5].map(j => Math.round(parseInt(h.slice(j, j + 2), 16) / 2.55));
+  presto(() => { chiaveCost(cSel, "colore", c.join(",")); mostraCostDalVivo(); });
+});
+$("kTocco").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; cTocco = +b.dataset.v; cProva = null; disegnaCost(); mostraCostDalVivo(); });
+$("kElimina").addEventListener("click", () => {
+  const b = $("kElimina");
+  if (b.dataset.conferma !== String(cSel)) { b.dataset.conferma = cSel; b.textContent = `Sicuro? Tocca di nuovo per eliminare «${nomeCost(cSel)}»`; setTimeout(() => { b.dataset.conferma = ""; b.textContent = "Elimina la costellazione"; }, 4000); return; }
+  b.dataset.conferma = ""; b.textContent = "Elimina la costellazione";
+  eliminaCost(cSel); mostraCostDalVivo();
+});
+$("kCiclo").addEventListener("click", () => { $("kCiclo").hidden = true; cProva = null; tornaAlCiclo(); disegnaCost(); });
 function mostraVista(v) {
   vista = v; store.set("presepe-vista", v);
-  $("vGrafico").classList.toggle("on", v === "grafico"); $("vTesto").classList.toggle("on", v === "testo");
-  $("vGrafico").setAttribute("aria-selected", String(v === "grafico")); $("vTesto").setAttribute("aria-selected", String(v === "testo"));
-  $("regia").hidden = v !== "grafico"; $("vTestoBox").hidden = v !== "testo";
-  firma = ""; edKey = ""; disegnaRegia();
+  [["vGrafico", "grafico"], ["vCost", "cost"], ["vTesto", "testo"]].forEach(([id, n]) => { $(id).classList.toggle("on", v === n); $(id).setAttribute("aria-selected", String(v === n)); });
+  $("regia").hidden = v !== "grafico"; $("vTestoBox").hidden = v !== "testo"; $("vCostBox").hidden = v !== "cost";
+  firma = ""; edKey = ""; disegnaRegia(); disegnaCost();
+  if (v === "cost") mostraCostDalVivo();
 }
 $("vGrafico").addEventListener("click", () => mostraVista("grafico"));
+$("vCost").addEventListener("click", () => mostraVista("cost"));
 $("vTesto").addEventListener("click", () => mostraVista("testo"));
 mostraVista(vista);
 
