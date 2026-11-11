@@ -1750,9 +1750,7 @@ function editorCost(q, j) {
     ed.innerHTML = `<div class="edhead"><b id="eTit"></b><span class="note" id="eIdx"></span><button type="button" id="eX" aria-label="Chiudi">✕</button></div>
     <div class="row"><label class="lbl">Fase <select id="cFase">${FASI.map((f, i) => `<option value="${i}">${f}</option>`).join("")}</select></label></div>
     <div class="rowp"><span class="lbl">Posizione</span><button type="button" id="cPm" aria-label="indietro">−</button><input type="range" id="cP" min="0" max="100" step="1" aria-label="percentuale della fase"><input type="number" id="cPn" min="0" max="100" step="1" aria-label="percentuale"><button type="button" id="cPp" aria-label="avanti">+</button></div>
-    <div class="rowp"><span class="lbl">Luminosità</span><input type="range" id="cL" min="0" max="255" aria-label="luminosità piena"><input type="number" id="cLn" min="0" max="255" aria-label="luminosità"></div>
-    <div class="row"><span class="lbl">Modo</span><div class="seg" id="cModo"><button type="button" data-v="0">Insieme</button><button type="button" data-v="1">Una alla volta</button><button type="button" data-v="2">Scintilla</button></div></div>
-    <div class="row"><button type="button" id="cStelle">Tempi come le stelle</button></div>
+    <div class="row"><button type="button" id="cStelle">Tempi come le stelle</button><button type="button" id="cApri">Stelle, luminosità, modo… →</button></div>
     <p class="note" id="eHint"></p>`;
     $("eX").addEventListener("click", () => { sel = null; disegnaRegia(); });
     const sposta = (f, v) => { if (!spostaCost(q, j, f, v)) { rSay("Così si spegnerebbe prima di essere accesa del tutto: sposta prima gli altri momenti.", true); const c = cur(); $("cFase").value = c[0]; $("cP").value = $("cPn").value = c[1]; } else { if (f !== rFase) { rFase = f; firma = ""; } disegnaRegia(); vaiA(posizione(cfg, f, Math.min(100, Math.max(0, v)))); } };
@@ -1762,19 +1760,15 @@ function editorCost(q, j) {
     $("cPn").addEventListener("change", e => sposta(cur()[0], +e.target.value));
     $("cPm").addEventListener("click", () => sposta(cur()[0], cur()[1] - 1));
     $("cPp").addEventListener("click", () => sposta(cur()[0], cur()[1] + 1));
-    const lum = v => { v = Math.min(255, Math.max(0, Math.round(v) || 0)); if (v !== cfg.costellazioni[q].lum) chiaveCost(q, "luminosita", v); };
-    $("cL").addEventListener("input", e => { const v = +e.target.value; presto(() => lum(v)); });
-    $("cLn").addEventListener("change", e => lum(+e.target.value));
-    $("cModo").addEventListener("click", e => { const b = e.target.closest("button"); if (b) chiaveCost(q, "modo", MODI_COST[+b.dataset.v]); });
+    $("cApri").addEventListener("click", () => { cSel = q; sel = null; mostraVista("cost"); });
     $("cStelle").addEventListener("click", () => { chiaveCost(q, "accendi", null); chiaveCost(q, "spegni", null); sel = null; disegnaRegia(); });
   }
   ed.hidden = false;
   const set = (id, v) => { const e = $(id); if (e && document.activeElement !== e) e.value = v; };
   $("eTit").textContent = `✦ ${nomeCost(q)} · ${MOMENTI[j]}`;
   $("eIdx").textContent = (j < 2 ? x.haAcc : x.haSp) ? "" : "valore predefinito (come le stelle): cambiandolo entra nel file";
-  set("cFase", pt[0]); set("cP", pt[1]); set("cPn", pt[1]); set("cL", x.lum); set("cLn", x.lum);
-  $("cModo").querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.v === x.modo));
-  $("eHint").textContent = `${x.n} stelle. Le stelle che la compongono, il nome e il colore si cambiano nel testo del file ([COSTELLAZIONE] ${q + 1}). ` +
+  set("cFase", pt[0]); set("cP", pt[1]); set("cPn", pt[1]);
+  $("eHint").textContent = `Qui solo i tempi. Stelle, nome, luminosità, modo e colore si impostano nella vista Costellazioni. ` +
     (live ? "Sul presepe vero le costellazioni si vedono nel ciclo: qui l'anteprima è la sfumatura della corsia." : "Il palco mostra le stelle una per una.");
 }
 function corsiaEventi(tr, k) {
