@@ -1131,7 +1131,7 @@ bool running = true;
 bool fermo = false;          // STOP: tutto spento (rele', strisce, stelle) fino a PLAY
 bool testInCorso = false;
 bool testMostraIP = false;   // [WIFI] abilitato: passo del test con l'indirizzo IP (dopo il potenziometro)
-bool testMostraPot = false;  // primo passo del test: lettura dal vivo del potenziometro
+bool testMostraPot = false;  // ultimo passo del test: lettura dal vivo del potenziometro
 unsigned long testPotMs = 0; // ultimo aggiornamento del passo potenziometro
 bool testWeb = false;        // test comandato dalla pagina web (strisce, pixel, rele' uno a uno)
 uint16_t releStato = 0;      // bit i = rele' i+1 acceso (per la pagina web)
@@ -1700,7 +1700,7 @@ void mostraOledTest() {
     display.display();
     return;
   }
-  if (testMostraPot) {               // primo passo: il potenziometro letto dal vivo
+  if (testMostraPot) {               // ultimo passo: il potenziometro letto dal vivo
     int raw = analogRead(PIN_POT), lim = potLimita(raw);
     int corsa = cfg.potMax - cfg.potMin;
     int pct = corsa > 0 ? (int)((long)(lim - cfg.potMin) * 100L / corsa) : 0;
@@ -2321,8 +2321,8 @@ void entraTest() {
   testInCorso = true;
   testIndice = 0;
   testWeb = false;
-  testMostraPot = true;                    // primo passo: il potenziometro
-  testMostraIP = cfg.wifiAbilitato != 0;   // poi, con il WiFi, l'indirizzo IP
+  testMostraPot = false;                   // il potenziometro e' l'ultimo passo
+  testMostraIP = cfg.wifiAbilitato != 0;   // con il WiFi il primo passo e' l'indirizzo IP
   testEraInMarcia = running;
   testPausaMs = millis();
   running = false;
@@ -2341,16 +2341,15 @@ void testUscite() {
     testMostraIP = false;
     testMostraPot = false;
     testIndice = 0;
-  } else if (testMostraPot) {        // dal potenziometro all'IP (se c'e' il WiFi) o al passo 1
+  } else if (testMostraPot) {        // dopo il potenziometro (ultimo): da capo, dall'IP se c'e' il WiFi
     testMostraPot = false;
     testIndice = 0;
+    testMostraIP = cfg.wifiAbilitato != 0;
   } else if (testMostraIP) {
     testMostraIP = false;
     testIndice = 0;
-  } else if (testIndice >= 33) {     // dopo l'ultimo passo: da capo (potenziometro, IP, passi)
-    testIndice = 0;
+  } else if (testIndice >= 33) {     // dopo l'ultimo rele': il potenziometro
     testMostraPot = true;
-    testMostraIP = cfg.wifiAbilitato != 0;
   } else {
     testIndice++;
   }
