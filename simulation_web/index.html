@@ -1015,15 +1015,25 @@ function presto(f) { if (!pend) requestAnimationFrame(() => { const g = pend; pe
 // ------------------------------------------------ dal vivo
 let live = DEVICE, inTest = false, lbusy = false, lastRele = null; const lq = new Map();
 function lsend(key, c) { lq.set(key, c); lpump(); }
+// messaggi dei comandi al presepe: nella vista in cui sei
+let lFatto = null;                           // cosa dire quando la coda e' finita senza errori
+const dice = (t, bad) => vista === "cost" ? cSay(t, bad) : rSay(t, bad);
 async function lpump() {
   if (lbusy || !lq.size) return;
   const [key, c] = lq.entries().next().value; lq.delete(key); lbusy = true;
   try {
     const r = await fetch("/api/cmd", { method: "POST", headers: { "Content-Type": "text/plain", "X-Presepe": "1" }, body: c });
     const j = await r.json();
-    if (!j.ok) { rSay("Il presepe non ha eseguito «" + c + "»: " + (j.msg || "errore"), true); lq.clear(); }
-  } catch (e) { rSay("Il presepe non risponde: le strisce non seguono l'anteprima.", true); lq.clear(); }
-  lbusy = false; lpump();
+    if (!j.ok) {
+      const m = j.msg === "stop" ? "Il presepe è in STOP: premi START sulla scheda (o «Riprendi» nel pannello) e riprova."
+        : j.msg === "modo colore" ? "Il presepe è in modalità colore: esci da lì e riprova."
+        : "Il presepe non ha eseguito «" + c + "»: " + (j.msg || "errore");
+      dice(m, true); lq.clear(); lFatto = null;
+    }
+  } catch (e) { dice("Il presepe non risponde: le luci non seguono l'editor.", true); lq.clear(); lFatto = null; }
+  lbusy = false;
+  if (!lq.size && lFatto) { dice(lFatto); lFatto = null; }
+  lpump();
 }
 function liveScena(q) {
   if (!live) return;
@@ -1526,6 +1536,8 @@ function mostraCostDalVivo() {
   const x = cfg.costellazioni[cSel];
   const col = cProva || !x ? [255, 255, 255] : (x.col || cfg.stelle[cfg.costStella[0].includes(cSel + 1) ? 0 : 1].colore).map(v => Math.round(v * 2.55 * Math.max(x.lum, 30) / 255));
   lsend("PC", `PC ${col.join(" ")}`);
+  lFatto = cProva ? `Sul presepe è accesa solo la stella 0${cProva.k + 1}:${cProva.i + 1}.`
+    : x ? `Sul presepe sono accese le ${x.n} stelle di «${nomeCost(cSel)}».` : null;
   for (let k = 0; k < 2; k++) {
     if (!cfg.stelle[k].numero) continue;
     lsend("PA" + k, `PA ${k} 0`);
