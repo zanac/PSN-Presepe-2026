@@ -617,7 +617,8 @@ return { parse, faseDi, inizio, fine, colore, rele, STRISCE };
       case "T": entraTest(); return ok;
       case "X": if (modo === 2) { modo = 0; run = true; } return ok;
       case "S":
-        if (n.length !== 4 || !range(n[0], 0, 2) || !n.slice(1).every(v => range(v, 0, 255))) return err("arg");
+        if (n.length !== 4 || !range(n[0], 0, 3) || !n.slice(1).every(v => range(v, 0, 255))) return err("arg");
+        if (n[0] === 3) { if (n[1] > 100 || n[2] > 99) return err("arg"); entraTest(); return ok; }   // stelle a una posizione del ciclo
         entraTest(); test[E.STRISCE[n[0]]] = n.slice(1); return ok;
       case "R":
         if (n.length !== 2 || !range(n[0], 1, 16) || !range(n[1], 0, 1)) return err("arg");

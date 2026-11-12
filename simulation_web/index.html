@@ -1042,6 +1042,9 @@ function liveScena(q) {
     rSay("Il presepe è in TEST: strisce e relè seguono l'editor. «Torna al ciclo» per riprendere il ciclo.", false, true);
   }
   for (let s = 0; s < 3; s++) lsend("S" + s, `S ${s} ${colore(cfg, s, q).join(" ")}`);
+  // stelle e costellazioni: le calcola il presepe nella stessa posizione (S 3), dal file salvato
+  const qq = Math.min(100, Math.max(0, q)), cent = Math.min(99, Math.round((qq % 1) * 100));
+  lsend("S3", `S 3 ${Math.floor(qq)} ${cent} 0`);
   const rs = rele(cfg, q);
   rs.forEach((on, i) => { if (!lastRele || lastRele[i] !== on) lsend("R" + i, `R ${i + 1} ${on ? 1 : 0}`); });
   lastRele = rs;
@@ -1251,7 +1254,7 @@ function editorCost(q, j) {
   $("eIdx").textContent = (j < 2 ? x.haAcc : x.haSp) ? "" : "valore predefinito (come le stelle): cambiandolo entra nel file";
   set("cFase", pt[0]); set("cP", pt[1]); set("cPn", pt[1]);
   $("eHint").textContent = `Qui solo i tempi. Stelle, nome, luminosità, modo e colore si impostano nella vista Costellazioni. ` +
-    (live ? "Sul presepe vero le costellazioni si vedono nel ciclo: qui l'anteprima è la sfumatura della corsia." : "Il palco mostra le stelle una per una.");
+    (live ? "Sul presepe le stelle e le costellazioni seguono la posizione della regia, con il file salvato sul presepe: dopo aver cambiato i tempi premi «Salva sul presepe» per vederli." : "Il palco mostra le stelle una per una.");
 }
 function corsiaEventi(tr, k) {
   let modo = null, delta = 0, x0 = 0, mosso = false;

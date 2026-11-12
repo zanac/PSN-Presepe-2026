@@ -2025,7 +2025,9 @@ void faseAvanti() {
 // SCENA
 // ============================================================
 
-void aggiornaScena(float p) {
+// Le stelle (scelte a caso e costellazioni) come nella posizione p del ciclo: le usa il ciclo
+// (aggiornaScena) e il test da web ("S 3", l'editor che scorre la linea del tempo).
+void stelleAPosizione(float p) {
   Fase fase = faseDaPercentuale(p);
 
   // Genera una nuova disposizione a ogni ingresso nel crepuscolo.
@@ -2033,13 +2035,6 @@ void aggiornaScena(float p) {
     generaTuttiICieli();
   }
   ultimaFaseStelle = fase;
-
-  // Strisce RGB: colore calcolato dalle tappe di [CIELO], [TRAMONTO], [ALBA]
-  // (vedi cfgColoreTappe nel blocco CONFIG). Le tappe di default riproducono
-  // le curve storiche: le laterali restano a PWM esattamente zero quando inattive.
-  CfgRGB cielo = cfgColoreTappe(cfg, CFG_S_CIELO, p);
-  CfgRGB tram  = cfgColoreTappe(cfg, CFG_S_TRAMONTO, p);
-  CfgRGB alba  = cfgColoreTappe(cfg, CFG_S_ALBA, p);
 
   // Stelle (le due catene allo stesso modo, ognuna col suo livello_notte):
   // compaiono nel CREPUSCOLO (lineare), piene di NOTTE, si dissolvono durante
@@ -2066,12 +2061,22 @@ void aggiornaScena(float p) {
     }
   }
 
-  setCielo(cielo.r, cielo.g, cielo.b);
-  setTramonto(tram.r, tram.g, tram.b);
-  setAlba(alba.r, alba.g, alba.b);
   posStelle = p;                     // le costellazioni usano la posizione nel ciclo
   for (uint8_t k = 0; k < CFG_NUM_CATENE; k++) setStelle(k, livelloStelle[k]);
   posStelle = -1.0f;
+}
+
+void aggiornaScena(float p) {
+  // Strisce RGB: colore calcolato dalle tappe di [CIELO], [TRAMONTO], [ALBA]
+  // (vedi cfgColoreTappe nel blocco CONFIG). Le tappe di default riproducono
+  // le curve storiche: le laterali restano a PWM esattamente zero quando inattive.
+  CfgRGB cielo = cfgColoreTappe(cfg, CFG_S_CIELO, p);
+  CfgRGB tram  = cfgColoreTappe(cfg, CFG_S_TRAMONTO, p);
+  CfgRGB alba  = cfgColoreTappe(cfg, CFG_S_ALBA, p);
+  setCielo(cielo.r, cielo.g, cielo.b);
+  setTramonto(tram.r, tram.g, tram.b);
+  setAlba(alba.r, alba.g, alba.b);
+  stelleAPosizione(p);
 }
 
 // ============================================================
@@ -2811,6 +2816,10 @@ uint8_t webPixel[2][(CFG_MAX_STELLE + 7) / 8];
 uint16_t lnkIdFatto = 0;
 uint8_t lnkIdEsito = 0;
 CfgRGB webPixelColore = { 70, 50, 27 };
+// "S 3 intero centesimi 0": le stelle come nella posizione del ciclo indicata (l'editor che
+// scorre la linea del tempo); -1 = stelle comandate pixel per pixel (P, PA, PC)
+float webStellePos = -1.0f;
+unsigned long webStelleMs = 0;
 
 bool lnkQuiet() {
   return lnkAttivo && (long)(millis() - lnkSilenzioFino) < 0;
@@ -3083,7 +3092,7 @@ void webPixelMostra(uint8_t k) {
 bool lnkPerTest() {
   if (modalitaColore) { lnkErr(F("modo colore")); return false; }
   if (fermo) { lnkErr(F("stop")); return false; }
-  if (!testWeb) { entraTestWeb(); memset(webPixel, 0, sizeof(webPixel)); }
+  if (!testWeb) { entraTestWeb(); memset(webPixel, 0, sizeof(webPixel)); webStellePos = -1.0f; }
   return true;
 }
 
@@ -3113,9 +3122,15 @@ void lnkComando(char *riga) {
   if (!strcmp(cmd, "T")) { if (lnkPerTest()) lnkOk(); return; }
   if (!strcmp(cmd, "X")) { if (testInCorso) toggleStartStop(); lnkOk(); return; }
   if (!strcmp(cmd, "S")) {                  // S striscia R G B   (0 CIELO, 1 TRAMONTO, 2 ALBA)
-    if (!lnkNumero(s, a, 0, 2) || !lnkNumero(s, b, 0, 255) || !lnkNumero(s, c, 0, 255) || !lnkNumero(s, d, 0, 255)) { lnkErr(F("arg")); return; }
+    // S 3 intero centesimi 0: stelle e costellazioni come nella posizione del ciclo
+    // intero.centesimi (0..100), con il file salvato; continuano a scintillare (loop)
+    if (!lnkNumero(s, a, 0, 3) || !lnkNumero(s, b, 0, 255) || !lnkNumero(s, c, 0, 255) || !lnkNumero(s, d, 0, 255)) { lnkErr(F("arg")); return; }
+    if (a == 3 && (b > 100 || c > 99)) { lnkErr(F("arg")); return; }
     if (!lnkPerTest()) return;
-    if (a == 0) setCielo(b, c, d); else if (a == 1) setTramonto(b, c, d); else setAlba(b, c, d);
+    if (a == 3) {
+      webStellePos = b + c / 100.0f; if (webStellePos > 100.0f) webStellePos = 100.0f;
+      stelleAPosizione(webStellePos); webStelleMs = millis();
+    } else if (a == 0) setCielo(b, c, d); else if (a == 1) setTramonto(b, c, d); else setAlba(b, c, d);
     lnkOk(); return;
   }
   if (!strcmp(cmd, "P") || !strcmp(cmd, "PA")) {   // P catena pixel 0/1  |  PA catena 0/1  (0 STELLE_01, 1 STELLE_02)
@@ -3125,6 +3140,7 @@ void lnkComando(char *riga) {
     if (!tutti && (!lnkNumero(s, b, 0, (long)n - 1))) { lnkErr(F("arg")); return; }
     if (!lnkNumero(s, c, 0, 1)) { lnkErr(F("arg")); return; }
     if (!lnkPerTest()) return;
+    webStellePos = -1.0f;                   // di nuovo pixel per pixel
     for (uint16_t i = 0; i < n; i++) {
       if (!tutti && i != b) continue;
       if (c) webPixel[a][i >> 3] |= (uint8_t)(1 << (i & 7)); else webPixel[a][i >> 3] &= (uint8_t)~(1 << (i & 7));
@@ -3135,6 +3151,7 @@ void lnkComando(char *riga) {
   if (!strcmp(cmd, "PC")) {                 // PC R G B: colore dei pixel accesi
     if (!lnkNumero(s, a, 0, 255) || !lnkNumero(s, b, 0, 255) || !lnkNumero(s, c, 0, 255)) { lnkErr(F("arg")); return; }
     if (!lnkPerTest()) return;
+    webStellePos = -1.0f;
     webPixelColore = rgb((uint8_t)a, (uint8_t)b, (uint8_t)c);
     webPixelMostra(0); webPixelMostra(1);
     lnkOk(); return;
@@ -3801,6 +3818,12 @@ void loop() {
       Serial.println(F("STOP (START breve = PLAY)"));
     }
     return;
+  }
+
+  // ----- test da web con le stelle a una posizione del ciclo ("S 3"): continuano a scintillare -----
+  if (testInCorso && testWeb && webStellePos >= 0.0f && millis() - webStelleMs >= 40UL) {
+    webStelleMs = millis();
+    stelleAPosizione(webStellePos);
   }
 
   // ----- passo "potenziometro" del test: il display segue la manopola -----

@@ -84,6 +84,8 @@ float percentualeFase(float, Fase) { return 50.0f; }
 void setCielo(uint8_t r, uint8_t g, uint8_t b) { rgbCieloR = r; rgbCieloG = g; rgbCieloB = b; }
 void setTramonto(uint8_t r, uint8_t g, uint8_t b) { rgbTramontoR = r; rgbTramontoG = g; rgbTramontoB = b; }
 void setAlba(uint8_t r, uint8_t g, uint8_t b) { rgbAlbaR = r; rgbAlbaG = g; rgbAlbaB = b; }
+float stellePos = -1.0f; int stelleChiamate = 0;   // "S 3": stars at a cycle position
+void stelleAPosizione(float p) { stellePos = p; stelleChiamate++; }
 void scriviRele(uint8_t i, bool on) { if (on) releStato |= (uint16_t)(1U << i); else releStato &= (uint16_t)~(1U << i); }
 void spegniRele() { for (uint8_t i = 0; i < 16; i++) scriviRele(i, false); }
 void tuttoSpento() { setCielo(0, 0, 0); setTramonto(0, 0, 0); setAlba(0, 0, 0); }

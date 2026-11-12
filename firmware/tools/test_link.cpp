@@ -110,6 +110,8 @@ float percentualeFase(float, Fase) { return 50.0f; }
 void setCielo(uint8_t r, uint8_t g, uint8_t b) { rgbCieloR = r; rgbCieloG = g; rgbCieloB = b; }
 void setTramonto(uint8_t r, uint8_t g, uint8_t b) { rgbTramontoR = r; rgbTramontoG = g; rgbTramontoB = b; }
 void setAlba(uint8_t r, uint8_t g, uint8_t b) { rgbAlbaR = r; rgbAlbaG = g; rgbAlbaB = b; }
+float stellePos = -1.0f; int stelleChiamate = 0;   // "S 3": stars at a cycle position
+void stelleAPosizione(float p) { stellePos = p; stelleChiamate++; }
 void scriviRele(uint8_t i, bool on) { if (on) releStato |= (uint16_t)(1U << i); else releStato &= (uint16_t)~(1U << i); }
 void spegniRele() { for (uint8_t i = 0; i < 16; i++) scriviRele(i, false); }
 void tuttoSpento() { setCielo(0, 0, 0); setTramonto(0, 0, 0); setAlba(0, 0, 0); stelle01.clear(); stelle02.clear(); }
@@ -241,7 +243,13 @@ int main() {
   CHECK(ok(cmd("@T")) && testInCorso && testWeb);
   CHECK(ok(cmd("@S 0 10 20 30")) && rgbCieloR == 10 && rgbCieloG == 20 && rgbCieloB == 30);
   CHECK(ok(cmd("@S 2 255 0 1")) && rgbAlbaR == 255 && rgbAlbaB == 1);
-  CHECK(cmd("@S 3 1 1 1")[0] == "@ERR arg" && cmd("@S 0 1 1")[0] == "@ERR arg" && cmd("@S 0 1 1 256")[0] == "@ERR arg");
+  CHECK(cmd("@S 4 1 1 1")[0] == "@ERR arg" && cmd("@S 0 1 1")[0] == "@ERR arg" && cmd("@S 0 1 1 256")[0] == "@ERR arg");
+  // S 3: stars at a cycle position (integer, hundredths); P / PA / PC go back to pixel mode
+  CHECK(ok(cmd("@S 3 62 50 0")) && webStellePos == 62.5f && stellePos == 62.5f);
+  CHECK(cmd("@S 3 101 0 0")[0] == "@ERR arg" && cmd("@S 3 50 100 0")[0] == "@ERR arg" && webStellePos == 62.5f);
+  CHECK(ok(cmd("@S 3 100 0 0")) && webStellePos == 100.0f);
+  CHECK(ok(cmd("@P 0 5 1")) && webStellePos < 0);
+  CHECK(ok(cmd("@S 3 0 0 0")) && webStellePos == 0.0f && ok(cmd("@PC 70 50 27")) && webStellePos < 0);
   CHECK(ok(cmd("@R 3 1")) && releStato == 4);
   CHECK(ok(cmd("@R 16 1")) && releStato == 0x8004 && cmd("@R 17 1")[0] == "@ERR arg");
   CHECK(ok(cmd("@R 3 0")) && releStato == 0x8000);
