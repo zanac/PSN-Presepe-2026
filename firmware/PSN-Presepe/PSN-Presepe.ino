@@ -431,6 +431,8 @@ void cfgDefault(PresepeConfig &c) {
   c.fastboot = 1;   // dalla release 038 l'avvio rapido e' il predefinito
   c.beepHz = 900; c.beepMs = 90; c.debugMs = 5000UL;
   // [WIFI] spento: la scheda si comporta come un Arduino Mega senza WiFi.
+  // Resta spento anche senza microSD (nessun dato sui pin 14/15 di un Mega senza ESP8266):
+  // il file di esempio invece lo accende (abilitato = 3).
   c.wifiAbilitato = 0;
   strcpy(c.wifiNome, "presepe");
   // [ACCESS_POINT] pronto all'uso: rete "Presepe", password presepe2026, http://192.168.4.1
@@ -3492,8 +3494,8 @@ const char INI_PREDEFINITO[] PROGMEM =
   ";               una_alla_volta salendo entrano una dopo l'altra (prima STELLE_01 poi\n"
   ";                              STELLE_02, in ordine di numero), scendendo escono al contrario\n"
   ";               scintilla      tutte insieme, e ogni stella scintilla come le altre\n"
-  "; Per usarle togli il ; davanti alle righe di una costellazione. Gli esempi sono teorici:\n"
-  "; metti i numeri delle stelle del tuo cielo.\n"
+  "; La Cometa qui sotto e' attiva; l'Orsa maggiore e' un esempio teorico: per usarla togli\n"
+  "; il ; davanti alle sue righe e metti i numeri delle stelle del tuo cielo.\n"
   ";\n"
   "; [COSTELLAZIONE]\n"
   "; nome       = Orsa maggiore\n"
@@ -3503,14 +3505,14 @@ const char INI_PREDEFINITO[] PROGMEM =
   "; spegni     = ALBA 20 - ALBA 70\n"
   "; modo       = una_alla_volta\n"
   ";\n"
-  "; [COSTELLAZIONE]\n"
-  "; nome       = Cometa\n"
-  "; stelle     = 02:20-24\n"
-  "; luminosita = 140\n"
-  "; colore     = 100,90,60\n"
-  "; accendi    = NOTTE 0 - NOTTE 30\n"
-  "; spegni     = ALBA 0 - ALBA 40\n"
-  "; modo       = scintilla\n"
+  "[COSTELLAZIONE]\n"
+  "nome       = Cometa\n"
+  "stelle     = 01:37, 01:39-41, 01:43-47, 01:49-50\n"
+  "luminosita = 140\n"
+  "colore     = 100,90,60\n"
+  "accendi    = CREPUSCOLO 30 - NOTTE 0      ; dal 30 % del crepuscolo, piena a inizio notte\n"
+  "spegni     = ALBA 0 - ALBA 100            ; si spegne piano durante tutta l'alba\n"
+  "modo       = scintilla\n"
   "\n"
   "[SISTEMA]\n"
   "; Avvio rapido. 1 = dopo la schermata iniziale \"by Vanni\" (3 s, sempre presente:\n"
@@ -3550,9 +3552,9 @@ const char INI_PREDEFINITO[] PROGMEM =
   ";     Con ssid vuoto apre subito l'access point.\n"
   "; Se SSID o password contengono ; # oppure spazi all'inizio o alla fine, scrivili\n"
   "; tra virgolette:  password = \"la;mia#password\"   (le virgolette non sono comprese).\n"
-  "abilitato = 0\n"
-  "ssid =                ; nome della rete WiFi di casa (massimo 32 caratteri)\n"
-  "password =            ; password della rete: 8..63 caratteri, vuota = rete aperta\n"
+  "abilitato = 3\n"
+  "ssid = wifi_presepe   ; nome della rete WiFi di casa (massimo 32 caratteri)\n"
+  "password = presepe2026 ; password della rete: 8..63 caratteri, vuota = rete aperta\n"
   "nome = presepe        ; nome in rete: http://presepe.local (lettere, numeri e -), vale per 1, 2 e 3\n"
   "\n"
   "[ACCESS_POINT]\n"

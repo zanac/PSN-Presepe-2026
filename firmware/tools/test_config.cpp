@@ -16,6 +16,15 @@ static bool sameScenography(const PresepeConfig &a, const PresepeConfig &b) {
   PresepeConfig x = a, y = b;   // ignore read-status bookkeeping
   x.sdStato = y.sdStato = 0; x.righeLette = y.righeLette = 0; x.errori = y.errori = 0;
   x.primaRigaErrata = y.primaRigaErrata = 0; x.eventiDaFile = y.eventiDaFile = 0;
+  // WiFi on and constellations live only in the file (the shipped one has abilitato = 3 with
+  // its network and the Cometa; the defaults keep WiFi off and have no constellation)
+  x.wifiAbilitato = y.wifiAbilitato = 0;
+  std::memset(x.wifiSsid, 0, sizeof(x.wifiSsid)); std::memset(y.wifiSsid, 0, sizeof(y.wifiSsid));
+  std::memset(x.wifiPassword, 0, sizeof(x.wifiPassword)); std::memset(y.wifiPassword, 0, sizeof(y.wifiPassword));
+  // constellations live only in the file (the shipped one has the Cometa; the defaults have none)
+  x.numCostellazioni = y.numCostellazioni = 0;
+  std::memset(x.cost, 0, sizeof(x.cost)); std::memset(y.cost, 0, sizeof(y.cost));
+  std::memset(x.costStella, 0, sizeof(x.costStella)); std::memset(y.costStella, 0, sizeof(y.costStella));
   for (int s = 0; s < CFG_NUM_STRISCE; s++) x.tappeDaFile[s] = y.tappeDaFile[s] = 0;
   return std::memcmp(&x, &y, sizeof(x)) == 0;
 }
@@ -44,7 +53,12 @@ int main(int argc, char **argv) {
     }
     PresepeConfig e; cfgDefault(e); cfgParseBuffer(e, u.c_str());
     CHECK(e.errori == 0 && e.numCostellazioni == 2 && e.cost[0].n == 7 && e.cost[0].modo == COST_UNA_ALLA_VOLTA &&
-          e.cost[1].n == 5 && e.cost[1].haColore && e.cost[1].modo == COST_SCINTILLA);
+          e.cost[1].n == 11 && e.cost[1].haColore && e.cost[1].modo == COST_SCINTILLA);
+    // as shipped: the Cometa is active (11 stars of STELLE_01), up from 30 % of the dusk to the night
+    CHECK(c.wifiAbilitato == 3 && std::strcmp(c.wifiSsid, "wifi_presepe") == 0 && std::strcmp(c.wifiPassword, "presepe2026") == 0);
+    CHECK(c.numCostellazioni == 1 && c.cost[0].n == 11 && c.cost[0].n0 == 11 && cfgCost(c, 0, 36) == 1 && cfgCost(c, 0, 37) == 0 &&
+          cfgCost(c, 0, 49) == 1 && c.cost[0].acc[0].fase == CFG_CREPUSCOLO && c.cost[0].acc[0].pct == 30 && c.cost[0].acc[1].fase == CFG_NOTTE &&
+          c.cost[0].sp[0].fase == CFG_ALBA && c.cost[0].sp[1].pct == 100);
   }
 
   // 3. custom values, CRLF, case, names, Grp_ syntax, forcing, both star chains
